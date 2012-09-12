@@ -10,6 +10,7 @@
  *		-h displaying hexadecimal security descriptors within a file
  *		-r recursing in a directory
  *		-s setting backed-up NTFS ACLs
+ *		-u getting a user mapping proposal
  *		-v verbose (very verbose if set twice)
  *	   also, if compile-time option is set
  *		-t run internal tests (with no access to storage)
@@ -198,6 +199,10 @@
  *  Jul 2012, version 1.3.24
  *     - added self-tests for authenticated users
  *     - added display of ace-inherited flag
+ *     - made runnable on OpenIndiana
+ *
+ *  Aug 2012, version 1.4.0
+ *     - added an option for user mapping proposal
  */
 
 /*
@@ -221,7 +226,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.24"
+#define AUDT_VERSION "1.4.0"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -477,7 +482,9 @@ unsigned int getfull(char*, const char*);
 BOOL updatefull(const char *name, DWORD flags, char *attr);
 BOOL setfull(const char*, int, BOOL);
 BOOL singleshow(const char*);
-void showmounted(const char*);
+BOOL proposal(const char*, const char*);
+BOOL showmounted(const char*);
+BOOL processmounted(const char*);
 BOOL recurseshow(const char*);
 BOOL singleset(const char*, int);
 BOOL recurseset(const char*, int);
@@ -492,6 +499,7 @@ BOOL iterate(RECURSE, const char*, mode_t);
 #else
 BOOL backup(const char*, const char*);
 BOOL listfiles(const char*, const char*);
+BOOL mapproposal(const char*, const char*);
 #endif
 #if POSIXACLS
 BOOL setfull_posix(const char *, const struct POSIX_SECURITY*, BOOL);
@@ -639,6 +647,7 @@ BOOL opt_e;	/* restore extra (currently windows attribs) */
 BOOL opt_h;	/* display an hexadecimal descriptor in a file */
 BOOL opt_r;	/* recursively apply to subdirectories */
 BOOL opt_s;	/* restore NTFS ACLs */
+BOOL opt_u;	/* user mapping proposal */
 #if SELFTESTS & !USESTUBS
 BOOL opt_t;	/* run self-tests */
 #endif
@@ -4648,6 +4657,69 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 	return (err);
 }
 
+BOOL proposal(const char *name, const char *attr)
+{
+	int uoff, goff;
+	int i;
+	u64 uauth, gauth;
+	int ucnt, gcnt;
+	int uid, gid;
+	BOOL err;
+
+	err = FALSE;
+#ifdef WIN32
+	uid = gid = 0;
+#else
+	uid = getuid();
+	gid = getgid();
+#endif
+	uoff = get4l(attr,4);
+	uauth = get6h(attr,uoff+2);
+	ucnt = attr[uoff+1] & 255;
+	goff = get4l(attr,8);
+	gauth = get6h(attr,goff+2);
+	gcnt = attr[goff+1] & 255;
+
+	if ((ucnt == 5) && (gcnt == 5)
+	    && (uauth == 5) && (gauth == 5)
+	    && (get4l(attr,uoff+8) == 21) && (get4l(attr,goff+8) == 21)) {
+		printf("# User mapping proposal\n");
+		if (uid)
+			printf("%d::",uid);
+		else
+			printf("user::");
+		printf("S-%d-%llu",attr[uoff] & 255,uauth);
+		for (i=0; i<ucnt; i++)
+			printf("-%lu",get4l(attr,uoff+8+4*i));
+		printf("\n");
+		if (gid)
+			printf(":%d:",gid);
+		else
+			printf(":group:");
+		printf("S-%d-%llu",attr[goff] & 255,gauth);
+		for (i=0; i<gcnt; i++)
+			printf("-%lu",get4l(attr,goff+8+4*i));
+		printf("\n");
+			/* generic rule, based on group */
+		printf("::S-%d-%llu",attr[goff] & 255,gauth);
+		for (i=0; i<gcnt-1; i++)
+			printf("-%lu",get4l(attr,goff+8+4*i));
+		printf("-10000\n");
+		if (!uid || !gid) {
+			printf("# Please replace \"user\" and \"group\" by the uid and gid\n");
+			printf("# of the Linux owner and group of ");
+			printname(stdout,name);
+			printf("\n");
+		}
+	} else {
+		printf("** Not possible : ");
+		printname(stdout,name);
+		printf(" was not created by a Windows user\n");
+		err = TRUE;
+	}
+	return (err);
+}
+
 #ifdef WIN32
 
 /*
@@ -4880,6 +4952,31 @@ BOOL singleshow(const char *fullname)
 		printf("\n");
 		printerror(stdout);
 		errors++;
+		err = TRUE;
+	}
+	return (err);
+}
+
+BOOL mapproposal(const char *fullname)
+{
+	char attr[256];
+	ULONG attrsz;
+	int attrib;
+	int err;
+
+	err = FALSE;
+	attrsz = 0;
+	attrib = GetFileAttributesW((LPCWSTR)fullname);
+	if ((attrib != INVALID_FILE_ATTRIBUTES)
+	    && GetFileSecurityW((LPCWSTR)fullname,
+				OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION,
+				(char*)attr,256,&attrsz)) {
+		err = proposal(fullname,attr);
+	} else { 
+		printf("** Could not access ");
+		printname(stdout,fullname);
+		printf("\n");
+		printerror(stdout);
 		err = TRUE;
 	}
 	return (err);
@@ -5273,7 +5370,7 @@ static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, si
  *		   Display all the parameters associated to a mounted file
  */
 
-void showmounted(const char *fullname)
+BOOL showmounted(const char *fullname)
 {
 
 	static char attr[MAXATTRSZ];
@@ -5289,7 +5386,9 @@ void showmounted(const char *fullname)
 	u32 attrib;
 	int level;
 	BOOL isdir;
+	BOOL err;
 
+	err = FALSE;
 	if (!stat(fullname,&st)) {
 		isdir = S_ISDIR(st.st_mode);
 		printf("%s ",(isdir ? "Directory" : "File"));
@@ -5360,21 +5459,65 @@ void showmounted(const char *fullname)
 				if (mapped)
 					ntfs_free_mapping(context.mapping);
 #endif
-			} else
+			} else {
 				printf("Descriptor fails sanity check\n");
+				errors++;
+			}
 		} else {
 			printf("** Could not get the NTFS ACL, check whether file is on NTFS\n");
 			errors++;
 		}
-	} else
+	} else {
 		printf("%s not found\n",fullname);
+		err = TRUE;
+	}
+	return (err);
+}
+
+BOOL processmounted(const char *fullname)
+{
+
+	static char attr[MAXATTRSZ];
+	struct stat st;
+	int attrsz;
+	BOOL err;
+
+	err = FALSE;
+	if (!opt_u)
+		err = showmounted(fullname);
+	else
+	if (!stat(fullname,&st)) {
+		attrsz = ntfs_getxattr(fullname,"system.ntfs_acl",attr,MAXATTRSZ);
+		if (attrsz > 0) {
+			if (opt_v) {
+				hexdump(attr,attrsz,8);
+				printf("Computed hash : 0x%08lx\n",
+					(unsigned long)hash((le32*)attr,attrsz));
+			}
+			if (ntfs_valid_descr(attr,attrsz)) {
+				err = proposal(fullname, attr);
+			} else {
+				printf("*** Descriptor fails sanity check\n");
+				errors++;
+			}
+		} else {
+			printf("** Could not get the NTFS ACL, check whether file is on NTFS\n");
+			errors++;
+		}
+	} else {
+		printf("%s not found\n",fullname);
+		err = TRUE;
+	}
+	return (err);
 }
 
 #else /* HAVE_SETXATTR */
 
-void showmounted(const char *fullname __attribute__((unused)))
+BOOL processmounted(const char *fullname __attribute__((unused)))
 {
-	fprintf(stderr,"Not possible on this configuration\n");
+	fprintf(stderr,"Not possible on this configuration,\n");
+	fprintf(stderr,"you have to use an unmounted partition\n");
+	return (TRUE);
 }
 
 #endif /* HAVE_SETXATTR */
@@ -5671,6 +5814,47 @@ BOOL listfiles(const char *volume, const char *root)
 				printf("%d security keys\n",count);
 			} else
 				err = singleshow(root);
+			close_volume(volume);
+		} else {
+			fprintf(stderr,"Could not open volume %s\n",volume);
+			printerror(stdout);
+			err = TRUE;
+		}
+		close_security_api();
+	} else {
+		if (getuid())
+			fprintf(stderr,"This is only possible as root\n");
+		else
+			fprintf(stderr,"Could not open security API\n");
+		err = TRUE;
+	}
+	return (err);
+}
+
+BOOL mapproposal(const char *volume, const char *name)
+{
+	BOOL err;
+	u32 attrsz;
+	int securindex;
+	char attr[256]; /* header (20) and a couple of SIDs (max 40 each) */
+
+	err = FALSE;
+	if (!getuid() && open_security_api()) {
+		if (open_volume(volume,MS_RDONLY)) {
+
+			attrsz = 0;
+			securindex = ntfs_get_file_security(ntfs_context,name,
+					OWNER_SECURITY_INFORMATION
+					    | GROUP_SECURITY_INFORMATION,
+					(char*)attr,MAXATTRSZ,&attrsz);
+			if (securindex)
+				err = proposal(name,attr);
+			else {
+				fprintf(stderr,"*** Could not get the ACL of %s\n",
+						name);
+				printerror(stdout);
+				errors++;
+			}
 			close_volume(volume);
 		} else {
 			fprintf(stderr,"Could not open volume %s\n",volume);
@@ -6718,7 +6902,7 @@ int getoptions(int argc, char *argv[])
 
 	opt_a = FALSE;
 	opt_b = FALSE;
-   opt_e = FALSE;
+	opt_e = FALSE;
 	opt_h = FALSE;
 #if FORCEMASK
 	opt_m = FALSE;
@@ -6728,6 +6912,7 @@ int getoptions(int argc, char *argv[])
 #if SELFTESTS & !USESTUBS
 	opt_t = FALSE;
 #endif
+	opt_u = FALSE;
 	opt_v = 0;
 	xarg = 1;
 	err = FALSE;
@@ -6767,6 +6952,9 @@ int getoptions(int argc, char *argv[])
 					opt_t = TRUE;
 					break;
 #endif
+				case 'u' :
+					opt_u = TRUE;
+					break;
 				case 'v' :
 					opt_v++;
 					break;
@@ -6778,7 +6966,7 @@ int getoptions(int argc, char *argv[])
 	narg = argc - xarg;
 #ifdef WIN32
 	if (   ((opt_h || opt_s) && (narg > 1))
-	    || ((opt_r || opt_b) && ((narg < 1) || (narg > 2)))
+	    || ((opt_r || opt_b || opt_u) && ((narg < 1) || (narg > 2)))
 #if SELFTESTS & !USESTUBS
 	    || (opt_t && (narg > 0))
 #endif
@@ -6812,6 +7000,8 @@ int getoptions(int argc, char *argv[])
 		fprintf(stderr,"	set the security parameters of file to perms\n");
 		fprintf(stderr,"   secaudit -r[v] perms directory\n");
 		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+		fprintf(stderr,"   secaudit -u file\n");
+		fprintf(stderr,"	get a user mapping proposal applicable to file\n");
 #if POSIXACLS
 		fprintf(stderr,"   Note: perms can be an octal mode or a Posix ACL description\n");
 #else
@@ -6822,12 +7012,13 @@ int getoptions(int argc, char *argv[])
 #else
 	if (   (opt_h && (narg > 1))
 	    || (opt_a && (narg != 1))
-	    || ((opt_r || opt_b || opt_s) && ((narg < 1) || (narg > 3)))
+	    || ((opt_r || opt_b || opt_s || opt_u)
+			&& ((narg < 1) || (narg > 3)))
 #if SELFTESTS & !USESTUBS
 	    || (opt_t && (narg > 0))
 #endif
 	    || (opt_e && !opt_s)
-	    || (!opt_h && !opt_a && !opt_r && !opt_b && !opt_s
+	    || (!opt_h && !opt_a && !opt_r && !opt_b && !opt_s && !opt_u
 #if SELFTESTS & !USESTUBS
 		&& !opt_t
 #endif
@@ -6861,8 +7052,12 @@ int getoptions(int argc, char *argv[])
 		fprintf(stderr,"	set the security parameters of file to perms\n");
 		fprintf(stderr,"   secaudit -r[v] volume perms directory\n");
 		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+		fprintf(stderr,"   secaudit -u volume file\n");
+		fprintf(stderr,"	get a user mapping proposal applicable to file\n");
 #ifdef HAVE_SETXATTR
-		fprintf(stderr," special case, does not require being root :\n");
+		fprintf(stderr," special cases, do not require being root :\n");
+		fprintf(stderr,"   secaudit -u mounted-file\n");
+		fprintf(stderr,"	get a user mapping proposal applicable to mounted file\n");
 		fprintf(stderr,"   secaudit [-v] mounted-file\n");
 		fprintf(stderr,"	display the security parameters of a mounted file\n");
 #endif
@@ -7065,23 +7260,27 @@ char *argv[];
 					filename = (char*)malloc(2*size + 2);
 					if (filename) {
 						makeutf16(filename,argv[xarg]);
+						if (opt_u) {
+							cmderr = mapproposal(filename);
+						} else {
 #if POSIXACLS
-						if (local_build_mapping(context.mapping,filename)) {
-							printf("*** Could not get user mapping data\n");
-							warnings++;
-						}
+							if (local_build_mapping(context.mapping,filename)) {
+								printf("*** Could not get user mapping data\n");
+								warnings++;
+							}
 #endif
-						if (opt_b)
-							cmderr = backup(filename);
-						else {
-							if (opt_r)
-								cmderr = listfiles(filename);
-							else
-								cmderr = singleshow(filename);
-						}
+							if (opt_b)
+								cmderr = backup(filename);
+							else {
+								if (opt_r)
+									cmderr = listfiles(filename);
+								else
+									cmderr = singleshow(filename);
+							}
 #if POSIXACLS
-						ntfs_free_mapping(context.mapping);
+							ntfs_free_mapping(context.mapping);
 #endif
+						}
 						free(filename);
 					} else {
 						fprintf(stderr,"No more memory\n");
@@ -7195,7 +7394,8 @@ char *argv[];
 			printf("** %u %s found\n",errors,
 				(errors > 1 ? "errors were" : "error was"));
 		else
-			printf("No errors were found\n");
+			if (!cmderr)
+				printf("No errors were found\n");
 		if (!isatty(1)) {
 			fflush(stdout);
 			if (warnings)
@@ -7280,7 +7480,7 @@ int main(int argc, char *argv[])
 							if (opt_s)
 								cmderr = dorestore(argv[xarg],stdin);
 							else
-								showmounted(argv[xarg]);
+								cmderr = processmounted(argv[xarg]);
 			break;
 		case 2 :
 			if (opt_b)
@@ -7297,7 +7497,10 @@ int main(int argc, char *argv[])
 						cmderr = TRUE;
 					}
 				} else
-					cmderr = listfiles(argv[xarg],argv[xarg+1]);
+					if (opt_u)
+						cmderr = mapproposal(argv[xarg],argv[xarg+1]);
+					else
+						cmderr = listfiles(argv[xarg],argv[xarg+1]);
 			break;
 		case 3 :
 			p = argv[xarg+1];
