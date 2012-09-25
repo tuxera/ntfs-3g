@@ -93,8 +93,9 @@ static const char *corrupt_volume_msg =
 "for more details.\n";
 
 static const char *hibernated_volume_msg =
-"The NTFS partition is hibernated. Please resume and shutdown Windows\n"
-"properly, or mount the volume read-only with the 'ro' mount option.\n";
+"The NTFS partition is in an unsafe state. Please resume and shutdown\n"
+"Windows fully (no hibernation or fast restarting), or mount the volume\n"
+"read-only with the 'ro' mount option.\n";
 
 static const char *unclean_journal_msg =
 "Write access is denied because the disk wasn't safely powered\n"
@@ -660,6 +661,24 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 	
 	if (!ntfs_check_logfile(na, &rp) || !ntfs_is_logfile_clean(na, rp))
 		err = EOPNOTSUPP;
+		/*
+		 * If the latest restart page was identified as version
+		 * 2.0, then Windows may have kept a cached copy of
+		 * metadata for fast restarting, and we should not mount.
+		 * Hibernation will be seen the same way on a non
+		 * Windows-system partition, so we have to use the same
+		 * error code (EPERM).
+		 * The restart page may also be identified as version 2.0
+		 * when access to the file system is terminated abruptly
+		 * by unplugging or power cut, so mounting is also rejected
+		 * after such an event.
+		 */
+	if (rp
+	    && (rp->major_ver == const_cpu_to_le16(2))
+	    && (rp->minor_ver == const_cpu_to_le16(0))) {
+		ntfs_log_error("Metadata kept in Windows cache, refused to mount.\n");
+		err = EPERM;
+	}
 	free(rp);
 	ntfs_attr_close(na);
 out:	
@@ -1212,7 +1231,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		    ntfs_volume_check_hiberfile(vol, 1) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_logfile(vol) < 0) {
-			if (!(flags & MS_RECOVER))
+			/* Always reject cached metadata for now */
+			if (!(flags & MS_RECOVER) || (errno == EPERM))
 				goto error_exit;
 			ntfs_log_info("The file system wasn't safely "
 				      "closed on Windows. Fixing.\n");
@@ -1708,6 +1728,10 @@ int ntfs_volume_error(int err)
 			ret = NTFS_VOLUME_CORRUPT;
 			break;
 		case EPERM:
+			/*
+			 * Hibernation and fast restarting are seen the
+			 * same way on a non Windows-system partition.
+			 */
 			ret = NTFS_VOLUME_HIBERNATED;
 			break;
 		case EOPNOTSUPP:

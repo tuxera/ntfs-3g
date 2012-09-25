@@ -36,6 +36,22 @@ a few differences mentioned below in relevant options descriptions.
 .PP
 The \fIvolume\fR to be mounted can be either a block device or 
 an image file.
+.SS Windows hibernation and fast restarting
+On computers which can be dual-booted into Windows or Linux, Windows has
+to be fully shut down before booting into Linux, otherwise the NTFS file
+systems on internal disks may be left in an inconsistent state and changes
+made by Linux may be ignored by Windows.
+.P
+So, Windows may not be left in hibernation when starting Linux, in order
+to avoid inconsistencies. Moreover, the fast restart feature available on
+recent Windows systems has to be disabled. This can be achieved by issuing
+as an Administrator the Windows command which disables both
+hibernation and fast restarting :
+.RS
+.sp
+powercfg /h off
+.sp
+.RE
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process, and everybody has
