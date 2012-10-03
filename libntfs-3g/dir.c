@@ -2277,6 +2277,8 @@ ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
 /*
  *		Get a DOS name for a file in designated directory
  *
+ *	Not allowed if there are several non-dos names (EMLINK)
+ *
  *	Returns size if found
  *		0 if not found
  *		-1 if there was an error (described by errno)
@@ -2285,6 +2287,7 @@ ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
 static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 {
 	size_t outsize = 0;
+	int namecount = 0;
 	FILE_NAME_ATTR *fn;
 	ntfs_attr_search_ctx *ctx;
 
@@ -2299,6 +2302,8 @@ static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 		fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
 				le16_to_cpu(ctx->attr->value_offset));
 
+		if (fn->file_name_type != FILE_NAME_DOS)
+			namecount++;
 		if ((fn->file_name_type & FILE_NAME_DOS)
 		    && (MREF_LE(fn->parent_directory) == dnum)) {
 				/*
@@ -2313,12 +2318,18 @@ static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 		}
 	}
 	ntfs_attr_put_search_ctx(ctx);
+	if ((outsize > 0) && (namecount > 1)) {
+		outsize = -1;
+		errno = EMLINK; /* this error implies there is a dos name */
+	}
 	return (outsize);
 }
 
 
 /*
  *		Get a long name for a file in designated directory
+ *
+ *	Not allowed if there are several non-dos names (EMLINK)
  *
  *	Returns size if found
  *		0 if not found
@@ -2328,6 +2339,7 @@ static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 {
 	size_t outsize = 0;
+	int namecount = 0;
 	FILE_NAME_ATTR *fn;
 	ntfs_attr_search_ctx *ctx;
 
@@ -2343,6 +2355,8 @@ static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 		fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
 				le16_to_cpu(ctx->attr->value_offset));
 
+		if (fn->file_name_type != FILE_NAME_DOS)
+			namecount++;
 		if ((fn->file_name_type & FILE_NAME_WIN32)
 		    && (MREF_LE(fn->parent_directory) == dnum)) {
 				/*
@@ -2352,6 +2366,10 @@ static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 			outsize = fn->file_name_length;
 			memcpy(longname,fn->file_name,outsize*sizeof(ntfschar));
 		}
+	}
+	if (namecount > 1) {
+		errno = EMLINK;
+		return -1;
 	}
 		/* if not found search for POSIX names */
 	if (!outsize) {
@@ -2673,7 +2691,8 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			res = -1;
 	} else {
 		res = -1;
-		errno = ENOENT;
+		if (!longlen)
+			errno = ENOENT;
 	}
 	free(shortname);
 	if (!closed) {
@@ -2749,7 +2768,8 @@ int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 			}
 		}
 	} else {
-		errno = ENOENT;
+		if (!longlen)
+			errno = ENOENT;
 		res = -1;
 	}
 	if (!deleted) {
