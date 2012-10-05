@@ -2368,6 +2368,7 @@ static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 		}
 	}
 	if (namecount > 1) {
+		ntfs_attr_put_search_ctx(ctx);
 		errno = EMLINK;
 		return -1;
 	}
