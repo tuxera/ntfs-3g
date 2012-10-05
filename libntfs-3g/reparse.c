@@ -49,6 +49,7 @@
 #include "compat.h"
 #include "types.h"
 #include "debug.h"
+#include "layout.h"
 #include "attrib.h"
 #include "inode.h"
 #include "dir.h"
@@ -59,18 +60,6 @@
 #include "logging.h"
 #include "misc.h"
 #include "reparse.h"
-
-/* the definitions in layout.h are wrong, we use names defined in
-  http://msdn.microsoft.com/en-us/library/aa365740(VS.85).aspx
-*/
-
-#define IO_REPARSE_TAG_DFS         const_cpu_to_le32(0x8000000A)
-#define IO_REPARSE_TAG_DFSR        const_cpu_to_le32(0x80000012)
-#define IO_REPARSE_TAG_HSM         const_cpu_to_le32(0xC0000004)
-#define IO_REPARSE_TAG_HSM2        const_cpu_to_le32(0x80000006)
-#define IO_REPARSE_TAG_MOUNT_POINT const_cpu_to_le32(0xA0000003)
-#define IO_REPARSE_TAG_SIS         const_cpu_to_le32(0x80000007)
-#define IO_REPARSE_TAG_SYMLINK     const_cpu_to_le32(0xA000000C)
 
 struct MOUNT_POINT_REPARSE_DATA {      /* reparse data for junctions */
 	le16	subst_name_offset;
