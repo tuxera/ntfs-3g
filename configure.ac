@@ -210,27 +210,31 @@ case "${target}" in
 	;;
 esac
 
-AC_MSG_CHECKING([fuse compatibility])
-case "${target_os}" in
-linux*|solaris*)
-	AC_ARG_WITH(
-		[fuse],
-		[AS_HELP_STRING([--with-fuse=<internal|external>],[Select FUSE library: internal or external @<:@default=internal@:>@])],
-		,
-		[with_fuse="internal"]
-	)
-	;;
-darwin*|netbsd*|kfreebsd*-gnu)
-	with_fuse="external"
-	;;
-freebsd*)
-	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
-	;;
-*)
-	AC_MSG_ERROR([ntfs-3g can be built for Linux, FreeBSD, Mac OS X, NetBSD, and Solaris only.])
-	;;
-esac
-AC_MSG_RESULT([${with_fuse}])
+if test "x${enable_ntfs_3g}" = "xyes"; then
+	AC_MSG_CHECKING([fuse compatibility])
+	case "${target_os}" in
+	linux*|solaris*)
+		AC_ARG_WITH(
+			[fuse],
+			[AS_HELP_STRING([--with-fuse=<internal|external>],[Select FUSE library: internal or external @<:@default=internal@:>@])],
+			,
+			[with_fuse="internal"]
+		)
+		;;
+	darwin*|netbsd*|kfreebsd*-gnu)
+		with_fuse="external"
+		;;
+	freebsd*)
+		AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
+		;;
+	*)
+		AC_MSG_ERROR([ntfs-3g can be built for Linux, FreeBSD, Mac OS X, NetBSD, and Solaris only.])
+		;;
+	esac
+	AC_MSG_RESULT([${with_fuse}])
+else
+        with_fuse="none"
+fi
 
 case "${target_os}" in
 solaris*)
@@ -270,7 +274,7 @@ if test "${with_fuse}" = "internal"; then
 		[1],
 		[Define to 1 if using internal fuse]
 	)
-else
+elif test "${with_fuse}" = "external"; then
 	if test -z "$PKG_CONFIG"; then
 		AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
 	fi
