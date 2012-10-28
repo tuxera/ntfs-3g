@@ -7,6 +7,7 @@ endif
 
 libfuse_lite_la_CFLAGS=			  \
 	$(AM_CFLAGS) 			  \
+	$(LIBFUSE_LITE_CFLAGS)		  \
 	-I$(top_srcdir)/include/fuse-lite
 
 libfuse_lite_la_LIBADD  = $(LIBFUSE_LITE_LIBS)

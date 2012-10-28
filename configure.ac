@@ -274,6 +274,27 @@ if test "${with_fuse}" = "internal"; then
 		[1],
 		[Define to 1 if using internal fuse]
 	)
+
+	AC_MSG_CHECKING([Solaris OS])
+	AC_LANG_PUSH([C])
+	AC_COMPILE_IFELSE(
+		[
+			AC_LANG_SOURCE(
+				[[#if !((defined(sun) || defined(__sun)) && (defined(__SVR4) || defined(__svr4__)))]]
+				[[#error "Not a Solaris system."]]
+				[[#endif]]
+			)
+		],
+		[
+			AC_MSG_RESULT([yes])
+			LIBFUSE_LITE_CFLAGS="${LIBFUSE_LITE_CFLAGS} -std=c99 -D__SOLARIS__ -D_XOPEN_SOURCE=600 -D__EXTENSIONS__"
+			LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lxnet"
+		],
+		[
+			AC_MSG_RESULT([no])
+		]
+	)
+	AC_LANG_POP([C])
 elif test "${with_fuse}" = "external"; then
 	if test -z "$PKG_CONFIG"; then
 		AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
@@ -499,6 +520,7 @@ AC_SUBST([rootbindir])
 AC_SUBST([rootsbindir])
 AC_SUBST([rootlibdir])
 AC_SUBST([LIBNTFS_3G_VERSION])
+AC_SUBST([LIBFUSE_LITE_CFLAGS])
 AC_SUBST([LIBFUSE_LITE_LIBS])
 AC_SUBST([MKNTFS_CPPFLAGS])
 AC_SUBST([MKNTFS_LIBS])
