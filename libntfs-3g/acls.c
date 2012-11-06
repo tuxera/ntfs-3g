@@ -3171,8 +3171,10 @@ static int build_owngrp_permissions(const char *securattr,
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);
-	} else
+	} else {
 		acecnt = 0;
+		offace = 0;
+	}
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)) {
