@@ -103,9 +103,10 @@ static const char *EXEC_NAME = "ntfsclone";
 
 static const char *bad_sectors_warning_msg =
 "*************************************************************************\n"
-"* WARNING: The disk has bad sector. This means physical damage on the   *\n"
-"* disk surface caused by deterioration, manufacturing faults or other   *\n"
-"* reason. The reliability of the disk may stay stable or degrade fast.  *\n"
+"* WARNING: The disk has one or more bad sectors. This means that damage *\n"
+"* has occurred on the disk surface, possibly caused by deterioration of *\n"
+"* the physical media, manufacturing faults or other reasons. The        *\n"
+"* reliability of the disk may stay stable or degrade fast.              *\n"
 "* Use the --rescue option to efficiently save as much data as possible! *\n"
 "*************************************************************************\n";
 
