@@ -375,16 +375,46 @@ if test "x$extrapath" != "x"; then
 		MKNTFS_CPPFLAGS="$MKNTFS_CPPFLAGS -I$extrapath/include"
 		MKNTFS_LIBS="$MKNTFS_LIBS -L$extrapath/lib"
 	fi
+
+	search_for_luuid="yes"
 	AC_CHECK_HEADER([uuid/uuid.h],
-		AC_CHECK_LIB([uuid], [uuid_generate],
-			AC_DEFINE([ENABLE_UUID], 1,
-			[Define this to 1 if you want to enable generation of
-			DCE compliant UUIDs.])
-			MKNTFS_LIBS="$MKNTFS_LIBS -luuid",
-			AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.]),
-		),
-		AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.]),
+		[],
+		[
+			AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.])
+			search_for_luuid="no"
+		],
 	)
+
+	if test "x$search_for_luuid" != "xno"; then
+		# Look for uuid_generate in the standard C library.
+		AC_CHECK_FUNC([uuid_generate],
+			[
+				AC_DEFINE([ENABLE_UUID], 1,
+					[Define this to 1 if you want to enable
+					generation of DCE compliant UUIDs.])
+				search_for_luuid="no"
+			],
+			[],
+		)
+	fi
+
+	if test "x$search_for_luuid" != "xno"; then
+		# Look for uuid_generate in the 'uuid' library.
+		AC_CHECK_LIB([uuid], [uuid_generate],
+			[
+				AC_DEFINE([ENABLE_UUID], 1,
+					[Define this to 1 if you want to enable
+					generation of DCE compliant UUIDs.])
+				MKNTFS_LIBS="$MKNTFS_LIBS -luuid"
+				search_for_luuid="no"
+			],
+			[],
+		)
+	fi
+
+	if test "x$search_for_luuid" != "xno"; then
+		AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.])
+	fi
 fi
 
 # Checks for header files.
