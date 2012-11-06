@@ -1575,7 +1575,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 			u64 k = (u64)lcn + j;
 			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
 				err_exit("Cluster %llu referenced twice!\n"
-					 "You didn't shutdown your Windows"
+					 "You didn't shutdown your Windows "
 					 "properly?\n", (unsigned long long)k);
 		}
 
