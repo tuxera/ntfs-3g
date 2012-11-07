@@ -3501,13 +3501,13 @@ static int ntfs_open(const char *device)
 	ntfs_volume *vol;
         
 	if (!ctx->blkdev)
-		flags |= MS_EXCLUSIVE;
+		flags |= NTFS_MNT_EXCLUSIVE;
 	if (ctx->ro)
-		flags |= MS_RDONLY;
+		flags |= NTFS_MNT_RDONLY;
 	if (ctx->recover)
-		flags |= MS_RECOVER;
+		flags |= NTFS_MNT_RECOVER;
 	if (ctx->hiberfile)
-		flags |= MS_IGNORE_HIBERFILE;
+		flags |= NTFS_MNT_IGNORE_HIBERFILE;
 
 	ctx->vol = vol = ntfs_mount(device, flags);
 	if (!vol) {

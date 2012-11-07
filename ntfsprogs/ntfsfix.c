@@ -1419,7 +1419,7 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	NVolSetShowSysFiles(vol);
 	NVolSetShowHidFiles(vol);
 	NVolClearHideDotFiles(vol);
-	if (flags & MS_RDONLY)
+	if (flags & NTFS_MNT_RDONLY)
 		NVolSetReadOnly(vol);
 	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
@@ -1508,7 +1508,7 @@ static int fix_mount(void)
 		ntfs_log_perror("Failed to allocate device");
 		return -1;
 	}
-	flags = (opt.no_action ? MS_RDONLY : 0);
+	flags = (opt.no_action ? NTFS_MNT_RDONLY : 0);
 	vol = ntfs_volume_startup(dev, flags);
 	if (!vol) {
 		ntfs_log_info(FAILED);
@@ -1573,7 +1573,7 @@ int main(int argc, char **argv)
 		ntfs_log_perror("Failed to determine whether %s is mounted",
 				opt.volume);
 	/* Attempt a full mount first. */
-	flags = (opt.no_action ? MS_RDONLY : 0);
+	flags = (opt.no_action ? NTFS_MNT_RDONLY : 0);
 	ntfs_log_info("Mounting volume... ");
 	vol = ntfs_mount(opt.volume, flags);
 	if (vol) {

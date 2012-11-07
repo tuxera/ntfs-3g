@@ -529,7 +529,7 @@ static int parse_options(int argc, char **argv)
 			opt.infombonly++;
 			break;
 		case 'n':
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 			break;
 		case 'P':
 			opt.show_progress = 0;
@@ -568,7 +568,7 @@ static int parse_options(int argc, char **argv)
 			err++;
 		}
 		if (opt.info || opt.infombonly) {
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 		}
 		if (opt.bytes
 		    && (opt.expand || opt.info || opt.infombonly)) {
@@ -2562,11 +2562,12 @@ static ntfs_volume *check_volume(void)
 	ntfs_volume *myvol = NULL;
 
 	/*
-	 * Pass MS_FORENSIC so that the mount process does not modify the
+	 * Pass NTFS_MNT_FORENSIC so that the mount process does not modify the
 	 * volume at all.  We will do the logfile emptying and dirty setting
 	 * later if needed.
 	 */
-	if (!(myvol = ntfs_mount(opt.volume, opt.ro_flag | MS_FORENSIC))) {
+	if (!(myvol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_FORENSIC)))
+	{
 		int err = errno;
 
 		perr_printf("Opening '%s' as NTFS failed", opt.volume);

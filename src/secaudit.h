@@ -154,8 +154,8 @@ typedef int BOOL;   /* Already defined in windows.h */
 typedef u32 DWORD; /* must be 32 bits whatever the platform */
 typedef DWORD *LPDWORD;
 
-#define MS_NONE 0    /* no flag for mounting the device */
-#define MS_RDONLY 1  /* flag for mounting the device read-only */
+#define NTFS_MNT_NONE 0    /* no flag for mounting the device */
+#define NTFS_MNT_RDONLY 1  /* flag for mounting the device read-only */
 
 #endif /* WIN32 */
 

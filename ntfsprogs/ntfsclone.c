@@ -2178,7 +2178,7 @@ static s64 open_volume(void)
 {
 	s64 device_size;
 
-	mount_volume(MS_RDONLY);
+	mount_volume(NTFS_MNT_RDONLY);
 
 	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)
@@ -2448,7 +2448,7 @@ int main(int argc, char **argv)
 	   FIXME: use mount flags to avoid potential side-effects in future */
 		opt.force++;
 		ntfs_umount(vol,FALSE);
-		mount_volume(0 /*MS_NOATIME*/);
+		mount_volume(0 /*NTFS_MNT_NOATIME*/);
 	}
 
 	free(lcn_bitmap.bm);

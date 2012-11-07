@@ -68,7 +68,7 @@ static int ntfs_open(const char *device)
 	int ret = NTFS_VOLUME_OK;
 	
 	if (opts.probetype == PROBE_READONLY)
-		flags |= MS_RDONLY;
+		flags |= NTFS_MNT_RDONLY;
 
 	vol = ntfs_mount(device, flags);
 	if (!vol)

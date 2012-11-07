@@ -2009,9 +2009,9 @@ int main(int argc, char *argv[])
 		print_summary();
 
 	if (opts.info || opts.noaction)
-		flags = MS_RDONLY;
+		flags = NTFS_MNT_RDONLY;
 	if (opts.force)
-		flags |= MS_RECOVER;
+		flags |= NTFS_MNT_RECOVER;
 
 	vol = utils_mount_volume(opts.device, flags);
 	if (!vol)

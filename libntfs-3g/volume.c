@@ -466,7 +466,8 @@ error_exit:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
+ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
+		ntfs_mount_flags flags)
 {
 	LCN mft_zone_size, mft_lcn;
 	s64 br;
@@ -508,7 +509,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 #else
 	NVolClearCompression(vol);
 #endif
-	if (flags & MS_RDONLY)
+	if (flags & NTFS_MNT_RDONLY)
 		NVolSetReadOnly(vol);
 	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
@@ -887,7 +888,7 @@ static int fix_txf_data(ntfs_volume *vol)
  * @flags is an optional second parameter. The same flags are used as for
  * the mount system call (man 2 mount). Currently only the following flag
  * is implemented:
- *	MS_RDONLY	- mount volume read-only
+ *	NTFS_MNT_RDONLY	- mount volume read-only
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -898,7 +899,7 @@ static int fix_txf_data(ntfs_volume *vol)
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
+ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 {
 	s64 l;
 	ntfs_volume *vol;
@@ -1226,13 +1227,13 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
 	 */
-	if (!(flags & (MS_RDONLY | MS_FORENSIC))) {
-		if (!(flags & MS_IGNORE_HIBERFILE) && 
+	if (!(flags & (NTFS_MNT_RDONLY | NTFS_MNT_FORENSIC))) {
+		if (!(flags & NTFS_MNT_IGNORE_HIBERFILE) &&
 		    ntfs_volume_check_hiberfile(vol, 1) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_logfile(vol) < 0) {
 			/* Always reject cached metadata for now */
-			if (!(flags & MS_RECOVER) || (errno == EPERM))
+			if (!(flags & NTFS_MNT_RECOVER) || (errno == EPERM))
 				goto error_exit;
 			ntfs_log_info("The file system wasn't safely "
 				      "closed on Windows. Fixing.\n");
@@ -1321,7 +1322,7 @@ int ntfs_set_ignore_case(ntfs_volume *vol)
  * @flags is an optional second parameter. The same flags are used as for
  * the mount system call (man 2 mount). Currently only the following flags
  * is implemented:
- *	MS_RDONLY	- mount volume read-only
+ *	NTFS_MNT_RDONLY	- mount volume read-only
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1336,7 +1337,7 @@ int ntfs_set_ignore_case(ntfs_volume *vol)
  * soon as the function returns.
  */
 ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
-		unsigned long flags __attribute__((unused)))
+		ntfs_mount_flags flags __attribute__((unused)))
 {
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;

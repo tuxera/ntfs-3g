@@ -331,8 +331,8 @@
 
 #endif /* STSC */
 
-#define MS_NONE 0    /* no flag for mounting the device */
-#define MS_RDONLY 1  /* flag for mounting the device read-only */
+#define NTFS_MNT_NONE 0    /* no flag for mounting the device */
+#define NTFS_MNT_RDONLY 1  /* flag for mounting the device read-only */
 
 struct CALLBACK;
 
@@ -2869,7 +2869,7 @@ BOOL dorestore(const char *volume, FILE *fd)
 	err = FALSE;
 	if (!getuid()) {
  		if (open_security_api()) {
-			if (open_volume(volume,MS_NONE)) {
+			if (open_volume(volume,NTFS_MNT_NONE)) {
 				if (restore(fd)) err = TRUE;
 				close_volume(volume);
 			} else {
@@ -5735,7 +5735,7 @@ BOOL backup(const char *volume, const char *root)
 	now = time((time_t*)NULL);
 	txtime = ctime(&now);
 	if (!getuid() && open_security_api()) {
-		if (open_volume(volume,MS_RDONLY)) {
+		if (open_volume(volume,NTFS_MNT_RDONLY)) {
 			printf("#\n# Recursive ACL collection on %s#\n",txtime);
 			err = recurseshow(root);
 			count = 0;
@@ -5796,7 +5796,7 @@ BOOL listfiles(const char *volume, const char *root)
 	int count;
 
 	if (!getuid() && open_security_api()) {
-		if (open_volume(volume,MS_RDONLY)) {
+		if (open_volume(volume,NTFS_MNT_RDONLY)) {
 			if (opt_r) {
 				printf("\nRecursive file check\n");
 				err = recurseshow(root);
@@ -5840,7 +5840,7 @@ BOOL mapproposal(const char *volume, const char *name)
 
 	err = FALSE;
 	if (!getuid() && open_security_api()) {
-		if (open_volume(volume,MS_RDONLY)) {
+		if (open_volume(volume,NTFS_MNT_RDONLY)) {
 
 			attrsz = 0;
 			securindex = ntfs_get_file_security(ntfs_context,name,
@@ -6567,7 +6567,7 @@ BOOL audit(const char *volume)
 
 	err = FALSE;
 	if (!getuid() && open_security_api()) {
-		if (open_volume(volume,MS_RDONLY)) {
+		if (open_volume(volume,NTFS_MNT_RDONLY)) {
 			if (audit_sds(FALSE)) err = TRUE;
 			if (audit_sds(TRUE)) err = TRUE;
 			if (audit_sii()) err = TRUE;
@@ -7508,7 +7508,7 @@ int main(int argc, char *argv[])
 			pxdesc = encode_posix_acl(p);
 			if (pxdesc) {
 				if (!getuid() && open_security_api()) {
-					if (open_volume(argv[xarg],MS_NONE)) {
+					if (open_volume(argv[xarg],NTFS_MNT_NONE)) {
 						if (opt_r) {
 							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
 								securdata[i] = (struct SECURITY_DATA*)NULL;
@@ -7541,7 +7541,7 @@ int main(int argc, char *argv[])
 				cmderr = TRUE;
 			} else
 				if (!getuid() && open_security_api()) {
-					if (open_volume(argv[xarg],MS_NONE)) {
+					if (open_volume(argv[xarg],NTFS_MNT_NONE)) {
 						if (opt_r) {
 							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
 								securdata[i] = (struct SECURITY_DATA*)NULL;
