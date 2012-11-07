@@ -1832,7 +1832,7 @@ int ntfs_volume_get_free_space(ntfs_volume *vol)
  *
  * Change the label on the volume @vol to @label.
  */
-int ntfs_volume_rename(ntfs_volume *vol, ntfschar *label, int label_len)
+int ntfs_volume_rename(ntfs_volume *vol, const ntfschar *label, int label_len)
 {
 	ntfs_attr *na;
 	char *old_vol_name;
@@ -1867,7 +1867,7 @@ int ntfs_volume_rename(ntfs_volume *vol, ntfschar *label, int label_len)
 
 		/* The volume name attribute does not exist.  Need to add it. */
 		if (ntfs_attr_add(vol->vol_ni, AT_VOLUME_NAME, AT_UNNAMED, 0,
-			(u8*) label, label_len))
+			(const u8*) label, label_len))
 		{
 			err = errno;
 			ntfs_log_perror("Encountered error while adding "
