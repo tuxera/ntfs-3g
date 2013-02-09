@@ -208,7 +208,7 @@ int utils_valid_device(const char *name, int force)
 	unsigned long mnt_flags = 0;
 	struct stat st;
 
-#ifdef __CYGWIN32__
+#if defined(HAVE_WINDOWS_H) | defined(__CYGWIN32__) 
 	/* FIXME: This doesn't work for Cygwin, so just return success. */
 	return 1;
 #endif
