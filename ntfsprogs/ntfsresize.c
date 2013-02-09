@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011      Jean-Pierre Andre
+ * Copyright (c) 2011-2012 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -213,6 +213,7 @@ typedef struct {
 	int shrink;		     /* shrink = 1, enlarge = 0 */
 	s64 badclusters;	     /* num of physically dead clusters */
 	VCN mft_highest_vcn;	     /* used for relocating the $MFT */
+	runlist_element *new_mft_start; /* new first run for $MFT:$DATA */
 	struct DELAYED *delayed_runlists; /* runlists to process later */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
@@ -402,7 +403,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011       Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2012  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -723,14 +724,6 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		    err_exit("Highly fragmented $Bitmap isn't supported yet.");
 
 		supported = 1;
-
-	} else if (inode == FILE_MFT) {
-		llcn = &resize->last_mft;
-		/*
-		 *  First run of $MFT AT_DATA isn't supported yet.
-		 */
-		if (atype != AT_DATA || rl->vcn)
-			supported = 1;
 
 	} else if (NInoAttrList(resize->ni)) {
 		llcn = &resize->last_multi_mft;
@@ -1848,11 +1841,17 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 	}
 
 	hint = (resize->mref == FILE_MFTMirr) ? 1 : 0;
-	if (!(relocate_rl = alloc_cluster(&resize->lcn_bitmap, lcn_length,
-					  new_vol_size, hint)))
-		perr_exit("Cluster allocation failed for %llu:%lld",
-			  (unsigned long long)resize->mref,
-			  (long long)lcn_length);
+	if ((resize->mref == FILE_MFT)
+	    && (resize->ctx->attr->type == AT_DATA)
+	    && !run
+	    && resize->new_mft_start) {
+		relocate_rl = resize->new_mft_start;
+	} else
+		if (!(relocate_rl = alloc_cluster(&resize->lcn_bitmap,
+					lcn_length, new_vol_size, hint)))
+			perr_exit("Cluster allocation failed for %llu:%lld",
+				  (unsigned long long)resize->mref,
+				  (long long)lcn_length);
 
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
 	ntfs_log_verbose("Relocate record %7llu:0x%x:%08lld:0x%08llx:0x%08llx "
@@ -1868,7 +1867,13 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 
 	/* We don't release old clusters in the bitmap, that area isn't
 	   used by the allocator and will be truncated later on */
-	free(relocate_rl);
+
+		/* Do not free the relocated MFT start */
+	if ((resize->mref != FILE_MFT)
+	    || (resize->ctx->attr->type != AT_DATA)
+	    || run
+	    || !resize->new_mft_start)
+		free(relocate_rl);
 
 	resize->dirty_inode = DIRTY_ATTRIB;
 }
@@ -1994,7 +1999,9 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 
 static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 {
-	if (ntfs_file_record_read(resize->vol, mref, &resize->mrec, NULL)) {
+	ntfs_volume *vol = resize->vol;
+
+	if (ntfs_file_record_read(vol, mref, &resize->mrec, NULL)) {
 		/* FIXME: continue only if it make sense, e.g.
 		   MFT record not in use based on $MFT bitmap */
 		if (errno == EIO || errno == ENOENT)
@@ -2013,9 +2020,22 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 	if (resize->dirty_inode == DIRTY_INODE) {
 //		if (vol->dev->d_ops->sync(vol->dev) == -1)
 //			perr_exit("Failed to sync device");
-		if (write_mft_record(resize->vol, mref, resize->mrec))
-			perr_exit("Couldn't update record %llu",
-					(unsigned long long)mref);
+		if ((mref == FILE_MFT) && resize->new_mft_start) {
+			s64 pos;
+
+			/* write the MFT own record at its new location */
+			pos = (resize->new_mft_start->lcn
+						<< vol->cluster_size_bits)
+				+ (FILE_MFT << vol->mft_record_size_bits);
+			if (ntfs_mst_pwrite(vol->dev, pos, 1,
+					vol->mft_record_size,
+					resize->mrec) != 1)
+				perr_exit("Couldn't update MFT own record");
+		} else {
+			if (write_mft_record(vol, mref, resize->mrec))
+				perr_exit("Couldn't update record %llu",
+						(unsigned long long)mref);
+		}
 	}
 }
 
@@ -2036,6 +2056,31 @@ static void relocate_inodes(ntfs_resize_t *resize)
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
+
+		/*
+		 * If we need to relocate the first run of the MFT DATA,
+		 * do it now, to have a better chance of getting at least
+		 * 16 records in the first chunk. This is mandatory to be
+		 * later able to read an MFT extent in record 15.
+		 * Should this fail, we can stop with no damage, the volume
+		 * is still in its initial state.
+		 */
+	if (!resize->vol->mft_na->rl)
+		err_exit("Internal error : no runlist for $MFT\n");
+
+	if ((resize->vol->mft_na->rl->lcn + resize->vol->mft_na->rl->length)
+			>= resize->new_volume_size) {
+		resize->new_mft_start = alloc_cluster(&resize->lcn_bitmap,
+				resize->vol->mft_na->rl->length,
+				resize->new_volume_size, 0);
+		if (!resize->new_mft_start
+		    || (((resize->new_mft_start->length
+			<< resize->vol->cluster_size_bits)
+			    >> resize->vol->mft_record_size_bits) < 16)) {
+			err_exit("Could not allocate 16 records in"
+					" the first MFT chunk\n");
+		}
+	}
 
 	for (mref = 0; mref < (MFT_REF)nr_mft_records; mref++)
 		relocate_inode(resize, mref, 0);
@@ -2434,14 +2479,27 @@ static void truncate_badclust_file(ntfs_resize_t *resize)
  */
 static void truncate_bitmap_file(ntfs_resize_t *resize)
 {
+	ntfs_volume *vol = resize->vol;
+
 	printf("Updating $Bitmap file ...\n");
 
 	lookup_data_attr(resize->vol, FILE_Bitmap, NULL, &resize->ctx);
 	truncate_bitmap_data_attr(resize);
 
-	if (write_mft_record(resize->vol, resize->ctx->ntfs_ino->mft_no,
+	if (resize->new_mft_start) {
+		s64 pos;
+
+			/* write the MFT record at its new location */
+		pos = (resize->new_mft_start->lcn << vol->cluster_size_bits)
+			+ (FILE_Bitmap << vol->mft_record_size_bits);
+		if (ntfs_mst_pwrite(vol->dev, pos, 1,
+				vol->mft_record_size, resize->ctx->mrec) != 1)
+			perr_exit("Couldn't update $Bitmap at new location");
+	} else {
+		if (write_mft_record(vol, resize->ctx->ntfs_ino->mft_no,
 			     resize->ctx->mrec))
-		perr_exit("Couldn't update $Bitmap");
+			perr_exit("Couldn't update $Bitmap");
+	}
 
 #if CLEAN_EXIT
 	close_inode_and_context(resize->ctx);
@@ -2494,10 +2552,22 @@ static void update_bootsector(ntfs_resize_t *r)
 
 	if (r->mftmir_old) {
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
-		copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
-			      r->mftmir_rl.length);
+		/* Be sure the MFTMirr holds the updated MFT runlist */
+		if (r->new_mft_start)
+			copy_clusters(r, r->mftmir_rl.lcn,
+				 r->new_mft_start->lcn, r->mftmir_rl.length);
+		else
+			copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
+				      r->mftmir_rl.length);
 		bs.mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
 		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
+	}
+		/* Set the start of the relocated MFT */
+	if (r->new_mft_start) {
+		bs.mft_lcn = cpu_to_sle64(r->new_mft_start->lcn);
+			/* no more need for the new MFT start */
+		free(r->new_mft_start);
+		r->new_mft_start = (runlist_element*)NULL;
 	}
 
 	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
