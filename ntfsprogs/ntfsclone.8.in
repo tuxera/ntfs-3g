@@ -203,6 +203,12 @@ argument. If the
 .I SOURCE
 is '\-' then the image is read from the standard input.
 .TP
+\fB\-n\fR, \fB\-\-no\-action\fR
+Test the consistency of a saved image by simulating its restoring without
+writing anything. The NTFS data contained in the image is not tested.
+The option \fB\-\-restore\-image\fR must also be present, and the options
+\fB\-\-output\fR and \fB\-\-overwrite\fR must be omitted.
+.TP
 \fB\-\-rescue\fR
 Ignore disk read errors so disks having bad sectors, e.g. dying disks, can be
 rescued the most efficiently way, with minimal stress on them. Ntfsclone works

@@ -123,6 +123,7 @@ static struct {
 	int std_out;
 	int blkdev_out;		/* output file is block device */
 	int metadata;		/* metadata only cloning */
+	int no_action;		/* do not really restore */
 	int ignore_fs_check;
 	int rescue;
 	int save_image;
@@ -324,6 +325,7 @@ static void usage(void)
 		"    -r, --restore-image    Restore from the special image format\n"
 		"        --rescue           Continue after disk read errors\n"
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
+		"    -n, --no-action        Test restoring, without outputting anything\n"
 		"        --ignore-fs-check  Ignore the filesystem check result\n"
 		"        --new-serial       Set a new serial number\n"
 		"        --new-half-serial  Set a partial new serial number\n"
@@ -344,7 +346,7 @@ static void usage(void)
 
 static void parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhmo:O:qrst";
+	static const char *sopt = "-dfhmno:O:qrst";
 	static const struct option lopt[] = {
 #ifdef DEBUG
 		{ "debug",	      no_argument,	 NULL, 'd' },
@@ -353,6 +355,7 @@ static void parse_options(int argc, char **argv)
 		{ "force",	      no_argument,	 NULL, 'f' },
 		{ "help",	      no_argument,	 NULL, 'h' },
 		{ "metadata",	      no_argument,	 NULL, 'm' },
+		{ "no-action",	      no_argument,	 NULL, 'n' },
 		{ "output",	      required_argument, NULL, 'o' },
 		{ "overwrite",	      required_argument, NULL, 'O' },
 		{ "restore-image",    no_argument,	 NULL, 'r' },
@@ -397,6 +400,9 @@ static void parse_options(int argc, char **argv)
 		case 'm':
 			opt.metadata++;
 			break;
+		case 'n':
+			opt.no_action++;
+			break;
 		case 'O':
 			opt.overwrite++;
 		case 'o':
@@ -425,12 +431,12 @@ static void parse_options(int argc, char **argv)
 		}
 	}
 
-	if (opt.output == NULL) {
+	if (!opt.no_action && (opt.output == NULL)) {
 		err_printf("You must specify an output file.\n");
 		usage();
 	}
 
-	if (strcmp(opt.output, "-") == 0)
+	if (!opt.no_action && (strcmp(opt.output, "-") == 0))
 		opt.std_out++;
 
 	if (opt.volume == NULL) {
@@ -458,7 +464,13 @@ static void parse_options(int argc, char **argv)
 		err_exit("Saving and restoring an image at the same time "
 			 "is not supported!\n");
 
-	if (!opt.std_out) {
+	if (opt.no_action && !opt.restore_image)
+		err_exit("A restoring test requires the restore option!\n");
+
+	if (opt.no_action && opt.output)
+		err_exit("A restoring test requires not defining any output!\n");
+
+	if (!opt.no_action && !opt.std_out) {
 		struct stat st;
 
 		if (stat(opt.output, &st) == -1) {
@@ -590,10 +602,14 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 
 	while (count > 0) {
 		if (do_write) {
-			if (opt.save_image || opt.metadata_image)
-				i = fwrite(buf, 1, count, stream_out);
-			else
-				i = write(*(int *)fd, buf, count);
+			if (opt.no_action) {
+				i = count;
+			} else {
+				if (opt.save_image || opt.metadata_image)
+					i = fwrite(buf, 1, count, stream_out);
+				else
+					i = write(*(int *)fd, buf, count);
+			}
 		} else if (opt.restore_image)
 			i = read(*(int *)fd, buf, count);
 		else
@@ -618,7 +634,8 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
 	struct ntfs_device *dev = fd;
 
 	if (opt.restore_image) {
-		if (lseek(*(int *)fd, pos, SEEK_SET) == (off_t)-1)
+		if (!opt.no_action
+		    && (lseek(*(int *)fd, pos, SEEK_SET) == (off_t)-1))
 			perr_exit("lseek");
 	} else {
 		if (vol->dev->d_ops->seek(dev, pos, SEEK_SET) == (off_t)-1)
@@ -947,8 +964,9 @@ static void restore_image(void)
 					> sle64_to_cpu(image_hdr.nr_clusters)))
 					err_exit("restore_image: corrupt image\n");
 				else
-					if (lseek(fd_out, count * csize,
-							SEEK_CUR) == (off_t)-1)
+					if (!opt.no_action
+					    && (lseek(fd_out, count * csize,
+							SEEK_CUR) == (off_t)-1))
 						perr_exit("restore_image: lseek");
 			}
 			pos += count;
@@ -2105,7 +2123,7 @@ static void set_filesize(s64 filesize)
 		       "operation will be very inefficient and may fail!\n");
 #endif
 
-	if (ftruncate(fd_out, filesize) == -1) {
+	if (!opt.no_action && (ftruncate(fd_out, filesize) == -1)) {
 		int err = errno;
 		perr_printf("ftruncate failed for file '%s'", opt.output);
 #ifndef NO_STATFS
@@ -2414,6 +2432,7 @@ int main(int argc, char **argv)
 		/* device_size_get() might need to read() */
 		int flags = O_RDWR;
 
+		fd_out = 0;
 		if (!opt.blkdev_out) {
 			flags |= O_CREAT | O_TRUNC;
 			if (!opt.overwrite)
@@ -2427,19 +2446,21 @@ int main(int argc, char **argv)
 						opt.output);
 			fd_out = fileno(stream_out);
 		} else
-			if ((fd_out = open(opt.output, flags,
-						S_IRUSR | S_IWUSR)) == -1)
+			if (!opt.no_action
+			    && ((fd_out = open(opt.output, flags,
+						S_IRUSR | S_IWUSR)) == -1))
 				perr_exit("Opening file '%s' failed",
 						opt.output);
 
-		if (!opt.save_image && !opt.metadata_image)
+		if (!opt.save_image && !opt.metadata_image && !opt.no_action)
 			check_output_device(ntfs_size);
 	}
 
 	if (opt.restore_image) {
 		print_image_info();
 		restore_image();
-		fsync_clone(fd_out);
+		if (!opt.no_action)
+			fsync_clone(fd_out);
 		exit(0);
 	}
 
