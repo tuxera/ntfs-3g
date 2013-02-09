@@ -677,7 +677,7 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 
 static void rescue_sector(void *fd, off_t pos, void *buff)
 {
-	const char *badsector_magic = "BadSectoR\0";
+	const char badsector_magic[] = "BadSectoR";
 	struct ntfs_device *dev = fd;
 
 	if (opt.restore_image) {
