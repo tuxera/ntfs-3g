@@ -210,6 +210,8 @@ static BOOL image_is_host_endian = FALSE;
 #define NTFSCLONE_IMG_VER_MAJOR	10
 #define NTFSCLONE_IMG_VER_MINOR	1
 
+enum { CMD_GAP, CMD_NEXT } ;
+
 /* All values are in little endian. */
 static struct image_hdr {
 	char magic[IMAGE_MAGIC_SIZE];
@@ -764,7 +766,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	}
 
 	if (opt.save_image || (opt.metadata_image && wipe)) {
-		char cmd = 1;
+		char cmd = CMD_NEXT;
 		if (write_all(&fd_out, &cmd, sizeof(cmd)) == -1)
 			perr_exit("write_all");
 	}
@@ -809,7 +811,7 @@ static void gap_to_cluster(s64 gap)
 
 	if (gap) {
 		count = cpu_to_sle64(gap);
-		buf[0] = 0;
+		buf[0] = CMD_GAP;
 		memcpy(&buf[1], &count, sizeof(count));
 		if (write_all(&fd_out, buf, sizeof(buf)) == -1)
 			perr_exit("write_all");
@@ -822,7 +824,7 @@ static void image_skip_clusters(s64 count)
 		s64 count_buf;
 		char buff[1 + sizeof(count)];
 
-		buff[0] = 0;
+		buff[0] = CMD_GAP;
 		count_buf = cpu_to_sle64(count);
 		memcpy(buff + 1, &count_buf, sizeof(count_buf));
 
@@ -951,7 +953,7 @@ static void restore_image(void)
 				perr_exit("read_all");
 		}
 
-		if (cmd == 0) {
+		if (cmd == CMD_GAP) {
 			if (!image_is_host_endian) {
 				le64 lecount;
 
@@ -990,7 +992,7 @@ static void restore_image(void)
 						perr_exit("restore_image: lseek");
 			}
 			pos += count;
-		} else if (cmd == 1) {
+		} else if (cmd == CMD_NEXT) {
 			copy_cluster(0, 0, pos);
 			pos++;
 			progress_update(&progress, ++p_counter);
@@ -1378,7 +1380,7 @@ static void write_set(char *buff, u32 csize, s64 *current_lcn,
 {
 	u32 k;
 	s64 target_lcn;
-	char cmd = 1;
+	char cmd = CMD_NEXT;
 
 	for (k=0; k<cnt; k++) {
 		target_lcn = rl[wi].lcn + wj;
