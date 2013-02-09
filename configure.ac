@@ -422,7 +422,7 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	mntent.h stddef.h stdint.h stdlib.h stdio.h stdarg.h string.h \
 	strings.h errno.h time.h unistd.h utime.h wchar.h getopt.h features.h \
-	endian.h byteswap.h sys/byteorder.h sys/disk.h sys/endian.h \
+	regex.h endian.h byteswap.h sys/byteorder.h sys/disk.h sys/endian.h \
 	sys/param.h sys/ioctl.h sys/mkdev.h sys/mount.h sys/stat.h sys/types.h \
 	sys/vfs.h sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h \
 	linux/hdreg.h machine/endian.h windows.h syslog.h pwd.h malloc.h])

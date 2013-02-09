@@ -68,10 +68,16 @@
 #ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
+#ifdef HAVE_REGEX_H
 #include <regex.h>
+#endif
 
 #if !defined(REG_NOERROR) || (REG_NOERROR != 0)
 #define REG_NOERROR 0
+#endif
+
+#ifndef REG_NOMATCH
+#define REG_NOMATCH 1
 #endif
 
 #include "ntfsundelete.h"
@@ -105,6 +111,132 @@ static short	with_regex;			/* Flag  Regular expression available */
 static short	avoid_duplicate_printing;	/* Flag  No duplicate printing of file infos */
 static range	*ranges;			/* Array containing all Inode-Ranges for undelete */
 static long	nr_entries;			/* Number of range entries */
+
+#ifndef HAVE_REGEX_H
+
+/*
+ *		Pattern matching routing for systems with no regex.
+ */
+
+typedef struct REGEX {
+	ntfschar *upcase;
+	u32 upcase_len;
+	int flags;
+	int pattern_len;
+	ntfschar pattern[1];
+} *regex_t;
+
+enum { REG_NOSUB = 1, REG_ICASE = 2 };
+
+static BOOL patmatch(regex_t *re, const ntfschar *f, int flen,
+			const ntfschar *p, int plen, BOOL dot)
+{
+	regex_t pre;
+	BOOL ok;
+	BOOL anyextens;
+	int i;
+	unsigned int c;
+
+	pre = *re;
+	if (pre->flags & REG_ICASE) {
+		while ((flen > 0) && (plen > 0)
+		    && ((*f == *p)
+			|| (*p == const_cpu_to_le16('?'))
+			|| ((c = le16_to_cpu(*f)) < pre->upcase_len
+				? pre->upcase[c] : c) == *p)) {
+			flen--;
+			if (*f++ == const_cpu_to_le16('.'))
+				dot = TRUE;
+			plen--;
+			p++;
+		}
+	} else {
+		while ((flen > 0) && (plen > 0)
+		    && ((*f == *p) || (*p == const_cpu_to_le16('?')))) {
+			flen--;
+			if (*f++ == const_cpu_to_le16('.'))
+				dot = TRUE;
+			plen--;
+			p++;
+		}
+	}
+	if ((flen <= 0) && (plen <= 0))
+		ok = TRUE;
+	else {
+		ok = FALSE;
+		plen--;
+		if (*p++ == const_cpu_to_le16('*')) {
+			/* special case "*.*" requires the end or a dot */
+			anyextens = FALSE;
+			if ((plen == 2)
+			    && (p[0] == const_cpu_to_le16('.'))
+			    && (p[1] == const_cpu_to_le16('*'))
+			    && !dot) {
+				for (i=0; (i<flen) && !anyextens; i++)
+					if (f[i] == const_cpu_to_le16('.'))
+						anyextens = TRUE;
+			}
+			if (!plen || anyextens)
+				ok = TRUE;
+			else
+				while ((flen > 0) && !ok)
+					if (patmatch(re,f,flen,p,plen,dot))
+						ok = TRUE;
+					else {
+						flen--;
+						f++;
+					}
+		}
+	}
+	return (ok);
+}
+
+static int regcomp(regex_t *re, const char *pattern, int flags)
+{
+	regex_t pre;
+	ntfschar *rp;
+	ntfschar *p;
+	unsigned int c;
+	int lth;
+	int i;
+
+	pre = (regex_t)malloc(sizeof(struct REGEX)
+			+ strlen(pattern)*sizeof(ntfschar));
+	*re = pre;
+	if (pre) {
+		pre->flags = flags;
+		pre->upcase_len = 0;
+		rp = pre->pattern;
+		lth = ntfs_mbstoucs(pattern, &rp);
+		pre->pattern_len = lth;
+		p = pre->pattern;
+		if (flags & REG_ICASE) {
+			for (i=0; i<lth; i++) {
+				c = le16_to_cpu(*p);
+				if (c < pre->upcase_len)
+					*p = pre->upcase[c];
+				p++;
+			}
+		}
+	}
+	return (*re && (lth > 0) ? 0 : -1);
+}
+
+static int regexec(regex_t *re, const ntfschar *uname, int len,
+		char *q __attribute__((unused)), int r __attribute__((unused)))
+{
+	BOOL m;
+
+	m = patmatch(re, uname, len, (*re)->pattern, (*re)->pattern_len, FALSE);
+	return (m ? REG_NOERROR : REG_NOMATCH);
+}
+
+static void regfree(regex_t *re)
+{
+	free(*re);
+}
+
+#endif
 
 /**
  * parse_inode_arg - parses the inode expression
@@ -292,7 +424,10 @@ static void usage(void)
 static int transform(const char *pattern, char **regex)
 {
 	char *result;
-	int length, i, j;
+	int length, i;
+#ifdef HAVE_REGEX_H
+	int j;
+#endif
 
 	if (!pattern || !regex)
 		return 0;
@@ -314,6 +449,7 @@ static int transform(const char *pattern, char **regex)
 		return 0;
 	}
 
+#ifdef HAVE_REGEX_H
 	result[0] = '^';
 
 	for (i = 0, j = 1; pattern[i]; i++, j++) {
@@ -336,6 +472,9 @@ static int transform(const char *pattern, char **regex)
 	result[j+1] = 0;
 	ntfs_log_debug("Pattern '%s' replaced with regex '%s'.\n", pattern,
 			result);
+#else
+	strcpy(result, pattern);
+#endif
 
 	*regex = result;
 	return 1;
@@ -1578,7 +1717,11 @@ static int name_match(regex_t *re, struct ufile *file)
 
 		if (!f->name)
 			continue;
+#ifdef HAVE_REGEX_H
 		result = regexec(re, f->name, 0, NULL, 0);
+#else
+		result = regexec(re, f->uname, f->uname_len, NULL, 0);
+#endif
 		if (result < 0) {
 			ntfs_log_perror("Couldn't compare filename with regex");
 			return 0;
@@ -2032,6 +2175,10 @@ static int scan_disk(ntfs_volume *vol)
 			ntfs_log_error("ERROR: Couldn't create a regex.\n");
 			goto out;
 		}
+#ifndef HAVE_REGEX_H
+		re->upcase = vol->upcase;
+		re->upcase_len = vol->upcase_len;
+#endif
 	}
 
 	nr_mft_records = vol->mft_na->initialized_size >>
