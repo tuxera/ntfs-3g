@@ -4659,12 +4659,19 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 
 BOOL proposal(const char *name, const char *attr)
 {
+	char fullname[MAXFILENAME];
 	int uoff, goff;
 	int i;
 	u64 uauth, gauth;
 	int ucnt, gcnt;
 	int uid, gid;
 	BOOL err;
+#ifdef WIN32
+	char driveletter;
+#else
+	struct stat st;
+	char *p,*q;
+#endif
 
 	err = FALSE;
 #ifdef WIN32
@@ -4683,7 +4690,8 @@ BOOL proposal(const char *name, const char *attr)
 	if ((ucnt == 5) && (gcnt == 5)
 	    && (uauth == 5) && (gauth == 5)
 	    && (get4l(attr,uoff+8) == 21) && (get4l(attr,goff+8) == 21)) {
-		printf("# User mapping proposal\n");
+		printf("# User mapping proposal :\n");
+		printf("# -------------------- cut here -------------------\n");
 		if (uid)
 			printf("%d::",uid);
 		else
@@ -4705,12 +4713,62 @@ BOOL proposal(const char *name, const char *attr)
 		for (i=0; i<gcnt-1; i++)
 			printf("-%lu",get4l(attr,goff+8+4*i));
 		printf("-10000\n");
+		printf("# -------------------- cut here -------------------\n");
 		if (!uid || !gid) {
-			printf("# Please replace \"user\" and \"group\" by the uid and gid\n");
-			printf("# of the Linux owner and group of ");
+			printf("# Please replace \"user\" and \"group\" above by the uid\n");
+			printf("# and gid of the Linux owner and group of ");
 			printname(stdout,name);
-			printf("\n");
+			printf(", then\n");
+			printf("# insert the modified lines into .NTFS-3G/Usermapping, with .NTFS-3G\n");
+		} else
+			printf("# Insert the above lines into .NTFS-3G/Usermapping, with .NTFS-3G\n");
+#ifdef WIN32
+		printf("# being a directory of the root of the NTFS file system.\n");
+
+		/* Get the drive letter to the file system */
+		driveletter = 0;
+		if ((((name[0] >= 'a') && (name[0] <= 'z'))
+			|| ((name[0] >= 'A') && (name[0] <= 'Z')))
+		    && (name[1] == ':'))
+			driveletter = name[0];
+		else {
+			if (GetCurrentDirectoryA(MAXFILENAME, fullname)
+					&& (fullname[1] == ':'))
+				driveletter = fullname[0];
 		}
+		if (driveletter) {
+			printf("# Example : %c:\\.NTFS-3G\\UserMapping\n",
+				driveletter);
+		}
+#else
+		printf("# being a hidden subdirectory of the root of the NTFS file system.\n");
+
+		/* Get the path to the root of the file system */
+		if (name[0] != '/') {
+			p = getcwd(fullname,MAXFILENAME);
+			if (p) {
+				strcat(fullname,"/");
+				strcat(fullname,name);
+			}
+		} else {
+			strcpy(fullname,name);
+			p = fullname;
+		}
+		if (p) {
+			/* go down the path to inode 5 (fails on symlinks) */
+			do {
+				lstat(fullname,&st);
+				q = strrchr(p,'/');
+				if (q && (st.st_ino != 5))
+					*q = 0;
+			} while (strchr(p,'/') && (st.st_ino != 5));
+		}
+		if (p && (st.st_ino == 5)) {
+			printf("# Example : ");
+			printname(stdout,p);
+			printf("/.NTFS-3G/UserMapping\n");
+		}
+#endif
 	} else {
 		printf("** Not possible : ");
 		printname(stdout,name);
