@@ -95,8 +95,35 @@
 #define BLKGETSIZE64	_IOR(0x12,114,size_t)	/* Get device size in bytes. */
 #endif
 
-#ifdef __sun
+#if defined(linux) || defined(__uClinux__) || defined(__sun) \
+		|| defined(__APPLE__) || defined(__DARWIN__)
+  /* Make sure the presence of <windows.h> means compiling for Windows */
+#undef HAVE_WINDOWS_H
+#endif
+
+#if defined(__sun) | defined(HAVE_WINDOWS_H)
 #define NO_STATFS 1	/* statfs(2) and f_type are not universal */
+#endif
+
+#ifdef HAVE_WINDOWS_H
+/*
+ *		Replacements for functions which do not exist on Windows
+ */
+int setmode(int, int); /* from msvcrt.dll */
+
+#define getpid() (0)
+#define srandom(seed) srand(seed)
+#define random() rand()
+#define fsync(fd) (0)
+#define ioctl(fd,code,buf) (0)
+#define ftruncate(fd, size) ntfs_device_win32_ftruncate(dev_out, size)
+#define BINWMODE "wb"
+#else
+#define BINWMODE "w"
+#endif
+
+#ifndef O_BINARY
+#define O_BINARY 0
 #endif
 
 static const char *EXEC_NAME = "ntfsclone";
@@ -172,6 +199,7 @@ static struct bitmap lcn_bitmap;
 static int fd_in;
 static int fd_out;
 static FILE *stream_out = (FILE*)NULL;
+struct ntfs_device *dev_out = (struct ntfs_device*)NULL;
 static FILE *msg_out = NULL;
 
 static int wipe = 0;
@@ -477,8 +505,14 @@ static void parse_options(int argc, char **argv)
 
 	if (!opt.no_action && !opt.std_out) {
 		struct stat st;
+#ifdef HAVE_WINDOWS_H
+		BOOL blkdev = opt.output[0] && (opt.output[1] == ':')
+					&& !opt.output[2];
 
+		if (!blkdev && (stat(opt.output, &st) == -1)) {
+#else
 		if (stat(opt.output, &st) == -1) {
+#endif
 			if (errno != ENOENT)
 				perr_exit("Couldn't access '%s'", opt.output);
 		} else {
@@ -487,7 +521,11 @@ static void parse_options(int argc, char **argv)
 					 "Use option --overwrite if you want to"
 					 " replace its content.\n", opt.output);
 
+#ifdef HAVE_WINDOWS_H
+			if (blkdev) {
+#else
 			if (S_ISBLK(st.st_mode)) {
+#endif
 				opt.blkdev_out = 1;
 				if (opt.metadata && !opt.force)
 					err_exit("Cloning only metadata to a "
@@ -606,6 +644,11 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 			} else {
 				if (opt.save_image || opt.metadata_image)
 					i = fwrite(buf, 1, count, stream_out);
+#ifdef HAVE_WINDOWS_H
+				else if (dev_out)
+					i = dev_out->d_ops->write(dev_out,
+								buf, count);
+#endif
 				else
 					i = write(*(int *)fd, buf, count);
 			}
@@ -778,6 +821,17 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	}
 }
 
+static s64 lseek_out(int fd, s64 pos, int mode)
+{
+	s64 ret;
+
+	if (dev_out)
+		ret = (dev_out->d_ops->seek)(dev_out, pos, mode);
+	else
+		ret = lseek(fd, pos, mode);
+	return (ret);
+}
+
 static void lseek_to_cluster(s64 lcn)
 {
 	off_t pos;
@@ -790,8 +844,8 @@ static void lseek_to_cluster(s64 lcn)
 	if (opt.std_out || opt.save_image || opt.metadata_image)
 		return;
 
-	if (lseek(fd_out, pos, SEEK_SET) == (off_t)-1)
-		perr_exit("lseek output");
+	if (lseek_out(fd_out, pos, SEEK_SET) == (off_t)-1)
+			perr_exit("lseek output");
 }
 
 static void gap_to_cluster(s64 gap)
@@ -975,11 +1029,12 @@ static void restore_image(void)
 					err_exit("restore_image: corrupt image "
 						"at input offset %lld\n",
 						(long long)tellin(fd_in) - 9);
-				else
+				else {
 					if (!opt.no_action
-					    && (lseek(fd_out, count * csize,
+					    && (lseek_out(fd_out, count * csize,
 							SEEK_CUR) == (off_t)-1))
 						perr_exit("restore_image: lseek");
+				}
 			}
 			pos += count;
 		} else if (cmd == CMD_NEXT) {
@@ -2215,9 +2270,13 @@ static s64 open_image(void)
 {
 	if (strcmp(opt.volume, "-") == 0) {
 		if ((fd_in = fileno(stdin)) == -1)
-			perr_exit("fileno for stdout failed");
+			perr_exit("fileno for stdin failed");
+#ifdef HAVE_WINDOWS_H
+		if (setmode(fd_in,O_BINARY) == -1)
+			perr_exit("setting binary stdin failed");
+#endif
 	} else {
-		if ((fd_in = open(opt.volume, O_RDONLY)) == -1)
+		if ((fd_in = open(opt.volume, O_RDONLY | O_BINARY)) == -1)
 			perr_exit("failed to open image");
 	}
 	if (read_all(&fd_in, &image_hdr, NTFSCLONE_IMG_HEADER_SIZE_OLD) == -1)
@@ -2323,7 +2382,12 @@ static void initialise_image_hdr(s64 device_size, s64 inuse)
 static void check_output_device(s64 input_size)
 {
 	if (opt.blkdev_out) {
-		s64 dest_size = device_size_get(fd_out);
+		s64 dest_size;
+
+		if (dev_out)
+			dest_size = ntfs_device_size_get(dev_out, 1);
+		else
+			dest_size = device_size_get(fd_out);
 		if (dest_size < input_size)
 			err_exit("Output device is too small (%lld) to fit the "
 				 "NTFS image (%lld).\n",
@@ -2414,6 +2478,7 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 
 static void check_dest_free_space(u64 src_bytes)
 {
+#ifndef HAVE_WINDOWS_H
 	u64 dest_bytes;
 	struct statvfs stvfs;
 	struct stat st;
@@ -2446,6 +2511,7 @@ static void check_dest_free_space(u64 src_bytes)
 			 "%llu MB < %llu MB\n",
 			 (unsigned long long)rounded_up_division(dest_bytes, NTFS_MBYTE),
 			 (unsigned long long)rounded_up_division(src_bytes,  NTFS_MBYTE));
+#endif
 }
 
 int main(int argc, char **argv)
@@ -2486,9 +2552,13 @@ int main(int argc, char **argv)
 		if ((fd_out = fileno(stdout)) == -1)
 			perr_exit("fileno for stdout failed");
 		stream_out = stdout;
+#ifdef HAVE_WINDOWS_H
+		if (setmode(fileno(stdout),O_BINARY) == -1)
+			perr_exit("setting binary stdout failed");
+#endif
 	} else {
 		/* device_size_get() might need to read() */
-		int flags = O_RDWR;
+		int flags = O_RDWR | O_BINARY;
 
 		fd_out = 0;
 		if (!opt.blkdev_out) {
@@ -2498,17 +2568,29 @@ int main(int argc, char **argv)
 		}
 
 		if (opt.save_image || opt.metadata_image) {
-			stream_out = fopen(opt.output,"w");
+			stream_out = fopen(opt.output,BINWMODE);
 			if (!stream_out)
 				perr_exit("Opening file '%s' failed",
 						opt.output);
 			fd_out = fileno(stream_out);
-		} else
+		} else {
+#ifdef HAVE_WINDOWS_H
+			if (!opt.no_action) {
+				dev_out = ntfs_device_alloc(opt.output, 0,
+					&ntfs_device_default_io_ops, NULL);
+				if (!dev_out
+				    || (dev_out->d_ops->open)(dev_out, flags))
+					perr_exit("Opening volume '%s' failed",
+							opt.output);
+			}
+#else
 			if (!opt.no_action
 			    && ((fd_out = open(opt.output, flags,
 						S_IRUSR | S_IWUSR)) == -1))
 				perr_exit("Opening file '%s' failed",
 						opt.output);
+#endif
+		}
 
 		if (!opt.save_image && !opt.metadata_image && !opt.no_action)
 			check_output_device(ntfs_size);
@@ -2558,7 +2640,11 @@ int main(int argc, char **argv)
 		initialise_image_hdr(device_size, image.inuse);
 		write_image_hdr();
 	} else {
-		fsync_clone(fd_out); /* sync copy before mounting */
+		if (dev_out) {
+			(dev_out->d_ops->close)(dev_out);
+			dev_out = NULL;
+		} else
+			fsync_clone(fd_out); /* sync copy before mounting */
 		opt.volume = opt.output;
 	/* 'force' again mount for dirty volumes (e.g. after resize).
 	   FIXME: use mount flags to avoid potential side-effects in future */
