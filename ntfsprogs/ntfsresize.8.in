@@ -155,8 +155,10 @@ if the shrink size is the same as the original size (in MB).
 This option cannot be used in association with option \fB\-\-expand\fP.
 .TP
 \fB\-s\fR, \fB\-\-size\fR SIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR]
-Resize filesystem to \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes by
-shifting its end and keeping its beginning unchanged.
+Resize filesystem to fit in a partition whose size is
+\fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes by shifting its end and keeping
+its beginning unchanged. The filesystem size is set to be at least one
+sector smaller than the partition.
 The optional modifiers
 .BR k ,
 .BR M ,
