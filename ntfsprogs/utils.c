@@ -1120,4 +1120,65 @@ int mft_next_record(struct mft_search_ctx *ctx)
 	return (ctx->inode == NULL);
 }
 
+#ifdef HAVE_WINDOWS_H
 
+/*
+ *		Translate formats for older Windows
+ *
+ *	Up to Windows XP, msvcrt.dll does not support long long format
+ *	specifications (%lld, %llx, etc). We have to translate them
+ *	to %I64.
+ */
+
+char *ntfs_utils_reformat(char *out, int sz, const char *fmt)
+{
+	const char *f;
+	char *p;
+	int i;
+	enum { F_INIT, F_PERCENT, F_FIRST } state;
+
+	i = 0;
+	f = fmt;
+	p = out;
+	state = F_INIT;
+	while (*f && ((i + 3) < sz)) {
+		switch (state) {
+		case F_INIT :
+			if (*f == '%')
+				state = F_PERCENT;
+			*p++ = *f++;
+			i++;
+			break;
+		case F_PERCENT :
+			if (*f == 'l') {
+				state = F_FIRST;
+				f++;
+			} else {
+				if (((*f < '0') || (*f > '9'))
+				    && (*f != '*') && (*f != '-'))
+					state = F_INIT;
+				*p++ = *f++;
+				i++;
+			}
+			break;
+		case F_FIRST :
+			if (*f == 'l') {
+				*p++ = 'I';
+				*p++ = '6';
+				*p++ = '4';
+				f++;
+				i += 3;
+			} else {
+				*p++ = 'l';
+				*p++ = *f++;
+				i += 2;
+			state = F_INIT;
+			break;
+			}
+		}
+	}
+	*p++ = 0;
+	return (out);
+}
+
+#endif
