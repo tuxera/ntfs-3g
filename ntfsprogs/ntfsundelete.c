@@ -94,6 +94,13 @@
 #include "logging.h"
 #include "misc.h"
 
+#ifdef HAVE_WINDOWS_H
+/*
+ *		Replacements for functions which do not exist on Windows
+ */
+#define ftruncate(fd, size) ntfs_win32_ftruncate(fd, size)
+#endif
+
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
 static const char *UNNAMED   = "<unnamed>";
@@ -111,6 +118,31 @@ static short	with_regex;			/* Flag  Regular expression available */
 static short	avoid_duplicate_printing;	/* Flag  No duplicate printing of file infos */
 static range	*ranges;			/* Array containing all Inode-Ranges for undelete */
 static long	nr_entries;			/* Number of range entries */
+
+#ifdef HAVE_WINDOWS_H
+/*
+ *		Replacement for strftime() on Windows
+ *
+ *	strftime() on Windows uses format codes different from those
+ *	defined in C99 sect. 7.23.3.5
+ *	Use snprintf() instead.
+ */
+static int win32_strftime(char *buffer, int size, const char *format,
+					const struct tm *ptm)
+{
+	int ret;
+
+	if (!strcmp(format, "%F %R"))
+		ret = snprintf(buffer, size, "%4d-%02d-%02d %02d:%02d",
+			ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
+			ptm->tm_hour, ptm->tm_min);
+	else
+		ret = snprintf(buffer, size, "%4d-%02d-%02d",
+			ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday);
+	return (ret);
+}
+#define strftime(buf, sz, fmt, ptm) win32_strftime(buf, sz, fmt, ptm)
+#endif
 
 #ifndef HAVE_REGEX_H
 
@@ -1835,6 +1867,9 @@ static int open_file(const char *pathname)
 		flags = O_RDWR | O_CREAT | O_TRUNC;
 	else
 		flags = O_RDWR | O_CREAT | O_EXCL;
+#ifdef HAVE_WINDOWS_H
+	flags ^= O_BINARY | O_RDWR | O_WRONLY;
+#endif
 
 	return open(pathname, flags, S_IRUSR | S_IWUSR);
 }
