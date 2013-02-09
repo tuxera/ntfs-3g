@@ -2302,8 +2302,10 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 				"enumerating attributes");
 	} else {
 		printf("End of inode reached\n");
-		printf("Total runs: %lu (fragments: %lu)\n",
-				runcount.runs, runcount.fragments);
+		if (opts.verbose) {
+			printf("Total runs: %lu (fragments: %lu)\n",
+					runcount.runs, runcount.fragments);
+		}
 	}
 
 	/* close all data-structures we used */
