@@ -49,7 +49,7 @@ volume flag is set to request a volume checking at next mount.
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .TP
-\fB\-n\fR, \fB\-\-do\-nothing\fR
+\fB\-n\fR, \fB\-\-no\-action\fR
 Do not write anything, just show what would have been done.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
