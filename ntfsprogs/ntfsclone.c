@@ -594,6 +594,10 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 	return 0;
 }
 
+static off_t tellin(int in)
+{
+	return (lseek(in, 0, SEEK_CUR));
+}
 
 static int io_all(void *fd, void *buf, int count, int do_write)
 {
@@ -706,8 +710,12 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 // need reading when not about to write ?
 	if (read_all(fd, buff, csize) == -1) {
 
-		if (errno != EIO)
-			perr_exit("read_all");
+		if (errno != EIO) {
+			if (!errno && opt.restore_image)
+				err_exit("Short image file...\n");
+			else
+				perr_exit("read_all");
+		}
 		else if (rescue){
 			s32 i;
 			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
@@ -951,6 +959,9 @@ static void restore_image(void)
 						sizeof(count)) == -1)
 					perr_exit("read_all");
 			}
+			if (!count)
+				err_exit("Bad offset at input location 0x%llx\n",
+					(long long)tellin(fd_in) - 9);
 			if (opt.std_out) {
 				if ((!p_counter && count) || (count < 0))
 					err_exit("Cannot restore a metadata"
@@ -962,7 +973,9 @@ static void restore_image(void)
 				if (((pos + count) < 0)
 				   || ((pos + count)
 					> sle64_to_cpu(image_hdr.nr_clusters)))
-					err_exit("restore_image: corrupt image\n");
+					err_exit("restore_image: corrupt image "
+						"at input offset %lld\n",
+						(long long)tellin(fd_in) - 9);
 				else
 					if (!opt.no_action
 					    && (lseek(fd_out, count * csize,
@@ -975,7 +988,8 @@ static void restore_image(void)
 			pos++;
 			progress_update(&progress, ++p_counter);
 		} else
-			err_exit("Invalid command code in image\n");
+			err_exit("Invalid command code %d at input offset 0x%llx\n",
+					cmd, (long long)tellin(fd_in) - 1);
 	}
 }
 
