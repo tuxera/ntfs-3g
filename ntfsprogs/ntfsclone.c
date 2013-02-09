@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2012 Jean-Pierre Andre
+ * Copyright (c) 2010-2013 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -675,7 +675,7 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 }
 
 
-static void rescue_sector(void *fd, off_t pos, void *buff)
+static void rescue_sector(void *fd, u32 bytes_per_sector, off_t pos, void *buff)
 {
 	const char badsector_magic[] = "BadSectoR";
 	struct ntfs_device *dev = fd;
@@ -689,10 +689,10 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
 			perr_exit("seek input");
 	}
 
-	if (read_all(fd, buff, NTFS_SECTOR_SIZE) == -1) {
+	if (read_all(fd, buff, bytes_per_sector) == -1) {
 		Printf("WARNING: Can't read sector at %llu, lost data.\n",
 			(unsigned long long)pos);
-		memset(buff, '?', NTFS_SECTOR_SIZE);
+		memset(buff, '?', bytes_per_sector);
 		memmove(buff, badsector_magic, sizeof(badsector_magic));
 	}
 }
@@ -701,7 +701,8 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
  *		Read a cluster, try to rescue if cannot read
  */
 
-static void read_rescue(void *fd, char *buff, u32 csize, u64 rescue_lcn)
+static void read_rescue(void *fd, char *buff, u32 csize, u32 bytes_per_sector,
+				u64 rescue_lcn)
 {
 	off_t rescue_pos;
 
@@ -713,8 +714,9 @@ static void read_rescue(void *fd, char *buff, u32 csize, u64 rescue_lcn)
 			u32 i;
 
 			rescue_pos = (off_t)(rescue_lcn * csize);
-			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
-				rescue_sector(fd, rescue_pos + i, buff + i);
+			for (i = 0; i < csize; i += bytes_per_sector)
+				rescue_sector(fd, bytes_per_sector,
+						rescue_pos + i, buff + i);
 		} else {
 			Printf("%s", bad_sectors_warning_msg);
 			err_exit("Disk is faulty, can't make full backup!");
@@ -732,10 +734,11 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	off_t rescue_pos;
 	NTFS_BOOT_SECTOR *bs;
 	le64 mask;
-	static u16 bytes_per_sector;
+	static u16 bytes_per_sector = NTFS_SECTOR_SIZE;
 
 	if (!opt.restore_image) {
 		csize = vol->cluster_size;
+		bytes_per_sector = vol->sector_size;
 		fd = vol->dev;
 	}
 
@@ -761,8 +764,9 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 		}
 		else if (rescue){
 			s32 i;
-			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
-				rescue_sector(fd, rescue_pos + i, buff + i);
+			for (i = 0; i < csize; i += bytes_per_sector)
+				rescue_sector(fd, bytes_per_sector,
+						rescue_pos + i, buff + i);
 		} else {
 			Printf("%s", bad_sectors_warning_msg);
 			err_exit("Disk is faulty, can't make full backup!");
@@ -1463,6 +1467,7 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 	s64 mft_no;
 	u32 mft_record_size;
 	u32 csize;
+	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
 	u32 wi,wj; /* indexes for reading */
@@ -1474,6 +1479,7 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 	current_lcn = image->current_lcn;
 	mft_record_size = image->ni->vol->mft_record_size;
 	csize = image->ni->vol->cluster_size;
+	bytes_per_sector = image->ni->vol->sector_size;
 	fd = image->ni->vol->dev;
 		/*
 		 * Depending on the sizes, there may be several records
@@ -1493,7 +1499,8 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 		lseek_to_cluster(rl[ri].lcn);
 	while (rl[ri].length) {
 		for (k=0; (k<clusters_per_set) && rl[ri].length; k++) {
-			read_rescue(fd, &buff[k*csize], csize, rl[ri].lcn + rj);
+			read_rescue(fd, &buff[k*csize], csize, bytes_per_sector,
+							rl[ri].lcn + rj);
 			if (++rj >= rl[ri].length) {
 				rj = 0;
 				if (rl[++ri].length)
@@ -1533,6 +1540,7 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 	void *fd;
 	u32 indx_record_size;
 	u32 csize;
+	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
 	u32 wi,wj; /* indexes for reading */
@@ -1543,6 +1551,7 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 	current_lcn = image->current_lcn;
 	csize = image->ni->vol->cluster_size;
+	bytes_per_sector = image->ni->vol->sector_size;
 	fd = image->ni->vol->dev;
 		/*
 		 * Depending on the sizes, there may be several records
@@ -1562,7 +1571,8 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 		lseek_to_cluster(rl[ri].lcn);
 	while (rl[ri].length) {
 		for (k=0; (k<clusters_per_set) && rl[ri].length; k++) {
-			read_rescue(fd, &buff[k*csize], csize, rl[ri].lcn + rj);
+			read_rescue(fd, &buff[k*csize], csize, bytes_per_sector,
+							rl[ri].lcn + rj);
 			if (++rj >= rl[ri].length) {
 				rj = 0;
 				if (rl[++ri].length)
