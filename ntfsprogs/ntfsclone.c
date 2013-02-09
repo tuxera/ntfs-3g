@@ -1542,13 +1542,14 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 		return;
 
 	lseek_to_cluster(rl->lcn);
-	if (opt.metadata_image && wipe)
-		gap_to_cluster(rl->lcn - image->current_lcn);
 	if (opt.metadata_image ? wipe : !wipe) {
+		if (opt.metadata_image)
+			gap_to_cluster(rl->lcn - image->current_lcn);
 		/* FIXME: this could give pretty suboptimal performance */
 		for (i = 0; i < len; i++)
 			copy_cluster(opt.rescue, rl->lcn + i, rl->lcn + i);
-		image->current_lcn = rl->lcn + len;
+		if (opt.metadata_image)
+			image->current_lcn = rl->lcn + len;
 	}
 }
 
@@ -1916,14 +1917,16 @@ out:
 			compare_bitmaps(&lcn_bitmap, TRUE);
 			walk->image->current_lcn = 0;
 		}
+		if (opt.metadata_image ? wipe : !wipe) {
 				/* also get the backup bootsector */
-		nr_clusters = vol->nr_clusters;
-		lseek_to_cluster(nr_clusters);
-		if (opt.metadata_image && wipe)
-			gap_to_cluster(nr_clusters - walk->image->current_lcn);
-		if (opt.metadata_image ? wipe : !wipe)
+			nr_clusters = vol->nr_clusters;
+			lseek_to_cluster(nr_clusters);
+			if (opt.metadata_image && wipe)
+				gap_to_cluster(nr_clusters
+					- walk->image->current_lcn);
 			copy_cluster(opt.rescue, nr_clusters, nr_clusters);
-		walk->image->current_lcn = nr_clusters;
+			walk->image->current_lcn = nr_clusters;
+		}
 			/* Not counted, for compatibility with older versions */
 		if (!opt.metadata_image)
 			walk->image->inuse++;
