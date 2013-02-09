@@ -1395,7 +1395,8 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 	mft_no = 0;
 	ri = rj = 0;
 	wi = wj = 0;
-	lseek_to_cluster(rl[ri].lcn);
+	if (rl[ri].length)
+		lseek_to_cluster(rl[ri].lcn);
 	while (rl[ri].length) {
 		for (k=0; (k<clusters_per_set) && rl[ri].length; k++) {
 			read_rescue(fd, &buff[k*csize], csize, rl[ri].lcn + rj);
@@ -1463,7 +1464,8 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 	}
 	ri = rj = 0;
 	wi = wj = 0;
-	lseek_to_cluster(rl[ri].lcn);
+	if (rl[ri].length)
+		lseek_to_cluster(rl[ri].lcn);
 	while (rl[ri].length) {
 		for (k=0; (k<clusters_per_set) && rl[ri].length; k++) {
 			read_rescue(fd, &buff[k*csize], csize, rl[ri].lcn + rj);
@@ -1602,10 +1604,44 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		}
 	}
 	if (wipe && opt.metadata_image) {
-		if (mft_data)
-			copy_wipe_mft(walk->image,rl);
-		if (index_i30)
-			copy_wipe_i30(walk->image,rl);
+		ntfs_attr *na;
+		/*
+		 * Non-resident metadata has to be wiped globally,
+		 * because its logical blocks may be larger than
+		 * a cluster and split over two extents.
+		 */
+		if (mft_data && !a->lowest_vcn) {
+			na = ntfs_attr_open(walk->image->ni,
+					AT_DATA, NULL, 0);
+			if (na) {
+				na->rl = rl;
+				rl = (runlist_element*)NULL;
+				if (!ntfs_attr_map_whole_runlist(na)) {
+					copy_wipe_mft(walk->image,na->rl);
+				} else
+					perr_exit("Failed to map data of inode %lld",
+						(long long)walk->image->ni->mft_no);
+				ntfs_attr_close(na);
+			} else
+				perr_exit("Failed to open data of inode %lld",
+					(long long)walk->image->ni->mft_no);
+		}
+		if (index_i30 && !a->lowest_vcn) {
+			na = ntfs_attr_open(walk->image->ni,
+					AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
+			if (na) {
+				na->rl = rl;
+				rl = (runlist_element*)NULL;
+				if (!ntfs_attr_map_whole_runlist(na)) {
+					copy_wipe_i30(walk->image,na->rl);
+				} else
+					perr_exit("Failed to map index of inode %lld",
+						(long long)walk->image->ni->mft_no);
+				ntfs_attr_close(na);
+			} else
+				perr_exit("Failed to open index of inode %lld",
+					(long long)walk->image->ni->mft_no);
+		}
 	}
 	if (opt.metadata
 	    && (opt.metadata_image || !wipe)
