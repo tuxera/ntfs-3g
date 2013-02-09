@@ -504,26 +504,16 @@ static void parse_options(int argc, char **argv)
 		}
 	}
 
-	msg_out = stdout;
-
-	/* FIXME: this is a workaround for losing debug info if stdout != stderr
-	   and for the uncontrollable verbose messages in libntfs. Ughhh. */
-	if (opt.std_out)
+	/*
+	 * Send messages, debug information and library messages to stdout,
+	 * but, if outputing to stdout send them to stderr
+	 */
+	if (opt.std_out) {
 		msg_out = stderr;
-	else if (opt.debug) {
-		/* Redirect stderr to stdout, note fflush()es are essential! */
-		fflush(stdout);
-		fflush(stderr);
-		if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1) {
-			perror("Failed to redirect stderr to stdout");
-			exit(1);
-		}
-		fflush(stdout);
-		fflush(stderr);
+		ntfs_log_set_handler(ntfs_log_handler_stderr);
 	} else {
-		fflush(stderr);
-		if (!freopen("/dev/null", "w", stderr))
-			perr_exit("Failed to redirect stderr to /dev/null");
+		msg_out = stdout;
+		ntfs_log_set_handler(ntfs_log_handler_outerr);
 	}
 }
 
