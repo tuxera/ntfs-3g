@@ -477,6 +477,11 @@ static void parse_options(int argc, char **argv)
 		usage();
 	}
 
+	if (!opt.restore_image && !strcmp(opt.volume, "-")) {
+		err_printf("Only special images can be read from standard input\n");
+		usage();
+	}
+
 	if (opt.metadata && opt.save_image) {
 		opt.metadata_image++;
 		opt.save_image = 0;
