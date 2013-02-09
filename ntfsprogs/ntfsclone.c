@@ -154,6 +154,7 @@ typedef struct {
 	ntfs_inode *ni;			/* inode being processed */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
 	s64 inuse;			/* number of clusters in use */
+	int more_use;			/* possibly allocated clusters */
 	LCN current_lcn;
 } ntfs_walk_clusters_ctx;
 
@@ -221,6 +222,8 @@ static struct image_hdr {
 	le64 inuse;
 	le32 offset_to_image_data;	/* From start of image_hdr. */
 } __attribute__((__packed__)) image_hdr;
+
+static int compare_bitmaps(struct bitmap *a, BOOL copy);
 
 #define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
 		(offsetof(struct image_hdr, offset_to_image_data))
@@ -456,9 +459,9 @@ static void parse_options(int argc, char **argv)
 	if (opt.metadata && !opt.metadata_image && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
 
-	if (opt.ignore_fs_check && !opt.metadata)
+	if (opt.ignore_fs_check && !opt.metadata && !opt.rescue)
 		err_exit("Filesystem check can be ignored only for metadata "
-			 "cloning!\n");
+			 "cloning or rescue situations!\n");
 
 	if (opt.save_image && opt.restore_image)
 		err_exit("Saving and restoring an image at the same time "
@@ -843,7 +846,7 @@ static void write_image_hdr(void)
 	}
 }
 
-static void clone_ntfs(u64 nr_clusters)
+static void clone_ntfs(u64 nr_clusters, int more_use)
 {
 	u64 cl, last_cl;  /* current and last used cluster */
 	void *buf;
@@ -876,6 +879,10 @@ static void clone_ntfs(u64 nr_clusters)
 			perr_exit("write_all");
 	}
 
+		/* save suspicious clusters if required */
+	if (more_use && opt.ignore_fs_check) {
+		compare_bitmaps(&lcn_bitmap, TRUE);
+	}
 		/* Examine up to the alternate boot sector */
 	for (last_cl = cl = 0; cl <= (u64)vol->nr_clusters; cl++) {
 
@@ -1261,10 +1268,13 @@ static void clone_logfile_parts(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 		lseek_to_cluster(lcn);
 
-		if (opt.metadata_image && wipe)
-			gap_to_cluster(lcn - image->current_lcn);
+		if ((lcn + 1) != image->current_lcn) {
+			/* do not duplicate a cluster */
+			if (opt.metadata_image && wipe)
+				gap_to_cluster(lcn - image->current_lcn);
 
-		copy_cluster(opt.rescue, lcn, lcn);
+			copy_cluster(opt.rescue, lcn, lcn);
+		}
 		image->current_lcn = lcn + 1;
 		if (opt.metadata_image && !wipe)
 			image->inuse++;
@@ -1703,17 +1713,26 @@ static void walk_attributes(struct ntfs_walk_cluster *walk)
 	ntfs_attr_put_search_ctx(ctx);
 }
 
+/*
+ *		Compare the actual bitmap to the list of clusters
+ *	allocated to identified files.
+ *
+ *	Clusters found in use, though not marked in the bitmap are copied
+ *	if the option --ignore-fs-checks is set.
+ */
 
-
-static void compare_bitmaps(struct bitmap *a)
+static int compare_bitmaps(struct bitmap *a, BOOL copy)
 {
 	s64 i, pos, count;
 	int mismatch = 0;
+	int more_use = 0;
+	s64 new_cl;
 	u8 bm[NTFS_BUF_SIZE];
 
 	Printf("Accounting clusters ...\n");
 
 	pos = 0;
+	new_cl = 0;
 	while (1) {
 		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
 		if (count == -1)
@@ -1744,8 +1763,16 @@ static void compare_bitmaps(struct bitmap *a)
 				if (bit == ntfs_bit_get(bm, i * 8 + cl % 8))
 					continue;
 
-				if (opt.ignore_fs_check) {
+				if (!bit)
+					more_use++;
+				if (opt.ignore_fs_check && !bit && copy) {
 					lseek_to_cluster(cl);
+					if (opt.save_image
+					   || (opt.metadata
+						&& opt.metadata_image)) {
+						gap_to_cluster(cl - new_cl);
+						new_cl = cl + 1;
+					}
 					copy_cluster(opt.rescue, cl, cl);
 				}
 
@@ -1765,12 +1792,16 @@ done:
 		if (opt.ignore_fs_check) {
 			Printf("WARNING: The NTFS inconsistency was overruled "
 			       "by the --ignore-fs-check option.\n");
-			return;
+			if (new_cl) {
+				gap_to_cluster(-new_cl);
+			}
+			return (more_use);
 		}
 		err_exit("Filesystem check failed! Windows wasn't shutdown "
 			 "properly or inconsistent\nfilesystem. Please run "
 			 "chkdsk /f on Windows then reboot it TWICE.\n");
 	}
+	return (more_use);
 }
 
 
@@ -1888,6 +1919,11 @@ out:
 				(long long)inode);
 	}
 	if (opt.metadata) {
+		if (opt.metadata_image && wipe && opt.ignore_fs_check) {
+			gap_to_cluster(-walk->image->current_lcn);
+			compare_bitmaps(&lcn_bitmap, TRUE);
+			walk->image->current_lcn = 0;
+		}
 				/* also get the backup bootsector */
 		nr_clusters = vol->nr_clusters;
 		lseek_to_cluster(nr_clusters);
@@ -2020,7 +2056,20 @@ static void mount_volume(unsigned long new_mntflag)
 			       "disk instead of a partition (e.g. /dev/hda, "
 			       "not /dev/hda1)?\n", opt.volume);
 		}
-		exit(1);
+		/*
+		 * Retry with recovering the log file enabled.
+		 * Normally avoided in order to get the original log file
+		 * data, but needed when remounting the metadata of a
+		 * volume improperly unmounted from Windows.
+		 */
+		if (!(new_mntflag & (NTFS_MNT_RDONLY | NTFS_MNT_RECOVER))) {
+			Printf("Trying to recover...\n");
+			vol = ntfs_mount(opt.volume,
+					new_mntflag | NTFS_MNT_RECOVER);
+			Printf("... %s\n",(vol ? "Successful" : "Failed"));
+		}
+		if (!vol)
+			exit(1);
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY)
@@ -2483,7 +2532,8 @@ int main(int argc, char **argv)
 	backup_clusters.image = &image;
 
 	walk_clusters(vol, &backup_clusters);
-	compare_bitmaps(&lcn_bitmap);
+	image.more_use = compare_bitmaps(&lcn_bitmap,
+				opt.metadata && !opt.metadata_image);
 	print_disk_usage("", vol->cluster_size, vol->nr_clusters, image.inuse);
 
 	check_dest_free_space(vol->cluster_size * image.inuse);
@@ -2499,7 +2549,7 @@ int main(int argc, char **argv)
 			nr_clusters_to_save = vol->nr_clusters;
 		nr_clusters_to_save++; /* account for the backup boot sector */
 
-		clone_ntfs(nr_clusters_to_save);
+		clone_ntfs(nr_clusters_to_save, image.more_use);
 		fsync_clone(fd_out);
 		if (opt.save_image)
 			fclose(stream_out);
