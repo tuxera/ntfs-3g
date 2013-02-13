@@ -1,5 +1,6 @@
 if REALLYSTATIC
-AM_LIBS		= $(top_builddir)/libntfs-3g/.libs/libntfs-3g.a
+AM_LIBS		= $(top_builddir)/libntfs-3g/.libs/libntfs-3g.a $(NTFSPROGS_STATIC_LIBS)
+# older builds may need -static instead of newer -all-static
 AM_LFLAGS	= -static
 STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else

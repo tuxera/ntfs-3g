@@ -447,7 +447,8 @@ if test "x$extrapath2" != "x"; then
 			AC_DEFINE([ENABLE_HD], 1,
 			[Define this to 1 if you want to enable use of Windows
 			compliant disk geometry.])
-			LIBNTFS_LIBS="$LIBNTFS_LIBS -lhd",
+			LIBNTFS_LIBS="$LIBNTFS_LIBS -lhd"
+			NTFSPROGS_STATIC_LIBS="$NTFSPROGS_STATIC_LIBS -lhd",
 			AC_MSG_WARN([ntfsprogs Windows compliant geometry code requires the hd library.]),
 		),
 		AC_MSG_WARN([ntfsprogs Windows compliant geometry code requires the hd library.]),
@@ -593,6 +594,7 @@ AC_SUBST([MKNTFS_CPPFLAGS])
 AC_SUBST([MKNTFS_LIBS])
 AC_SUBST([LIBNTFS_CPPFLAGS])
 AC_SUBST([LIBNTFS_LIBS])
+AC_SUBST([NTFSPROGS_STATIC_LIBS])
 AC_SUBST([OUTPUT_FORMAT])
 AM_CONDITIONAL([FUSE_INTERNAL], [test "${with_fuse}" = "internal"])
 AM_CONDITIONAL([GENERATE_LDSCRIPT], [test "${enable_ldscript}" = "yes"])
