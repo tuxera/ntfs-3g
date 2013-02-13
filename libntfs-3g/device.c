@@ -660,7 +660,7 @@ static int ntfs_device_get_geo(struct ntfs_device *dev)
 #ifdef ENABLE_HD
 	{
 		hd_data_t *hddata;
-		hd_t *devlist, *partlist, *hd;
+		hd_t *hd, *devlist, *partlist = NULL;
 		str_list_t *names;
 		hd_res_t *res;
 		const int d_name_len = strlen(dev->d_name) + 1;
@@ -742,7 +742,8 @@ got_hd:
 			done = 1;
 		}
 end_hd:
-		hd_free_hd_list(partlist);
+		if (partlist)
+			hd_free_hd_list(partlist);
 		hd_free_hd_list(devlist);
 		hd_free_hd_data(hddata);
 		free(hddata);
