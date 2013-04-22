@@ -105,7 +105,7 @@ int mft_next_record(struct mft_search_ctx *ctx);
 /*
  *	Macroes to hide the needs to translate formats on older Windows
  */
-#define MAX_FMT 256
+#define MAX_FMT 1536
 char *ntfs_utils_reformat(char *out, int sz, const char *fmt);
 #define ntfs_log_redirect(fn,fi,li,le,d,fmt, args...) \
 		do { char buf[MAX_FMT]; ntfs_log_redirect(fn,fi,li,le,d, \
