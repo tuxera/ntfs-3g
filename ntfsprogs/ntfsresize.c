@@ -1920,6 +1920,12 @@ static void relocate_attribute(ntfs_resize_t *resize)
 
 static int is_mftdata(ntfs_resize_t *resize)
 {
+	/*
+	 * We must update the MFT own DATA record at the end of the second
+	 * step, because the old MFT must be kept available for processing
+	 * the other files.
+	 */
+
 	if (resize->ctx->attr->type != AT_DATA)
 		return 0;
 
@@ -2017,24 +2023,24 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 
 	relocate_attributes(resize, do_mftdata);
 
-	if (resize->dirty_inode == DIRTY_INODE) {
 //		if (vol->dev->d_ops->sync(vol->dev) == -1)
 //			perr_exit("Failed to sync device");
-		if ((mref == FILE_MFT) && resize->new_mft_start) {
-			s64 pos;
+		/* relocate MFT during second step, even if not dirty */
+	if ((mref == FILE_MFT) && do_mftdata && resize->new_mft_start) {
+		s64 pos;
 
 			/* write the MFT own record at its new location */
-			pos = (resize->new_mft_start->lcn
-						<< vol->cluster_size_bits)
-				+ (FILE_MFT << vol->mft_record_size_bits);
-			if (!opt.ro_flag
-			    && (ntfs_mst_pwrite(vol->dev, pos, 1,
-					vol->mft_record_size,
-					resize->mrec) != 1))
-				perr_exit("Couldn't update MFT own record");
-		} else {
-			if (write_mft_record(vol, mref, resize->mrec))
-				perr_exit("Couldn't update record %llu",
+		pos = (resize->new_mft_start->lcn
+					<< vol->cluster_size_bits)
+			+ (FILE_MFT << vol->mft_record_size_bits);
+		if (!opt.ro_flag
+		    && (ntfs_mst_pwrite(vol->dev, pos, 1,
+				vol->mft_record_size, resize->mrec) != 1))
+			perr_exit("Couldn't update MFT own record");
+	} else {
+		if ((resize->dirty_inode == DIRTY_INODE)
+		   && write_mft_record(vol, mref, resize->mrec)) {
+			perr_exit("Couldn't update record %llu",
 						(unsigned long long)mref);
 		}
 	}
@@ -2045,6 +2051,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	s64 nr_mft_records;
 	MFT_REF mref;
 	VCN highest_vcn;
+	u64 length;
 
 	printf("Relocating needed data ...\n");
 
@@ -2071,9 +2078,35 @@ static void relocate_inodes(ntfs_resize_t *resize)
 
 	if ((resize->vol->mft_na->rl->lcn + resize->vol->mft_na->rl->length)
 			>= resize->new_volume_size) {
+		/*
+		 * The length of the first run is normally found in
+		 * mft_na. However in some rare circumstance, this is
+		 * merged with the first run of an extent of MFT,
+		 * which implies there is a single run in the base record.
+		 * So we have to make sure not to overflow from the
+		 * runs present in the base extent.
+		 */
+		length = resize->vol->mft_na->rl->length;
+		if (ntfs_file_record_read(resize->vol, FILE_MFT,
+				&resize->mrec, NULL)
+		    || !(resize->ctx = attr_get_search_ctx(NULL,
+				resize->mrec))) {
+			err_exit("Could not read the base record of MFT\n");
+		}
+		while (!ntfs_attrs_walk(resize->ctx)
+		   && (resize->ctx->attr->type != AT_DATA)) { }
+		if (resize->ctx->attr->type == AT_DATA) {
+			le64 high_le;
+
+			high_le = resize->ctx->attr->highest_vcn;
+			if (le64_to_cpu(high_le) < length)
+				length = le64_to_cpu(high_le) + 1;
+		} else {
+			err_exit("Could not find the DATA of MFT\n");
+		}
+		ntfs_attr_put_search_ctx(resize->ctx);
 		resize->new_mft_start = alloc_cluster(&resize->lcn_bitmap,
-				resize->vol->mft_na->rl->length,
-				resize->new_volume_size, 0);
+				length, resize->new_volume_size, 0);
 		if (!resize->new_mft_start
 		    || (((resize->new_mft_start->length
 			<< resize->vol->cluster_size_bits)
