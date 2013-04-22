@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2012 Jean-Pierre Andre
+ * Copyright (c) 2011-2013 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -2027,9 +2027,10 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 			pos = (resize->new_mft_start->lcn
 						<< vol->cluster_size_bits)
 				+ (FILE_MFT << vol->mft_record_size_bits);
-			if (ntfs_mst_pwrite(vol->dev, pos, 1,
+			if (!opt.ro_flag
+			    && (ntfs_mst_pwrite(vol->dev, pos, 1,
 					vol->mft_record_size,
-					resize->mrec) != 1)
+					resize->mrec) != 1))
 				perr_exit("Couldn't update MFT own record");
 		} else {
 			if (write_mft_record(vol, mref, resize->mrec))
@@ -2492,8 +2493,9 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 			/* write the MFT record at its new location */
 		pos = (resize->new_mft_start->lcn << vol->cluster_size_bits)
 			+ (FILE_Bitmap << vol->mft_record_size_bits);
-		if (ntfs_mst_pwrite(vol->dev, pos, 1,
-				vol->mft_record_size, resize->ctx->mrec) != 1)
+		if (!opt.ro_flag
+		    && (ntfs_mst_pwrite(vol->dev, pos, 1,
+				vol->mft_record_size, resize->ctx->mrec) != 1))
 			perr_exit("Couldn't update $Bitmap at new location");
 	} else {
 		if (write_mft_record(vol, resize->ctx->ntfs_ino->mft_no,
