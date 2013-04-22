@@ -98,7 +98,6 @@ struct fuse {
     struct fuse_config conf;
     int intr_installed;
     struct fuse_fs *fs;
-    int utime_omit_ok;
 };
 
 struct lock {
@@ -1428,7 +1427,7 @@ static void fuse_lib_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
                 err = fuse_fs_truncate(f->fs, path, attr->st_size);
         }
 #ifdef HAVE_UTIMENSAT
-        if (!err && f->utime_omit_ok &&
+        if (!err &&
             (valid & (FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME))) {
             struct timespec tv[2];
 
@@ -2998,7 +2997,6 @@ struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
         goto out_free;
 
     f->fs = fs;
-    f->utime_omit_ok = fs->op.flag_utime_omit_ok;
 
     /* Oh f**k, this is ugly! */
     if (!fs->op.lock) {
@@ -3053,10 +3051,6 @@ struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
 
     fuse_session_add_chan(f->se, ch);
 
-#ifndef __SOLARIS__
-    if (f->conf.debug)
-        fprintf(stderr, "utime_omit_ok: %i\n", f->utime_omit_ok);
-#endif /* ! __SOLARIS__ */
     f->ctr = 0;
     f->generation = 0;
     /* FIXME: Dynamic hash table */

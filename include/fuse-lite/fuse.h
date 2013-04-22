@@ -422,12 +422,6 @@ struct fuse_operations {
 	int (*bmap) (const char *, size_t blocksize, uint64_t *idx);
  	unsigned int flag_nullpath_ok : 1;
  
- 	/**
-	 * Flag indicating that the filesystem accepts special
-	 * UTIME_NOW and UTIME_OMIT values in its utimens operation.
-	 */
-	unsigned int flag_utime_omit_ok : 1;
-
 	/**
  	 * Reserved flags, don't set
  	 */
