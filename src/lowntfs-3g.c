@@ -214,7 +214,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2012 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2013 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -2134,8 +2134,10 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 			enum RM_TYPES rm_type __attribute__((unused)))
 {
 	ntfschar *uname = NULL;
+	ntfschar *ugname;
 	ntfs_inode *dir_ni = NULL, *ni = NULL;
 	int res = 0, uname_len;
+	int ugname_len;
 	u64 iref;
 	fuse_ino_t ino;
 	struct open_file *of;
@@ -2162,44 +2164,14 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 		res = -errno;
 		goto exit;
 	}
+	ino = (fuse_ino_t)MREF(iref);
 	/* deny unlinking metadata files */
-	if (MREF(iref) < FILE_first_user) {
+	if (ino < FILE_first_user) {
 		res = -EPERM;
 		goto exit;
 	}
 
-	of = ctx->open_files;
-	ino = (fuse_ino_t)MREF(iref);
-				/* improvable search in open files list... */
-	while (of
-	    && (of->ino != ino))
-		of = of->next;
-	if (of && !(of->state & CLOSE_GHOST)) {
-			/* file was open, create a ghost in unlink parent */
-		of->state |= CLOSE_GHOST;
-		of->parent = parent;
-		of->ghost = ++ctx->latest_ghost;
-		sprintf(ghostname,ghostformat,of->ghost);
-			/* need to close the dir for linking the ghost */
-		if (ntfs_inode_close(dir_ni)) {
-			res = -errno;
-			goto out;
-		}
-			/* sweep existing ghost if any */
-		ntfs_fuse_rm(req, parent, ghostname, RM_LINK);
-		res = ntfs_fuse_newlink(req, of->ino, parent, ghostname,
-				(struct fuse_entry_param*)NULL);
-		if (res)
-			goto out;
-			/* now reopen then parent directory */
-		dir_ni = ntfs_inode_open(ctx->vol, INODE(parent));
-		if (!dir_ni) {
-			res = -errno;
-			goto exit;
-		}
-	}
-
-	ni = ntfs_inode_open(ctx->vol, MREF(iref));
+	ni = ntfs_inode_open(ctx->vol, ino);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -2217,24 +2189,96 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	/* JPA deny unlinking if directory is not writable and executable */
-	if (!ntfs_fuse_fill_security_context(req, &security)
-	    || ntfs_allowed_dir_access(&security, dir_ni, ino, ni,
+	if (ntfs_fuse_fill_security_context(req, &security)
+	    && !ntfs_allowed_dir_access(&security, dir_ni, ino, ni,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
+		errno = EACCES;
+		res = -errno;
+		goto exit;
+	}
 #endif
-		if (ntfs_delete(ctx->vol, (char*)NULL, ni, dir_ni,
-				 uname, uname_len))
+		/*
+		 * We keep one open_file record per opening, to avoid
+		 * having to check the list of open files when opening
+		 * and closing (which are more frequent than unlinking).
+		 * As a consequence, we may have to create several
+		 * ghosts names for the same file.
+		 * The file may have been opened with a different name
+		 * in a different parent directory. The ghost is
+		 * nevertheless created in the parent directory of the
+		 * name being unlinked, and permissions to do so are the
+		 * same as required for unlinking.
+		 */
+	for (of=ctx->open_files; of; of = of->next) {
+		if ((of->ino == ino) && !(of->state & CLOSE_GHOST)) {
+			/* file was open, create a ghost in unlink parent */
+			ntfs_inode *gni;
+			u64 gref;
+
+			/* ni has to be closed for linking ghost */
+			if (ni) {
+				if (ntfs_inode_close(ni)) {
+					res = -errno;
+					goto exit;
+				}
+				ni = (ntfs_inode*)NULL;
+			}
+			of->state |= CLOSE_GHOST;
+			of->parent = parent;
+			of->ghost = ++ctx->latest_ghost;
+			sprintf(ghostname,ghostformat,of->ghost);
+				/* Generate unicode filename. */
+			ugname = (ntfschar*)NULL;
+			ugname_len = ntfs_mbstoucs(ghostname, &ugname);
+			if (ugname_len < 0) {
+				res = -errno;
+				goto exit;
+			}
+			/* sweep existing ghost if any, ignoring errors */
+			gref = ntfs_inode_lookup_by_mbsname(dir_ni, ghostname);
+			if (gref != (u64)-1) {
+				gni = ntfs_inode_open(ctx->vol, MREF(gref));
+				ntfs_delete(ctx->vol, (char*)NULL, gni, dir_ni,
+					 ugname, ugname_len);
+				/* ntfs_delete() always closes gni and dir_ni */
+				dir_ni = (ntfs_inode*)NULL;
+			} else {
+				if (ntfs_inode_close(dir_ni)) {
+					res = -errno;
+					goto out;
+				}
+				dir_ni = (ntfs_inode*)NULL;
+			}
+			free(ugname);
+			res = ntfs_fuse_newlink(req, of->ino, parent, ghostname,
+					(struct fuse_entry_param*)NULL);
+			if (res)
+				goto out;
+				/* now reopen then parent directory */
+			dir_ni = ntfs_inode_open(ctx->vol, INODE(parent));
+			if (!dir_ni) {
+				res = -errno;
+				goto exit;
+			}
+		}
+	}
+	if (!ni) {
+		ni = ntfs_inode_open(ctx->vol, ino);
+		if (!ni) {
 			res = -errno;
+			goto exit;
+		}
+	}
+	if (ntfs_delete(ctx->vol, (char*)NULL, ni, dir_ni,
+				 uname, uname_len))
+		res = -errno;
 		/* ntfs_delete() always closes ni and dir_ni */
-		ni = dir_ni = NULL;
-#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-	} else
-		res = -EACCES;
-#endif
+	ni = dir_ni = NULL;
 exit:
-	if (ntfs_inode_close(ni))
-		set_fuse_error(&res);
-	if (ntfs_inode_close(dir_ni))
-		set_fuse_error(&res);
+	if (ntfs_inode_close(ni) && !res)
+		res = -errno;
+	if (ntfs_inode_close(dir_ni) && !res)
+		res = -errno;
 out :
 	free(uname);
 	return res;
