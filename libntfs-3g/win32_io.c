@@ -156,7 +156,11 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
  } ;
 
 typedef u32 NTSTATUS; /* do not let the compiler choose the size */
-typedef unsigned long ULONG_PTR;
+#ifdef __x86_64__
+typedef unsigned long long ULONG_PTR; /* an integer the same size as a pointer */
+#else
+typedef unsigned long ULONG_PTR; /* an integer the same size as a pointer */
+#endif
 
 HANDLE get_osfhandle(int); /* from msvcrt.dll */
 
@@ -175,14 +179,25 @@ typedef struct _IO_STATUS_BLOCK {
 typedef struct _UNICODE_STRING {
 	USHORT Length;
 	USHORT MaximumLength;
+#ifdef __x86_64__
+	u32    padding;
+#endif
 	PWSTR  Buffer;
 } UNICODE_STRING, *PUNICODE_STRING;
 
 typedef struct _OBJECT_ATTRIBUTES {
 	ULONG           Length;
+#ifdef __x86_64__
+	u32		padding1;
 	HANDLE          RootDirectory;
 	PUNICODE_STRING ObjectName;
 	ULONG           Attributes;
+	u32		padding2;
+#else
+	HANDLE          RootDirectory;
+	PUNICODE_STRING ObjectName;
+	ULONG           Attributes;
+#endif
 	PVOID           SecurityDescriptor;
 	PVOID           SecurityQualityOfService;
 }  OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
