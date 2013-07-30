@@ -28,7 +28,8 @@ integrity.
 Ntfsresize can be used to shrink or enlarge any NTFS filesystem located
 on an unmounted
 .I DEVICE
-(usually a disk partition). The new filesystem will have
+(usually a disk partition). The new filesystem will fit in a DEVICE
+whose desired size is
 .I SIZE
 bytes.
 The
@@ -49,7 +50,7 @@ If both
 and
 .B \-\-size
 are omitted then the
-NTFS filesystem will be enlarged to the underlying
+NTFS filesystem will be enlarged to match the underlying
 .I DEVICE
 size.
 .PP
@@ -166,7 +167,8 @@ The optional modifiers
 mean the
 .I SIZE
 parameter is given in kilo\-, mega\- or gigabytes respectively.
-Conforming to standards, k=10^3, M=10^6 and G=10^9. Use this option
+Conforming to standards, k=10^3, M=10^6 and G=10^9. ki=2^10, Mi=2^20
+and Gi=2^30 are also allowed. Use this option
 with
 .B \-\-no\-action
 first.
