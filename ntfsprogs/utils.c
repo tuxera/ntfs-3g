@@ -1172,9 +1172,9 @@ char *ntfs_utils_reformat(char *out, int sz, const char *fmt)
 				*p++ = 'l';
 				*p++ = *f++;
 				i += 2;
+			}
 			state = F_INIT;
 			break;
-			}
 		}
 	}
 	*p++ = 0;
