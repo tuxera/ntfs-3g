@@ -2180,7 +2180,8 @@ static int scan_disk(ntfs_volume *vol)
 	ntfs_attr *attr;
 	long long size;
 	long long bmpsize;
-	int i, j, k, b;
+	long long i;
+	int j, k, b;
 	int percent;
 	struct ufile *file;
 	regex_t re;
@@ -2238,7 +2239,8 @@ static int scan_disk(ntfs_volume *vol)
 					continue;
 				file = read_record(vol, (i+j)*8+k);
 				if (!file) {
-					ntfs_log_error("Couldn't read MFT Record %d.\n", (i+j)*8+k);
+					ntfs_log_error("Couldn't read MFT Record %lld.\n",
+							(long long)(i+j)*8+k);
 					continue;
 				}
 
