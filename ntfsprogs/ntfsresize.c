@@ -145,6 +145,7 @@ static struct {
 	int info;
 	int infombonly;
 	int expand;
+	int reliable_size;
 	int show_progress;
 	int badsectors;
 	int check;
@@ -424,8 +425,10 @@ static s64 get_new_volume_size(char *s)
 	if (size <= 0 || errno == ERANGE)
 		err_exit("Illegal new volume size\n");
 
-	if (!*suffix)
+	if (!*suffix) {
+		opt.reliable_size = 1;
 		return size;
+	}
 
 	if (strlen(suffix) == 2 && suffix[1] == 'i')
 		prefix_kind = 1024;
@@ -2570,20 +2573,24 @@ static int setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
  */
 static void update_bootsector(ntfs_resize_t *r)
 {
-	NTFS_BOOT_SECTOR bs;
-	s64  bs_size = sizeof(NTFS_BOOT_SECTOR);
+	NTFS_BOOT_SECTOR *bs;
 	ntfs_volume *vol = r->vol;
+	s64  bs_size = vol->sector_size;
 
 	printf("Updating Boot record ...\n");
+
+	bs = (NTFS_BOOT_SECTOR*)ntfs_malloc(vol->sector_size);
+	if (!bs)
+		perr_exit("ntfs_malloc");
 
 	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek");
 
-	if (vol->dev->d_ops->read(vol->dev, &bs, bs_size) == -1)
+	if (vol->dev->d_ops->read(vol->dev, bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs.number_of_sectors = cpu_to_sle64(r->new_volume_size *
-			bs.bpb.sectors_per_cluster);
+	bs->number_of_sectors = cpu_to_sle64(r->new_volume_size *
+			bs->bpb.sectors_per_cluster);
 
 	if (r->mftmir_old) {
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
@@ -2594,12 +2601,12 @@ static void update_bootsector(ntfs_resize_t *r)
 		else
 			copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
 				      r->mftmir_rl.length);
-		bs.mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
+		bs->mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
 		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
 	}
 		/* Set the start of the relocated MFT */
 	if (r->new_mft_start) {
-		bs.mft_lcn = cpu_to_sle64(r->new_mft_start->lcn);
+		bs->mft_lcn = cpu_to_sle64(r->new_mft_start->lcn);
 			/* no more need for the new MFT start */
 		free(r->new_mft_start);
 		r->new_mft_start = (runlist_element*)NULL;
@@ -2609,8 +2616,25 @@ static void update_bootsector(ntfs_resize_t *r)
 		perr_exit("lseek");
 
 	if (!opt.ro_flag)
-		if (vol->dev->d_ops->write(vol->dev, &bs, bs_size) == -1)
+		if (vol->dev->d_ops->write(vol->dev, bs, bs_size) == -1)
 			perr_exit("write() error");
+		/*
+		 * Set the backup boot sector, if the target size is
+		 * either not defined or is defined with no multiplier
+		 * suffix and is a multiple of the sector size.
+		 * With these conditions we can be confident enough that
+		 * the partition size is already defined or it will be
+		 * later defined with the same exact value.
+		 */
+	if (!opt.ro_flag && opt.reliable_size
+	    && !(opt.bytes % vol->sector_size)) {
+		if (vol->dev->d_ops->seek(vol->dev, opt.bytes
+				- vol->sector_size, SEEK_SET) == (off_t)-1)
+			perr_exit("lseek");
+		if (vol->dev->d_ops->write(vol->dev, bs, bs_size) == -1)
+			perr_exit("write() error");
+	}
+	free(bs);
 }
 
 /**
@@ -4372,8 +4396,10 @@ int main(int argc, char **argv)
 			 "size!\nCorrupt partition table or incorrect device "
 			 "partitioning?\n");
 
-	if (!opt.bytes && !opt.info && !opt.infombonly)
+	if (!opt.bytes && !opt.info && !opt.infombonly) {
 		opt.bytes = device_size;
+		opt.reliable_size = 1;
+	}
 
 	/* Take the integer part: don't make the volume bigger than requested */
 	new_size = opt.bytes / vol->cluster_size;
