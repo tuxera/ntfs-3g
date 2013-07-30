@@ -4401,13 +4401,12 @@ int main(int argc, char **argv)
 		opt.reliable_size = 1;
 	}
 
-	/* Take the integer part: don't make the volume bigger than requested */
-	new_size = opt.bytes / vol->cluster_size;
-
 	/* Backup boot sector at the end of device isn't counted in NTFS
 	   volume size thus we have to reserve space for it. */
-	if (new_size)
-		--new_size;
+	if (opt.bytes > vol->sector_size)
+		new_size = (opt.bytes - vol->sector_size) / vol->cluster_size;
+	else
+		new_size = 0;
 
 	if (!opt.info && !opt.infombonly) {
 		print_vol_size("New volume size    ", vol_size(vol, new_size));
