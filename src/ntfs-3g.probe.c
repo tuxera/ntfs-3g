@@ -159,6 +159,8 @@ int main(int argc, char *argv[])
 	err = ntfs_open(opts.device);
 
 	free(opts.device);
-	exit(err);
+	if (err)
+		exit(err);
+	return (0);
 }
 
