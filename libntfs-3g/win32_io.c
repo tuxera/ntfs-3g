@@ -6,7 +6,7 @@
  * Copyright (c) 2003-2004 Lode Leroy
  * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yuval Fledel
- * Copyright (c) 2012      Jean-Pierre Andre
+ * Copyright (c) 2012-2013 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -70,6 +70,7 @@ typedef struct {
 #endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#define stat stat64
 #define st_blocks  st_rdev /* emulate st_blocks, missing in Windows */
 #endif
 
@@ -1744,19 +1745,22 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 	win32_fd *fd = (win32_fd *)dev->d_private;
 	mode_t st_mode;
 
-	switch (GetFileType(fd->handle)) {
-	case FILE_TYPE_CHAR:
-		st_mode = S_IFCHR;
-		break;
-	case FILE_TYPE_DISK:
+	if ((dev->d_name[1] == ':') && (dev->d_name[2] == '\0'))
 		st_mode = S_IFBLK;
-		break;
-	case FILE_TYPE_PIPE:
-		st_mode = S_IFIFO;
-		break;
-	default:
-		st_mode = 0;
-	}
+	else
+		switch (GetFileType(fd->handle)) {
+		case FILE_TYPE_CHAR:
+			st_mode = S_IFCHR;
+			break;
+		case FILE_TYPE_DISK:
+			st_mode = S_IFREG;
+			break;
+		case FILE_TYPE_PIPE:
+			st_mode = S_IFIFO;
+			break;
+		default:
+			st_mode = 0;
+		}
 	memset(buf, 0, sizeof(struct stat));
 	buf->st_mode = st_mode;
 	buf->st_size = fd->part_length;
