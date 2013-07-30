@@ -5,6 +5,7 @@
  * Copyright (c) 2004-2005 Holger Ohmacht
  * Copyright (c) 2005      Anton Altaparmakov
  * Copyright (c) 2007      Yura Pakhuchiy
+ * Copyright (c) 2013      Jean-Pierre Andre
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -390,7 +391,8 @@ static void version(void)
 	ntfs_log_info("Copyright (c) 2002-2005 Richard Russon\n"
 			"Copyright (c) 2004-2005 Holger Ohmacht\n"
 			"Copyright (c) 2005      Anton Altaparmakov\n"
-			"Copyright (c) 2007      Yura Pakhuchiy\n");
+			"Copyright (c) 2007      Yura Pakhuchiy\n"
+			"Copyright (c) 2013      Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1656,7 +1658,7 @@ static void dump_record(struct ufile *file)
  *
  * Print a one line description of a file.
  *
- *   Inode    Flags  %age  Date            Size  Filename
+ *   Inode    Flags  %age     Date  Time        Size  Filename
  *
  * The output will contain the file's inode number (MFT Record), some flags,
  * the percentage of the file that is recoverable, the last modification date,
@@ -1683,7 +1685,7 @@ static void list_record(struct ufile *file)
 
 	char flagd = '.', flagr = '.', flagc = '.', flagx = '.';
 
-	strftime(buffer, sizeof(buffer), "%F", localtime(&file->date));
+	strftime(buffer, sizeof(buffer), "%F %R", localtime(&file->date));
 
 	if (file->attr_list)
 		flagx = '!';
@@ -2219,8 +2221,8 @@ static int scan_disk(ntfs_volume *vol)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
-	ntfs_log_quiet("Inode    Flags  %%age  Date           Size  Filename\n");
-	ntfs_log_quiet("---------------------------------------------------------------\n");
+	ntfs_log_quiet("Inode    Flags  %%age     Date    Time       Size  Filename\n");
+	ntfs_log_quiet("-----------------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
 		long long read_count = min((bmpsize - i), BUFSIZE);
 		size = ntfs_attr_pread(attr, i, read_count, buffer);
