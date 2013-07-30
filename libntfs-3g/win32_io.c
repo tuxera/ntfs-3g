@@ -599,7 +599,7 @@ static s64 ntfs_device_win32_getsize(HANDLE handle)
 		ntfs_log_trace("Couldn't get file size.\n");
 		return -1;
 	}
-	return ((s64)hiword << 32) + loword;
+	return ((s64)hiword << 32) + (ULONG)loword;
 }
 
 /**
