@@ -3550,10 +3550,6 @@ static long mkntfs_get_page_size(void)
 	page_size = sysconf(_SC_PAGESIZE);
 	if (page_size < 0)
 #endif
-#ifdef _SC_PAGE_SIZE
-		page_size = sysconf(_SC_PAGE_SIZE);
-	if (page_size < 0)
-#endif
 	{
 		ntfs_log_warning("Failed to determine system page size.  "
 				"Assuming safe default of 4096 bytes.\n");
