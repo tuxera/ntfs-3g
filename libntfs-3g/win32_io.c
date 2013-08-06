@@ -592,9 +592,11 @@ static s64 ntfs_device_win32_getsize(HANDLE handle)
 {
 	LONG loword, hiword;
 
+	SetLastError(NO_ERROR);
 	hiword = 0;
 	loword = SetFilePointer(handle, 0, &hiword, 2);
-	if (loword == INVALID_FILE_SIZE) {
+	if ((loword == INVALID_SET_FILE_POINTER)
+	    && (GetLastError() != NO_ERROR)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		ntfs_log_trace("Couldn't get file size.\n");
 		return -1;
