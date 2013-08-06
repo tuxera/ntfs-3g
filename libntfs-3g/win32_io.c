@@ -482,7 +482,8 @@ static int ntfs_device_win32_simple_open_file(const char *filename,
 	*handle = CreateFile(filename,
 			ntfs_device_unix_status_flags_to_win32(flags),
 			locking ? 0 : (FILE_SHARE_WRITE | FILE_SHARE_READ),
-			NULL, OPEN_EXISTING, 0, NULL);
+			NULL, (flags & O_CREAT ? OPEN_ALWAYS : OPEN_EXISTING),
+			0, NULL);
 	if (*handle == INVALID_HANDLE_VALUE) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		ntfs_log_trace("CreateFile(%s) failed.\n", filename);
