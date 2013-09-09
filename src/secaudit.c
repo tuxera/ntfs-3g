@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2012 Jean-Pierre Andre
+ * Copyright (c) 2007-2013 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -203,6 +203,9 @@
  *
  *  Aug 2012, version 1.4.0
  *     - added an option for user mapping proposal
+ *
+ *  Sep 2013, version 1.4.1
+ *     - silenced an aliasing warning by gcc >= 4.8
  */
 
 /*
@@ -226,7 +229,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.0"
+#define AUDT_VERSION "1.4.1"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2480,6 +2483,7 @@ void showhex(FILE *fd)
 	int mode;
 	unsigned int off;
 	int i;
+	le32 *pattr;
 	BOOL isdump;
 	BOOL done;
 
@@ -2539,8 +2543,9 @@ void showhex(FILE *fd)
 			/* decode it into attribute */
 		if (isdump && (off == pos)) {
 			for (i=first+8; i<lth; i+=9) {
+				pattr = (le32*)&attr[pos];
 				v = getlsbhex(&line[i]);
-				*(le32*)&attr[pos] = cpu_to_le32(v);
+				*pattr = cpu_to_le32(v);
 				pos += 4;
 			}
 		}
@@ -2718,6 +2723,7 @@ BOOL restore(FILE *fd)
 	int i;
 	int count;
 	int attrib;
+	le32 *pattr;
 	BOOL withattr;
 	BOOL done;
 
@@ -2774,8 +2780,9 @@ BOOL restore(FILE *fd)
 			/* decode it into attribute */
 		if (isdump && (off == pos)) {
 			for (i=first+8; i<lth; i+=9) {
+				pattr = (le32*)&attr[pos];
 				v = getlsbhex(&line[i]);
-				*(le32*)&attr[pos] = cpu_to_le32(v);
+				*pattr = cpu_to_le32(v);
 				pos += 4;
 			}
 		}

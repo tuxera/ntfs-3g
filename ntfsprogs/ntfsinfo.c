@@ -1979,6 +1979,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 {
 	EA_ATTR *ea;
 	u8 *buf = NULL;
+	le32 *pval;
 	s64 data_size;
 
 	if (attr->non_resident) {
@@ -2036,10 +2037,10 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		printf("\tValue:\t\t ");
 		if (ea->name_length == 11 &&
 				!strncmp((const char*)"SETFILEBITS",
-				(const char*)ea->name, 11))
-			printf("0%o\n", (unsigned)le32_to_cpu(*(le32*)
-					(ea->value + ea->name_length + 1)));
-		else
+				(const char*)ea->name, 11)) {
+			pval = (le32*)(ea->value + ea->name_length + 1);
+			printf("0%lo\n", (unsigned long)le32_to_cpu(*pval));
+		} else
 			printf("'%s'\n", ea->value + ea->name_length + 1);
 		if (ea->next_entry_offset)
 			ea = (EA_ATTR*)((u8*)ea +
