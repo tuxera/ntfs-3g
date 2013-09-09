@@ -305,7 +305,9 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
         char templ[] = "/tmp/fusermountXXXXXX";
         char *tmp;
 
-        setuid(geteuid());
+        if (setuid(geteuid()))
+            fprintf(stderr, "%s: failed to setuid : %s\n", progname,
+                             strerror(errno));
 
         /* 
          * hide in a directory, where mount isn't able to resolve
@@ -351,7 +353,9 @@ int fuse_mnt_umount(const char *progname, const char *mnt, int lazy)
         return -1;
     }
     if (res == 0) {
-        setuid(geteuid());
+        if (setuid(geteuid()))
+            fprintf(stderr, "%s: failed to setuid : %s\n", progname,
+                         strerror(errno));
         execl("/bin/umount", "/bin/umount", "-i", mnt, lazy ? "-l" : NULL,
               NULL);
         fprintf(stderr, "%s: failed to execute /bin/umount: %s\n", progname,
