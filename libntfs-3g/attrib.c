@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2011 Jean-Pierre Andre
+ * Copyright (c) 2007-2013 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -454,7 +454,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	if (type == AT_ATTRIBUTE_LIST)
 		a->flags = 0;
 
-	if ((type == AT_DATA) && !a->initialized_size) {
+	if ((type == AT_DATA)
+	   && (a->non_resident ? !a->initialized_size : !a->value_length)) {
 		/*
 		 * Define/redefine the compression state if stream is
 		 * empty, based on the compression mark on parent
