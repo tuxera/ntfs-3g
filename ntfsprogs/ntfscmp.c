@@ -704,7 +704,7 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 		 * If difference exists then it's already reported at the
 		 * attribute header since the mapping pairs must differ.
 		 */
-		return;
+		goto close_attribs;
 	}
 
 	if (na1->type == AT_INDEX_ALLOCATION)
