@@ -6588,7 +6588,8 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 	
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
-		ntfs_log_perror("ntfs_attr_open failed");
+		ntfs_log_perror("ntfs_attr_open failed, inode %lld attr 0x%lx",
+				(long long)ni->mft_no,(long)le32_to_cpu(type));
 		goto err_exit;
 	}
 	data = ntfs_malloc(na->data_size);
