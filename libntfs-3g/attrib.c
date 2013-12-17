@@ -5567,7 +5567,7 @@ retry:
 		BOOL changed;
 
 		if (!(na->data_flags & ATTR_IS_SPARSE)) {
-			int sparse;
+			int sparse = 0;
 			runlist_element *xrl;
 
 				/*
@@ -5575,10 +5575,18 @@ retry:
 				 * have to check whether there is a hole
 				 * in the updated region.
 				 */
-			xrl = na->rl;
-			if (xrl->lcn == LCN_RL_NOT_MAPPED)
-				xrl++;
-			sparse = ntfs_rl_sparse(xrl);
+			for (xrl = na->rl; xrl->length; xrl++) {
+				if (xrl->lcn < 0) {
+					if (xrl->lcn == LCN_HOLE) {
+						sparse = 1;
+						break;
+					}
+					if (xrl->lcn != LCN_RL_NOT_MAPPED) {
+						sparse = -1;
+						break;
+					}
+				}
+			}
 			if (sparse < 0) {
 				ntfs_log_error("Could not check whether sparse\n");
 				errno = EIO;
