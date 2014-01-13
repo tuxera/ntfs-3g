@@ -4,6 +4,7 @@
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2005-2007 Anton Altaparmakov
  * Copyright (c) 2007 Yura Pakhuchiy
+ * Copyright (c) 2014 Jean-Pierre Andre
  *
  * This utility will decrypt files and print the decrypted data on the standard
  * output.
@@ -102,24 +103,22 @@ typedef enum {
 	CALG_AES_256	= const_cpu_to_le32(0x6610),
 } NTFS_CRYPTO_ALGORITHMS;
 
+typedef struct {
+	u64 in_whitening, out_whitening;
+	u8 des_key[8];
+} ntfs_desx_ctx;
+
 /**
  * struct ntfs_fek - Decrypted, in-memory file encryption key.
  */
+
 typedef struct {
 	gcry_cipher_hd_t gcry_cipher_hd;
 	le32 alg_id;
 	u8 *key_data;
 	gcry_cipher_hd_t *des_gcry_cipher_hd_ptr;
+	ntfs_desx_ctx desx_ctx;
 } ntfs_fek;
-
-/* DESX-MS128 implementation for libgcrypt. */
-static gcry_module_t ntfs_desx_module;
-static int ntfs_desx_algorithm_id = -1;
-
-typedef struct {
-	u64 in_whitening, out_whitening;
-	gcry_cipher_hd_t gcry_cipher_hd;
-} ntfs_desx_ctx;
 
 struct options {
 	char *keyfile;	/* .pfx file containing the user's private key. */
@@ -153,6 +152,7 @@ static void version(void)
 			"standard output.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2005 Yuval Fledel\n");
 	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2014 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -393,11 +393,6 @@ static int ntfs_crypto_init(void)
 static void ntfs_crypto_deinit(void)
 {
 	gnutls_global_deinit();
-	if (ntfs_desx_module) {
-		gcry_cipher_unregister(ntfs_desx_module);
-		ntfs_desx_module = NULL;
-		ntfs_desx_algorithm_id = -1;
-	}
 }
 
 /**
@@ -865,81 +860,23 @@ out:
 }
 
 /**
- * ntfs_desx_setkey - libgcrypt set_key implementation for DES-X-MS128
- * @context:	pointer to a variable of type ntfs_desx_ctx
- * @key:	the 128 bit DES-X-MS128 key, concated with the DES handle
- * @keylen:	must always be 16
- *
- * This is the libgcrypt set_key implementation for DES-X-MS128.
- */
-static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
-		unsigned keylen)
-{
-	ntfs_desx_ctx *ctx = context;
-	gcry_error_t err;
-	u8 des_key[8];
-
-	if (keylen != 16) {
-		ntfs_log_error("Key length for desx must be 16.\n");
-		return GPG_ERR_INV_KEYLEN;
-	}
-	err = gcry_cipher_open(&ctx->gcry_cipher_hd, GCRY_CIPHER_DES,
-			GCRY_CIPHER_MODE_ECB, 0);
-	if (err != GPG_ERR_NO_ERROR) {
-		ntfs_log_error("Failed to open des cipher (error 0x%x).\n",
-				err);
-		return err;
-	}
-	err = ntfs_desx_key_expand(key, (u32*)des_key, &ctx->out_whitening,
-			&ctx->in_whitening);
-	if (err != GPG_ERR_NO_ERROR) {
-		ntfs_log_error("Failed to expand desx key (error 0x%x).\n",
-				err);
-		gcry_cipher_close(ctx->gcry_cipher_hd);
-		return err;
-	}
-	err = gcry_cipher_setkey(ctx->gcry_cipher_hd, des_key, sizeof(des_key));
-	if (err != GPG_ERR_NO_ERROR) {
-		ntfs_log_error("Failed to set des key (error 0x%x).\n", err);
-		gcry_cipher_close(ctx->gcry_cipher_hd);
-		return err;
-	}
-	/*
-	 * Take a note of the ctx->gcry_cipher_hd since we need to close it at
-	 * ntfs_decrypt_data_key_close() time.
-	 */
-	**(gcry_cipher_hd_t***)(key + ((keylen + 7) & ~7)) =
-			&ctx->gcry_cipher_hd;
-	return GPG_ERR_NO_ERROR;
-}
-
-/**
  * ntfs_desx_decrypt
  */
-static void ntfs_desx_decrypt(void *context, u8 *outbuf, const u8 *inbuf)
+static void ntfs_desx_decrypt(ntfs_fek *fek, u8 *outbuf, const u8 *inbuf)
 {
-	ntfs_desx_ctx *ctx = context;
 	gcry_error_t err;
+	ntfs_desx_ctx *ctx = &fek->desx_ctx;
 
-	err = gcry_cipher_reset(ctx->gcry_cipher_hd);
+	err = gcry_cipher_reset(fek->gcry_cipher_hd);
 	if (err != GPG_ERR_NO_ERROR)
 		ntfs_log_error("Failed to reset des cipher (error 0x%x).\n",
 				err);
 	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->out_whitening;
-	err = gcry_cipher_encrypt(ctx->gcry_cipher_hd, outbuf, 8, NULL, 0);
+	err = gcry_cipher_encrypt(fek->gcry_cipher_hd, outbuf, 8, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR)
 		ntfs_log_error("Des decryption failed (error 0x%x).\n", err);
 	*(u64*)outbuf ^= ctx->in_whitening;
 }
-
-static gcry_cipher_spec_t ntfs_desx_cipher = {
-	.name = "DES-X-MS128",
-	.blocksize = 8,
-	.keylen = 128,
-	.contextsize = sizeof(ntfs_desx_ctx),
-	.setkey = ntfs_desx_setkey,
-	.decrypt = ntfs_desx_decrypt,
-};
 
 //#define DO_CRYPTO_TESTS 1
 
@@ -1066,7 +1003,9 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 {
 	ntfs_fek *fek;
 	u32 key_size, wanted_key_size, gcry_algo;
+	int gcry_mode;
 	gcry_error_t err;
+	ntfs_desx_ctx *ctx;
 
 	key_size = le32_to_cpup(fek_buf);
 	ntfs_log_debug("key_size 0x%x\n", key_size);
@@ -1082,6 +1021,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 		errno = ENOMEM;
 		return NULL;
 	}
+	ctx = &fek->desx_ctx;
 	fek->alg_id = *(le32*)(fek_buf + 8);
 	//ntfs_log_debug("alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
 	fek->key_data = (u8*)fek + ((sizeof(*fek) + 7) & ~7);
@@ -1091,36 +1031,24 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 			&fek->des_gcry_cipher_hd_ptr;
 	switch (fek->alg_id) {
 	case CALG_DESX:
-		if (!ntfs_desx_module) {
-			if (!ntfs_desx_key_expand_test() || !ntfs_des_test()) {
-				err = EINVAL;
-				goto out;
-			}
-			err = gcry_cipher_register(&ntfs_desx_cipher,
-					&ntfs_desx_algorithm_id,
-					&ntfs_desx_module);
-			if (err != GPG_ERR_NO_ERROR) {
-				ntfs_log_error("Failed to register desx "
-						"cipher: %s\n",
-						gcry_strerror(err));
-				err = EINVAL;
-				goto out;
-			}
-		}
 		wanted_key_size = 16;
-		gcry_algo = ntfs_desx_algorithm_id;
+		gcry_algo = GCRY_CIPHER_DES;
+		gcry_mode = GCRY_CIPHER_MODE_ECB;
 		break;
 	case CALG_3DES:
 		wanted_key_size = 24;
 		gcry_algo = GCRY_CIPHER_3DES;
+		gcry_mode = GCRY_CIPHER_MODE_CBC;
 		break;
 	case CALG_AES_256:
 		wanted_key_size = 32;
 		gcry_algo = GCRY_CIPHER_AES256;
+		gcry_mode = GCRY_CIPHER_MODE_CBC;
 		break;
 	default:
 		wanted_key_size = 8;
 		gcry_algo = GCRY_CIPHER_DES;
+		gcry_mode = GCRY_CIPHER_MODE_CBC;
 		if (fek->alg_id == CALG_DES)
 			ntfs_log_error("DES is not supported at present\n");
 		else
@@ -1142,14 +1070,24 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 		goto out;
 	}
 	err = gcry_cipher_open(&fek->gcry_cipher_hd, gcry_algo,
-			GCRY_CIPHER_MODE_CBC, 0);
+				gcry_mode, 0);
+
 	if (err != GPG_ERR_NO_ERROR) {
 		ntfs_log_error("gcry_cipher_open() failed: %s\n",
 				gcry_strerror(err));
 		err = EINVAL;
 		goto out;
 	}
-	err = gcry_cipher_setkey(fek->gcry_cipher_hd, fek->key_data, key_size);
+	if (fek->alg_id == CALG_DESX) {
+		err = ntfs_desx_key_expand(fek->key_data, (u32*)ctx->des_key,
+				&ctx->out_whitening, &ctx->in_whitening);
+		if (err == GPG_ERR_NO_ERROR)
+			err = gcry_cipher_setkey(fek->gcry_cipher_hd,
+							ctx->des_key, 8);
+	} else {
+		err = gcry_cipher_setkey(fek->gcry_cipher_hd, fek->key_data,
+							key_size);
+	}
 	if (err != GPG_ERR_NO_ERROR) {
 		ntfs_log_error("gcry_cipher_setkey() failed: %s\n",
 				gcry_strerror(err));
@@ -1206,7 +1144,8 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 		df_cert = (EFS_DF_CERT_THUMBPRINT_HEADER*)((u8*)df_cred +
 				le32_to_cpu(
 				df_cred->cert_thumbprint_header_offset));
-		if (le32_to_cpu(df_cert->thumbprint_size) != thumbprint_size) {
+		if ((int)le32_to_cpu(df_cert->thumbprint_size)
+						!= thumbprint_size) {
 			ntfs_log_error("Thumbprint size %d is not valid "
 					"(should be %d), skipping this DF "
 					"entry.\n",
@@ -1306,7 +1245,14 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	 * that gcry_cipher_setiv() wants an iv of length 8 bytes but we give
 	 * it a length of 16 for AES256 so it does not like it.
 	 */
-	err = gcry_cipher_decrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);
+	if (fek->alg_id == CALG_DESX) {
+		int k;
+
+		for (k=0; k<512; k+=8) {
+			ntfs_desx_decrypt(fek, &data[k], &data[k]);
+		}
+	} else
+		err = gcry_cipher_decrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR) {
 		ntfs_log_error("Decryption failed: %s\n", gcry_strerror(err));
 		return -1;
