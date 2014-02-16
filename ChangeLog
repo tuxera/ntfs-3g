@@ -1,7 +1,6 @@
 
-Detailed ChangeLog can be found at http://mercurial.creo.hu/repos/ntfs-3g-hg/
+Detailed ChangeLog can be found at
+	http://www.tuxera.com/community/release-history/
 
-Alternatively it can be generated from the CVS source repository by cvs2cl.pl.
-Instructions for CVS access: http://sourceforge.net/cvs/?group_id=181143
-Home of the cvs2cl.pl utility: http://www.red-bean.com/cvs2cl/
-
+The changes and history may also be found on the source repository :
+	http://sourceforge.net/p/ntfs-3g/ntfs-3g/ci/edge/tree/
