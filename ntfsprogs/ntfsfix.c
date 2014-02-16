@@ -153,8 +153,8 @@ static void version(void)
 		   "Attempt to fix an NTFS partition.\n\n"
 		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
-		   "Copyright (c) 2007      Yura Pakhuchiy\n\n"
-		   "Copyright (c) 2011      Jean-Pierre Andre\n\n",
+		   "Copyright (c) 2007      Yura Pakhuchiy\n"
+		   "Copyright (c) 2011-2012 Jean-Pierre Andre\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);

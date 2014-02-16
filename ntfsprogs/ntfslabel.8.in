@@ -1,8 +1,9 @@
 .\" Copyright (c) 2002\-2004 Anton Altaparmakov.
 .\" Copyright (c) 2005 Richard Russon.
+.\" Copyright (c) 2012 Jean-Pierre Andre.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSLABEL 8 "November 2005" "ntfs-3g @VERSION@"
+.TH NTFSLABEL 8 "January 2012" "ntfs-3g @VERSION@"
 .SH NAME
 ntfslabel \- display/change the label on an ntfs file system
 .SH SYNOPSIS

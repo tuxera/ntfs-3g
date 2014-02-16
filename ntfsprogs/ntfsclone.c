@@ -369,6 +369,7 @@ static void usage(void)
 #ifdef DEBUG
 		"    -d, --debug            Show debug information\n"
 #endif
+		"    -V, --version           Display version information\n"
 		"\n"
 		"    If FILE is '-' then send the image to the standard output. If SOURCE is '-'\n"
 		"    and --restore-image is used then read the image from the standard input.\n"
@@ -377,9 +378,24 @@ static void usage(void)
 	exit(1);
 }
 
+/**
+ * version
+ */
+__attribute__((noreturn))
+static void version(void)
+{
+	fprintf(stderr,
+		   "Efficiently clone, image, restore or rescue an NTFS Volume.\n\n"
+		   "Copyright (c) 2003-2006 Szabolcs Szakacsits\n"
+		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
+		   "Copyright (c) 2010-2013 Jean-Pierre Andre\n\n");
+	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
+	exit(1);
+}
+
 static void parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhmno:O:qrst";
+	static const char *sopt = "-dfhmno:O:qrstV";
 	static const struct option lopt[] = {
 #ifdef DEBUG
 		{ "debug",	      no_argument,	 NULL, 'd' },
@@ -398,6 +414,7 @@ static void parse_options(int argc, char **argv)
 		{ "new-half-serial",  no_argument,	 NULL, 'i' },
 		{ "save-image",	      no_argument,	 NULL, 's' },
 		{ "preserve-timestamps",   no_argument,  NULL, 't' },
+		{ "version",	      no_argument,	 NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -457,6 +474,9 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 't':
 			opt.preserve_timestamps++;
+			break;
+		case 'V':
+			version();
 			break;
 		default:
 			err_printf("Unknown option '%s'.\n", argv[optind-1]);
