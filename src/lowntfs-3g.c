@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2013 Jean-Pierre Andre
+ * Copyright (c) 2007-2014 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -214,7 +214,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2013 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2014 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -3034,7 +3034,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		 * hijack internal data and ACL setting, whatever
 		 * mode was selected for xattr (from the user's
 		 * point of view, ACLs are not xattr)
-		 * Note : updating an ACL does not set ctime
+		 * Note : ctime updated on successful settings
 		 */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		ni = ntfs_check_access_xattr(req,&security,ino,attr,TRUE);
@@ -3051,9 +3051,13 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 					res = -errno;
 			} else
 				res = -errno;
-			if ((attr != XATTR_NTFS_DOS_NAME)
-			   && ntfs_inode_close(ni))
-				set_fuse_error(&res);
+			if (attr != XATTR_NTFS_DOS_NAME) {
+				if (!res)
+					ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_CTIME);
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
 		} else
 			res = -errno;
 #else
@@ -3081,9 +3085,13 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 					res = -errno;
 			} else
 				res = -errno;
-			if ((attr != XATTR_NTFS_DOS_NAME)
-			    && ntfs_inode_close(ni))
-				set_fuse_error(&res);
+			if (attr != XATTR_NTFS_DOS_NAME) {
+				if (!res)
+					ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_CTIME);
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
 		} else
 			res = -errno;
 #endif
@@ -3221,9 +3229,12 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 				res = -errno;
 		}
 	}
-	if (!res && !(ni->flags & FILE_ATTR_ARCHIVE)) {
-		set_archive(ni);
-		NInoFileNameSetDirty(ni);
+	if (!res) {
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+			set_archive(ni);
+			NInoFileNameSetDirty(ni);
+		}
 	}
 exit:
 	if (na)
@@ -3282,9 +3293,13 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 					/* never have to close dir_ni */
 				} else
 					res = -errno;
-				if ((attr != XATTR_NTFS_DOS_NAME)
-				   && ntfs_inode_close(ni))
-					set_fuse_error(&res);
+				if (attr != XATTR_NTFS_DOS_NAME) {
+					if (!res)
+						ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_CTIME);
+					if (ntfs_inode_close(ni))
+						set_fuse_error(&res);
+				}
 			} else
 				res = -errno;
 #else
@@ -3312,9 +3327,13 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 						res = -errno;
 				} else
 					res = -errno;
-				if ((attr != XATTR_NTFS_DOS_NAME)
-				    && ntfs_inode_close(ni))
-					set_fuse_error(&res);
+				if (attr != XATTR_NTFS_DOS_NAME) {
+					if (!res)
+						ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_CTIME);
+					if (ntfs_inode_close(ni))
+						set_fuse_error(&res);
+				}
 			} else
 				res = -errno;
 #endif
@@ -3409,9 +3428,12 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 			errno = ENODATA;
 		res = -errno;
 	}
-	if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
-		set_archive(ni);
-		NInoFileNameSetDirty(ni);
+	if (!res) {
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+			set_archive(ni);
+			NInoFileNameSetDirty(ni);
+		}
 	}
 exit:
 	free(lename);
