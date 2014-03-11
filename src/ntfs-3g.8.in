@@ -1,10 +1,10 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
 .\" Copyright (c) 2006-2009 Szabolcs Szakacsits.
-.\" Copyright (c) 2009-2012 Jean-Pierre Andre
+.\" Copyright (c) 2009-2014 Jean-Pierre Andre
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "May 2012" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "Mar 2014" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -267,12 +267,15 @@ The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 .TP
 .B silent
-Do nothing, without returning any error, on chmod and chown operations,
+Do nothing, without returning any error, on chmod and chown operations
+and on permission checking errors,
 when the \fBpermissions\fR option is not set and no user mapping file
-is defined. This option is on by default.
+is defined. This option is on by default, and when set off (through option
+\fBno_def_opts\fR) ownership and permissions parameters have to be set.
 .TP
 .B no_def_opts
-By default ntfs-3g acts as if "silent" (ignore errors on chmod and chown),
+By default ntfs-3g acts as if "silent" (ignore permission errors when
+permissions are not enabled),
 "allow_other" (allow any user to access files) and "nonempty"
 (allow mounting on non-empty directories) were set, and "no_def_opts"
 cancels these default options.
