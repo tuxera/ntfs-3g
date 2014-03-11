@@ -573,7 +573,7 @@ int main(int argc, char *argv[])
 close_attr:
 	ntfs_attr_close(na);
 close_dst:
-	while (ntfs_inode_close(out)) {
+	while (ntfs_inode_close(out) && !opts.noaction) {
 		if (errno != EBUSY) {
 			ntfs_log_error("Sync failed. Run chkdsk.\n");
 			break;
