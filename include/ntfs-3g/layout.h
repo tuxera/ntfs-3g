@@ -235,7 +235,7 @@ typedef enum {
 	FILE_reserved12	= 12,	/* Reserved for future use (records 12-15). */
 	FILE_reserved13	= 13,
 	FILE_reserved14	= 14,
-	FILE_reserved15	= 15,
+	FILE_mft_data	= 15,	/* Reserved for first extent of $MFT:$DATA */
 	FILE_first_user	= 16,	/* First user file, used as test limit for
 				   whether to allow opening a file or not. */
 } NTFS_SYSTEM_FILES;

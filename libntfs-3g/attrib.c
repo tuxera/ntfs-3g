@@ -5869,8 +5869,12 @@ retry:
 			ntfs_log_perror("%s: get mp size failed", __FUNCTION__);
 			goto put_err_out;
 		}
-		/* Allocate new mft record. */
-		ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
+		/* Allocate new mft record, with special case for mft itself */
+		if (!na->ni->mft_no)
+			ni = ntfs_mft_rec_alloc(na->ni->vol,
+				na->type == AT_DATA);
+		else
+			ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
 		if (!ni) {
 			ntfs_log_perror("Could not allocate new MFT record");
 			goto put_err_out;
