@@ -72,13 +72,13 @@ typedef gcry_sexp_t ntfs_rsa_private_key;
 
 #define NTFS_CRED_TYPE_CERT_THUMBPRINT const_cpu_to_le32(3)
 
-#define NTFS_EFS_CERT_PURPOSE_OID_DDF "1.3.6.1.4.1.311.10.3.4"
-#define NTFS_EFS_CERT_PURPOSE_OID_DRF "1.3.6.1.4.1.311.10.3.4.1"
+#define NTFS_EFS_CERT_PURPOSE_OID_DDF "1.3.6.1.4.1.311.10.3.4" /* decryption */
+#define NTFS_EFS_CERT_PURPOSE_OID_DRF "1.3.6.1.4.1.311.10.3.4.1" /* recovery */
 
 typedef enum {
 	DF_TYPE_UNKNOWN,
-	DF_TYPE_DDF,
-	DF_TYPE_DRF,
+	DF_TYPE_DDF, /* decryption */
+	DF_TYPE_DRF, /* recovery */
 } NTFS_DF_TYPES;
 
 /**
@@ -471,6 +471,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	ntfs_rsa_private_key rsa_key = NULL;
 	char purpose_oid[100];
 	size_t purpose_oid_size = sizeof(purpose_oid);
+	int oid_index;
 	size_t tp_size = thumbprint_size;
 	BOOL have_thumbprint = FALSE;
 
@@ -630,26 +631,40 @@ check_again:
 						"%s\n", gnutls_strerror(err));
 				goto err;
 			}
-			err = gnutls_x509_crt_get_key_purpose_oid(crt, 0,
+			oid_index = 0;
+				/*
+				 * Search in the key purposes for an EFS
+				 * encryption purpose or an EFS recovery
+				 * purpose, and use the first one found.
+				 */
+			do {
+				purpose_oid_size = sizeof(purpose_oid);
+				err = gnutls_x509_crt_get_key_purpose_oid(crt,
+					oid_index,
 					purpose_oid, &purpose_oid_size, NULL);
-			if (err) {
-				ntfs_log_error("Failed to get key purpose "
-						"OID: %s\n",
-						gnutls_strerror(err));
-				goto err;
-			}
-			purpose_oid[purpose_oid_size - 1] = '\0';
-			if (!strcmp(purpose_oid,
-					NTFS_EFS_CERT_PURPOSE_OID_DRF))
-				*df_type = DF_TYPE_DRF;
-			else if (!strcmp(purpose_oid,
-					NTFS_EFS_CERT_PURPOSE_OID_DDF))
-				*df_type = DF_TYPE_DDF;
-			else {
-				ntfs_log_error("Certificate has unknown "
-						"purpose OID %s.\n",
-						purpose_oid);
-				err = EINVAL;
+				if (!err) {
+					purpose_oid[purpose_oid_size - 1]
+							= '\0';
+					if (!strcmp(purpose_oid,
+						NTFS_EFS_CERT_PURPOSE_OID_DRF))
+					*df_type = DF_TYPE_DRF;
+					else if (!strcmp(purpose_oid,
+						NTFS_EFS_CERT_PURPOSE_OID_DDF))
+						*df_type = DF_TYPE_DDF;
+					else
+						oid_index++;
+				}
+			} while (!err && (*df_type == DF_TYPE_UNKNOWN));
+			if (*df_type == DF_TYPE_UNKNOWN) {
+				/* End of list reached ? */
+				if (err
+				    == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+					ntfs_log_error("Key does not have an "
+						"EFS purpose OID\n");
+				else
+					ntfs_log_error("Failed to get a key "
+							"purpose OID : %s ",
+							gnutls_strerror(err));
 				goto err;
 			}
 			/* Return the thumbprint to the caller. */
