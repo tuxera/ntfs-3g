@@ -204,7 +204,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 				  (sectors - 1) << vol->sector_size_bits,
 				  SEEK_SET) == -1) {
 		ntfs_log_perror("Failed to read last sector (%lld)",
-			       	(long long)sectors);
+			       	(long long)(sectors - 1));
 		ntfs_log_error("%s", last_sector_error);
 		return -1;
 	}
