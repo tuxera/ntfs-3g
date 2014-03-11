@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2013 Jean-Pierre Andre
+ * Copyright (c) 2010-2014 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -388,7 +388,7 @@ static void version(void)
 		   "Efficiently clone, image, restore or rescue an NTFS Volume.\n\n"
 		   "Copyright (c) 2003-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
-		   "Copyright (c) 2010-2013 Jean-Pierre Andre\n\n");
+		   "Copyright (c) 2010-2014 Jean-Pierre Andre\n\n");
 	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);
 }
@@ -2298,6 +2298,27 @@ static void set_filesize(s64 filesize)
 			       "option to restore the image.\n");
 		}
 		exit(1);
+	}
+		/*
+		 * If truncate just created a sparse file, the ability
+		 * to generically store big files has been checked, but no
+		 * space has been reserved and available space has probably
+		 * not been checked. Better reset the file so that we write
+		 * sequentially to the end.
+		 */
+	if (!opt.no_action) {
+#ifdef HAVE_WINDOWS_H
+		if (ftruncate(fd_out, 0))
+			Printf("Failed to reset the output file.\n");
+#else
+		struct stat st;
+		int s;
+
+		s = fstat(fd_out, &st);
+		if (s || (!st.st_blocks && ftruncate(fd_out, 0)))
+			Printf("Failed to reset the output file.\n");
+#endif
+			/* Proceed even if ftruncate failed */
 	}
 }
 
