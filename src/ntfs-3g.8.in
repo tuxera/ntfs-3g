@@ -155,7 +155,7 @@ mount option is not set.
 When creating a new file, set its initial protections
 according to inheritance rules defined in parent directory. These rules
 deviate from Posix specifications, but yield a better Windows
-compatibility. The \fBcompression\fR option or a valid user mapping file
+compatibility. The \fBpermissions\fR option or a valid user mapping file
 is required for this option to be effective.
 .TP
 .B ro
