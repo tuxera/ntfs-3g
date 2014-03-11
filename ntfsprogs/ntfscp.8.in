@@ -38,6 +38,10 @@ Treat
 .I destination
 as inode number.
 .TP
+\fB\-m\fR, \fB\-\-min-fragments\fR
+Minimize fragmentation when allocating space to the attribute. This is
+mostly useful when creating big files.
+.TP
 \fB\-N\fR, \fB\-\-attr\-name\fR NAME
 Write to attribute with this name.
 .TP

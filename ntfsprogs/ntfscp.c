@@ -4,6 +4,7 @@
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2006 Hil Liao
+ * Copyright (c) 2014 Jean-Pierre Andre
  *
  * This utility will copy file to an NTFS volume.
  *
@@ -53,9 +54,11 @@
 #include "utils.h"
 #include "volume.h"
 #include "dir.h"
+#include "bitmap.h"
 #include "debug.h"
 /* #include "version.h" */
 #include "logging.h"
+#include "misc.h"
 
 struct options {
 	char		*device;	/* Device/File to work with */
@@ -65,10 +68,26 @@ struct options {
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
+	int		 minfragments;	/* Do minimal fragmentation */
 	int		 noaction;	/* Do not write to disk */
 	ATTR_TYPES	 attribute;	/* Write to this attribute. */
 	int		 inode;		/* Treat dest_file as inode number. */
 };
+
+struct ALLOC_CONTEXT {
+	ntfs_volume *vol;
+	ntfs_attr *na;
+	runlist_element *rl;
+	unsigned char *buf;
+	s64 gathered_clusters;
+	s64 wanted_clusters;
+	s64 new_size;
+	s64 lcn;
+	int rl_allocated;
+	int rl_count;
+} ;
+
+enum STEP { STEP_ERR, STEP_ZERO, STEP_ONE } ;
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
@@ -88,6 +107,7 @@ static void version(void)
 	ntfs_log_info("Copyright (c) 2004-2007 Yura Pakhuchiy\n");
 	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2006 Hil Liao\n");
+	ntfs_log_info("Copyright (c) 2014 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -105,6 +125,7 @@ static void usage(void)
 		"    -i, --inode           Treat dest_file as inode number\n"
 		"    -f, --force           Use less caution\n"
 		"    -h, --help            Print this help\n"
+		"    -m, --min_fragments   Do minimal fragmentation\n"
 		"    -N, --attr-name NAME  Write to attribute with this name\n"
 		"    -n, --no-action       Do not write to disk\n"
 		"    -q, --quiet           Less output\n"
@@ -125,12 +146,13 @@ static void usage(void)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-a:ifh?N:nqVv";
+	static const char *sopt = "-a:ifh?mN:no:qVv";
 	static const struct option lopt[] = {
 		{ "attribute",	required_argument,	NULL, 'a' },
 		{ "inode",	no_argument,		NULL, 'i' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
+		{ "min-fragments", no_argument,		NULL, 'm' },
 		{ "attr-name",	required_argument,	NULL, 'N' },
 		{ "no-action",	no_argument,		NULL, 'n' },
 		{ "quiet",	no_argument,		NULL, 'q' },
@@ -200,6 +222,9 @@ static int parse_options(int argc, char **argv)
 				break;
 			}
 			help++;
+			break;
+		case 'm':
+			opts.minfragments++;
 			break;
 		case 'N':
 			if (opts.attr_name) {
@@ -274,6 +299,486 @@ static int parse_options(int argc, char **argv)
 static void signal_handler(int arg __attribute__((unused)))
 {
 	caught_terminate++;
+}
+
+/*
+ *		Search for the next '0' in a bitmap chunk
+ *
+ *	Returns the position of next '0'
+ *		or -1 if there are no more '0's
+ */
+
+static int next_zero(struct ALLOC_CONTEXT *alctx, s32 bufpos, s32 count)
+{
+	s32 index;
+	unsigned int q,b;
+
+	index = -1;
+	while ((index < 0) && (bufpos < count)) {
+		q = alctx->buf[bufpos >> 3];
+		if (q == 255)
+			bufpos = (bufpos | 7) + 1;
+		else {
+			b = bufpos & 7;
+			while ((b < 8)
+			    && ((1 << b) & q))
+				b++;
+			if (b < 8) {
+				index = (bufpos & -8) | b;
+			} else {
+				bufpos = (bufpos | 7) + 1;
+			}
+		}
+	}
+	return (index);
+}
+
+/*
+ *		Search for the next '1' in a bitmap chunk
+ *
+ *	Returns the position of next '1'
+ *		or -1 if there are no more '1's
+ */
+
+static int next_one(struct ALLOC_CONTEXT *alctx, s32 bufpos, s32 count)
+{
+	s32 index;
+	unsigned int q,b;
+
+	index = -1;
+	while ((index < 0) && (bufpos < count)) {
+		q = alctx->buf[bufpos >> 3];
+		if (q == 0)
+			bufpos = (bufpos | 7) + 1;
+		else {
+			b = bufpos & 7;
+			while ((b < 8)
+			    && !((1 << b) & q))
+				b++;
+			if (b < 8) {
+				index = (bufpos & -8) | b;
+			} else {
+				bufpos = (bufpos | 7) + 1;
+			}
+		}
+	}
+	return (index);
+}
+
+/*
+ *		Allocate a bigger runlist when needed
+ *
+ *	The allocation is done by multiple of 4096 entries to avoid
+ *	frequent reallocations.
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int run_alloc(struct ALLOC_CONTEXT *alctx, s32 count)
+{
+	runlist_element *prl;
+	int err;
+
+	err = 0;
+	if (count > alctx->rl_allocated) {
+		prl = (runlist_element*)ntfs_malloc(
+			(alctx->rl_allocated + 4096)*sizeof(runlist_element));
+		if (prl) {
+			if (alctx->rl) {
+				memcpy(prl, alctx->rl, alctx->rl_allocated
+						*sizeof(runlist_element));
+				free(alctx->rl);
+			}
+			alctx->rl = prl;
+			alctx->rl_allocated += 4096;
+		} else
+			err = -1;
+	}
+	return (err);
+}
+
+/*
+ *		Merge a new run into the current optimal runlist
+ *
+ *	The new run is inserted only if it leads to improving the runlist.
+ *	Runs in the current list are dropped when inserting the new one
+ *	make them unneeded.
+ *	The current runlist is sorted by run sizes, and there is no
+ *	terminator.
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int merge_run(struct ALLOC_CONTEXT *alctx, s64 lcn, s32 count)
+{
+	s64 excess;
+	BOOL replace;
+	int k;
+	int drop;
+	int err;
+
+	err = 0;
+	if (alctx->rl_count) {
+		excess = alctx->gathered_clusters + count
+				- alctx->wanted_clusters;
+		if (alctx->rl_count > 1)
+			/* replace if we can reduce the number of runs */
+			replace = excess > (alctx->rl[0].length
+						+ alctx->rl[1].length);
+		else
+			/* replace if we can shorten a single run */
+			replace = (excess > alctx->rl[0].length)
+				&& (count < alctx->rl[0].length);
+	} else
+		replace = FALSE;
+	if (replace) {
+			/* Using this run, we can now drop smaller runs */
+		drop = 0;
+		excess = alctx->gathered_clusters + count
+					- alctx->wanted_clusters;
+			/* Compute how many clusters we can drop */
+		while ((drop < alctx->rl_count)
+		    && (alctx->rl[drop].length <= excess)) {
+			excess -= alctx->rl[drop].length;
+			drop++;
+		}
+		k = 0;
+		while (((k + drop) < alctx->rl_count)
+		   && (alctx->rl[k + drop].length < count)) {
+			alctx->rl[k] = alctx->rl[k + drop];
+			k++;
+		}
+		alctx->rl[k].length = count;
+		alctx->rl[k].lcn = lcn;
+		if (drop > 1) {
+			while ((k + drop) < alctx->rl_count) {
+				alctx->rl[k + 1] = alctx->rl[k + drop];
+				k++;
+			}
+		}
+		alctx->rl_count -= (drop - 1);
+		alctx->gathered_clusters = alctx->wanted_clusters + excess;
+	} else {
+		if (alctx->gathered_clusters < alctx->wanted_clusters) {
+			/* We had not gathered enough clusters */
+			if (!run_alloc(alctx, alctx->rl_count + 1)) {
+				k = alctx->rl_count - 1;
+				while ((k >= 0)
+				    && (alctx->rl[k].length > count)) {
+					alctx->rl[k+1] = alctx->rl[k];
+					k--;
+				}
+				alctx->rl[k+1].length = count;
+				alctx->rl[k+1].lcn = lcn;
+				alctx->rl_count++;
+				alctx->gathered_clusters += count;
+			}
+		}
+	}
+	return (err);
+}
+
+/*
+ *		Examine a buffer from the global bitmap
+ *	in order to locate free runs of clusters
+ *
+ *	Returns STEP_ZERO or STEP_ONE depending on whether the last
+ *		bit examined was in a search for '0' or '1'. This must be
+ *		put as argument to next examination.
+ *	Returns STEP_ERR if there was an error.
+ */
+
+static enum STEP examine_buf(struct ALLOC_CONTEXT *alctx, s64 pos, s64 br,
+			enum STEP step)
+{
+	s32 count;
+	s64 offbuf; /* first bit available in buf */
+	s32 bufpos; /* bit index in buf */
+	s32 index;
+
+	bufpos = pos & ((alctx->vol->cluster_size << 3) - 1);
+	offbuf = pos - bufpos;
+	while (bufpos < (br << 3)) {
+		if (step == STEP_ZERO) {
+				/* find first zero */
+			index = next_zero(alctx, bufpos, br << 3);
+			if (index >= 0) {
+				alctx->lcn = offbuf + index;
+				step = STEP_ONE;
+				bufpos = index;
+			} else {
+				bufpos = br << 3;
+			}
+		} else {
+				/* find first one */
+			index = next_one(alctx, bufpos, br << 3);
+			if (index >= 0) {
+				count = offbuf + index - alctx->lcn;
+				step = STEP_ZERO;
+				bufpos = index;
+				if (merge_run(alctx, alctx->lcn, count)) {
+					step = STEP_ERR;
+					bufpos = br << 3;
+				}
+			} else {
+				bufpos = br << 3;
+			}
+		}
+	}
+	return (step);
+}
+
+/*
+ *		Sort the final runlist by lcn's and insert a terminator
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int sort_runlist(struct ALLOC_CONTEXT *alctx)
+{
+	LCN lcn;
+	VCN vcn;
+	s64 length;
+	BOOL sorted;
+	int err;
+	int k;
+
+	err = 0;
+			/* This sorting can be much improved... */
+	do {
+		sorted = TRUE;
+		for (k=0; (k+1)<alctx->rl_count; k++) {
+			if (alctx->rl[k+1].lcn < alctx->rl[k].lcn) {
+				length = alctx->rl[k].length;
+				lcn = alctx->rl[k].lcn;
+				alctx->rl[k] = alctx->rl[k+1];
+				alctx->rl[k+1].length = length;
+				alctx->rl[k+1].lcn = lcn;
+				sorted = FALSE;
+			}
+		}
+	} while (!sorted);
+		/* compute the vcns */
+	vcn = 0;
+	for (k=0; k<alctx->rl_count; k++) {
+		alctx->rl[k].vcn = vcn;
+		vcn += alctx->rl[k].length;
+	}
+		/* Shorten the last run if we got too much */
+	if (vcn > alctx->wanted_clusters) {
+		k = alctx->rl_count - 1;
+		alctx->rl[k].length -= vcn - alctx->wanted_clusters;
+		vcn = alctx->wanted_clusters;
+	}
+		/* Append terminator */
+	if (run_alloc(alctx, alctx->rl_count + 1))
+		err = -1;
+	else {
+		k = alctx->rl_count++;
+		alctx->rl[k].vcn = vcn;
+		alctx->rl[k].length = 0;
+		alctx->rl[k].lcn = LCN_ENOENT;
+	}
+	return (err);
+}
+
+/*
+ *		Update the sizes of an attribute
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int set_sizes(struct ALLOC_CONTEXT *alctx, ntfs_attr_search_ctx *ctx)
+{
+	ntfs_attr *na;
+	ntfs_inode *ni;
+	ATTR_RECORD *attr;
+
+	na = alctx->na;
+				/* Compute the sizes */
+	na->data_size = alctx->new_size;
+	na->initialized_size = 0;
+	na->allocated_size = alctx->wanted_clusters
+					<< alctx->vol->cluster_size_bits;
+		/* Feed the sizes into the attribute */
+	attr = ctx->attr;
+	attr->non_resident = 1;
+	attr->data_size = cpu_to_le64(na->data_size);
+	attr->initialized_size = cpu_to_le64(na->initialized_size);
+	attr->allocated_size = cpu_to_le64(na->allocated_size);
+	if (na->data_flags & ATTR_IS_SPARSE)
+		attr->compressed_size = cpu_to_le64(na->compressed_size);
+		/* Copy the unnamed data attribute sizes to inode */
+	if ((opts.attribute == AT_DATA) && !na->name_len) {
+		ni = na->ni;
+		ni->data_size = na->data_size;
+		if (na->data_flags & ATTR_IS_SPARSE) {
+			ni->allocated_size = na->compressed_size;
+			ni->flags |= FILE_ATTR_SPARSE_FILE;
+		} else
+			ni->allocated_size = na->allocated_size;
+	}
+	return (0);
+}
+
+/*
+ *		Assign a runlist to an attribute and store
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int assign_runlist(struct ALLOC_CONTEXT *alctx)
+{
+	ntfs_attr *na;
+	ntfs_attr_search_ctx *ctx;
+	int k;
+	int err;
+
+	err = 0;
+	na = alctx->na;
+	if (na->rl)
+		free(na->rl);
+	na->rl = alctx->rl;
+			/* Allocate the clusters */
+	for (k=0; ((k + 1) < alctx->rl_count) && !err; k++) {
+		if (ntfs_bitmap_set_run(alctx->vol->lcnbmp_na,
+				alctx->rl[k].lcn, alctx->rl[k].length)) {
+			err = -1;
+		}
+	}
+	na->allocated_size = alctx->wanted_clusters
+					<< alctx->vol->cluster_size_bits;
+	NAttrSetNonResident(na);
+	NAttrSetFullyMapped(na);
+	if (err || ntfs_attr_update_mapping_pairs(na, 0)) {
+		err = -1;
+	} else {
+		ctx = ntfs_attr_get_search_ctx(alctx->na->ni, NULL);
+		if (ctx) {
+			if (ntfs_attr_lookup(opts.attribute, na->name,
+					na->name_len,
+					CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+				err = -1;
+			} else {
+				if (set_sizes(alctx, ctx))
+					err = -1;
+			}
+		} else
+			err = -1;
+		ntfs_attr_put_search_ctx(ctx);
+	}
+	return (err);
+}
+
+/*
+ *		Find the runs which minimize fragmentation
+ *
+ *	Only the first and second data zones are examined, the MFT zone
+ *	is preserved.
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int find_best_runs(struct ALLOC_CONTEXT *alctx)
+{
+	ntfs_volume *vol;
+	s64 pos; /* bit index in bitmap */
+	s64 br; /* byte count in buf */
+	int err;
+	enum STEP step;
+
+	err = 0;
+	vol = alctx->vol;
+			/* examine the first data zone */
+	pos = vol->mft_zone_end;
+	br = vol->cluster_size;
+	step = STEP_ZERO;
+	while ((step != STEP_ERR)
+	    && (br == vol->cluster_size)
+	    && (pos < vol->nr_clusters)) {
+		br = ntfs_attr_pread(vol->lcnbmp_na,
+			(pos >> 3) & -vol->cluster_size,
+			vol->cluster_size, alctx->buf);
+		if (br > 0) {
+			step = examine_buf(alctx, pos, br, step);
+			pos = (pos | ((vol->cluster_size << 3) - 1)) + 1;
+		}
+	}
+			/* examine the second data zone */
+	pos = 0;
+	br = vol->cluster_size;
+	step = STEP_ZERO;
+	while ((step != STEP_ERR)
+	    && (br == vol->cluster_size)
+	    && (pos < vol->mft_zone_start)) {
+		br = ntfs_attr_pread(vol->lcnbmp_na,
+			(pos >> 3) & -vol->cluster_size,
+			vol->cluster_size, alctx->buf);
+		if (br > 0) {
+			step = examine_buf(alctx, pos, br, step);
+			pos = (pos | ((vol->cluster_size << 3) - 1)) + 1;
+		}
+	}
+	if (alctx->gathered_clusters < alctx->wanted_clusters) {
+		errno = ENOSPC;
+		ntfs_log_error("Error : not enough space on device\n");
+		err = -1;
+	} else {
+		if ((step == STEP_ERR) || sort_runlist(alctx))
+			err = -1;
+	}
+	return (err);
+}
+
+/*
+ *		Preallocate clusters with minimal fragmentation
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise, with errno set accordingly
+ */
+
+static int preallocate(ntfs_attr *na, s64 new_size)
+{
+	struct ALLOC_CONTEXT *alctx;
+	ntfs_volume *vol;
+	int err;
+
+	err = 0;
+	vol = na->ni->vol;
+	alctx = (struct ALLOC_CONTEXT*)ntfs_malloc(sizeof(struct ALLOC_CONTEXT));
+	if (alctx) {
+		alctx->buf = (unsigned char*)ntfs_malloc(vol->cluster_size);
+		if (alctx->buf) {
+			alctx->na = na;
+			alctx->vol = vol;
+			alctx->rl_count = 0;
+			alctx->rl_allocated = 0;
+			alctx->rl = (runlist_element*)NULL;
+			alctx->new_size = new_size;
+			alctx->wanted_clusters = (new_size
+				+ vol->cluster_size - 1)
+					>> vol->cluster_size_bits;
+			alctx->gathered_clusters = 0;
+			if (find_best_runs(alctx))
+				err = -1;
+			if (!err && !opts.noaction) {
+				if (assign_runlist(alctx))
+					err = -1;
+			} else
+				free(alctx->rl);
+			free(alctx->buf);
+		} else
+			err = -1;
+		free(alctx);
+	} else
+		err = -1;
+	return (err);
 }
 
 /**
@@ -528,13 +1033,44 @@ int main(int argc, char *argv[])
 			goto close_dst;
 		}
 	}
-	ntfs_ucsfree(attr_name);
 
 	ntfs_log_verbose("Old file size: %lld\n", (long long)na->data_size);
-	if (na->data_size != new_size) {
-		if (ntfs_attr_truncate_solid(na, new_size)) {
-			ntfs_log_perror("ERROR: Couldn't resize attribute");
+	if (opts.minfragments && NAttrCompressed(na)) {
+		ntfs_log_info("Warning : Cannot avoid fragmentation"
+				" of a compressed attribute\n");
+		opts.minfragments = 0;
+		}
+	if (na->data_size && opts.minfragments) {
+		if (ntfs_attr_truncate(na, 0)) {
+			ntfs_log_perror(
+				"ERROR: Couldn't truncate existing attribute");
 			goto close_attr;
+		}
+	}
+	if (na->data_size != new_size) {
+		if (opts.minfragments) {
+			/*
+			 * Do a standard truncate() to check whether the
+			 * attribute has to be made non-resident.
+			 * If still resident, preallocation is not needed.
+			 */
+			if (ntfs_attr_truncate(na, new_size)) {
+				ntfs_log_perror(
+					"ERROR: Couldn't resize attribute");
+				goto close_attr;
+			}
+			if (NAttrNonResident(na)
+			   && preallocate(na, new_size)) {
+				ntfs_log_perror(
+				    "ERROR: Couldn't preallocate attribute");
+				goto close_attr;
+			}
+		} else {
+			if (ntfs_attr_truncate_solid(na, new_size)) {
+				ntfs_log_perror(
+					"ERROR: Couldn't resize attribute");
+				goto close_attr;
+			}
 		}
 	}
 
