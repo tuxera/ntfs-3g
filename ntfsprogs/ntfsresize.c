@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2013 Jean-Pierre Andre
+ * Copyright (c) 2011-2014 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -404,7 +404,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011-2013  Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2014  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1360,6 +1360,9 @@ static void expand_attribute_runlist(ntfs_volume *vol, struct DELAYED *delayed)
 static void delayed_updates(ntfs_resize_t *resize)
 {
 	struct DELAYED *delayed;
+
+	if (ntfs_volume_get_free_space(resize->vol))
+		err_exit("Failed to determine free space\n");
 
 	while (resize->delayed_runlists) {
 		delayed = resize->delayed_runlists;
@@ -2324,6 +2327,7 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 {
 	ATTR_RECORD *a;
 	runlist *rl;
+	ntfs_attr *lcnbmp_na;
 	s64 bm_bsize, size;
 	s64 nr_bm_clusters;
 	int truncated;
@@ -2344,7 +2348,15 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 		realloc_lcn_bitmap(resize, bm_bsize);
 		realloc_bitmap_data_attr(resize, &rl, nr_bm_clusters);
 	}
-
+		/*
+		 * Delayed relocations may require cluster allocations
+		 * through the library, to hold added attribute lists,
+		 * be sure they will be within the new limits.
+		 */
+	lcnbmp_na = resize->vol->lcnbmp_na;
+	lcnbmp_na->data_size = bm_bsize;
+	lcnbmp_na->initialized_size = bm_bsize;
+	lcnbmp_na->allocated_size = nr_bm_clusters << vol->cluster_size_bits;
 	a->highest_vcn = cpu_to_sle64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_sle64(nr_bm_clusters * vol->cluster_size);
 	a->data_size = cpu_to_sle64(bm_bsize);
@@ -2365,8 +2377,11 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 				(long long)size, (long long)bm_bsize);
 	}
 
-	if (truncated)
-		free(rl);
+	if (truncated) {
+			/* switch to the new bitmap runlist */
+		free(lcnbmp_na->rl);
+		lcnbmp_na->rl = rl;
+	}
 }
 
 /**
@@ -2761,6 +2776,9 @@ static ntfs_volume *mount_volume(void)
 	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
 		err_exit("Cluster size %u is too large!\n",
 			(unsigned int)vol->cluster_size);
+
+	if (ntfs_volume_get_free_space(vol))
+		err_exit("Failed to update the free space\n");
 
 	if (!opt.infombonly) {
 		printf("Device name        : %s\n", opt.volume);
