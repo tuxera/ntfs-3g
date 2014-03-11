@@ -1851,7 +1851,7 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 	uname_len = ntfs_mbstoucs(name, &uname);
 	if ((uname_len < 0)
 	    || (ctx->windows_names
-		&& ntfs_forbidden_chars(uname,uname_len))) {
+		&& ntfs_forbidden_names(ctx->vol,uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -2067,7 +2067,7 @@ static int ntfs_fuse_newlink(fuse_req_t req __attribute__((unused)),
 	uname_len = ntfs_mbstoucs(newname, &uname);
 	if ((uname_len < 0)
             || (ctx->windows_names
-                && ntfs_forbidden_chars(uname,uname_len))) {
+                && ntfs_forbidden_names(ctx->vol,uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}

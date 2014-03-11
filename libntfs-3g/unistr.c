@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002-2009 Szabolcs Szakacsits
- * Copyright (c) 2008-2011 Jean-Pierre Andre
+ * Copyright (c) 2008-2014 Jean-Pierre Andre
  * Copyright (c) 2008      Bernhard Kaindl
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1367,7 +1367,7 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 	BOOL forbidden;
 	int ch;
 	int i;
-	u32 mainset =     (1L << ('\"' - 0x20))
+	static const u32 mainset = (1L << ('\"' - 0x20))
 			| (1L << ('*' - 0x20))
 			| (1L << ('/' - 0x20))
 			| (1L << (':' - 0x20))
@@ -1376,8 +1376,8 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('?' - 0x20));
 
 	forbidden = (len == 0)
-			|| (le16_to_cpu(name[len-1]) == ' ')
-			|| (le16_to_cpu(name[len-1]) == '.');
+			|| (name[len-1] == const_cpu_to_le16(' '))
+			|| (name[len-1] == const_cpu_to_le16('.'));
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
 		if ((ch < 0x20)
@@ -1387,6 +1387,92 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 		    || (ch == '|'))
 			forbidden = TRUE;
 	}
+	if (forbidden)
+		errno = EINVAL;
+	return (forbidden);
+}
+
+/*
+ *		Check whether a name contains no forbidden chars and
+ *	is not a reserved name for DOS or Win32 use
+ *
+ *	The reserved names are CON, PRN, AUX, NUL, COM1..COM9, LPT1..LPT9
+ *	with no suffix or any suffix.
+ *
+ *	If the name is forbidden, errno is set to EINVAL
+ */
+
+BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
+{
+	BOOL forbidden;
+	int h;
+	static const ntfschar dot = const_cpu_to_le16('.');
+	static const ntfschar con[] = { const_cpu_to_le16('c'),
+			const_cpu_to_le16('o'), const_cpu_to_le16('n') };
+	static const ntfschar prn[] = { const_cpu_to_le16('p'),
+			const_cpu_to_le16('r'), const_cpu_to_le16('n') };
+	static const ntfschar aux[] = { const_cpu_to_le16('a'),
+			const_cpu_to_le16('u'), const_cpu_to_le16('x') };
+	static const ntfschar nul[] = { const_cpu_to_le16('n'),
+			const_cpu_to_le16('u'), const_cpu_to_le16('l') };
+	static const ntfschar com[] = { const_cpu_to_le16('c'),
+			const_cpu_to_le16('o'), const_cpu_to_le16('m') };
+	static const ntfschar lpt[] = { const_cpu_to_le16('l'),
+			const_cpu_to_le16('p'), const_cpu_to_le16('t') };
+
+	forbidden = ntfs_forbidden_chars(name, len);
+	if (!forbidden && (len >= 3)) {
+		/*
+		 * Rough hash check to tell whether the first couple of chars
+		 * may be one of CO PR AU NU LP or lowercase variants.
+		 */
+		h = ((le16_to_cpu(name[0]) & 31)*48)
+				^ ((le16_to_cpu(name[1]) & 31)*165);
+		if ((h % 23) == 17) {
+			/* do a full check, depending on the third char */
+			switch (le16_to_cpu(name[2]) & ~0x20) {
+			case 'N' :
+				if (((len == 3) || (name[3] == dot))
+				    && (!ntfs_ucsncasecmp(name, con, 3,
+						vol->upcase, vol->upcase_len)
+					|| !ntfs_ucsncasecmp(name, prn, 3,
+						vol->upcase, vol->upcase_len)))
+					forbidden = TRUE;
+				break;
+			case 'X' :
+				if (((len == 3) || (name[3] == dot))
+				    && !ntfs_ucsncasecmp(name, aux, 3,
+						vol->upcase, vol->upcase_len))
+					forbidden = TRUE;
+				break;
+			case 'L' :
+				if (((len == 3) || (name[3] == dot))
+				    && !ntfs_ucsncasecmp(name, nul, 3,
+						vol->upcase, vol->upcase_len))
+					forbidden = TRUE;
+				break;
+			case 'M' :
+				if ((len > 3)
+				    && (le16_to_cpu(name[3]) >= '1')
+				    && (le16_to_cpu(name[3]) <= '9')
+				    && ((len == 4) || (name[4] == dot))
+				    && !ntfs_ucsncasecmp(name, com, 3,
+						vol->upcase, vol->upcase_len))
+					forbidden = TRUE;
+				break;
+			case 'T' :
+				if ((len > 3)
+				    && (le16_to_cpu(name[3]) >= '1')
+				    && (le16_to_cpu(name[3]) <= '9')
+				    && ((len == 4) || (name[4] == dot))
+				    && !ntfs_ucsncasecmp(name, lpt, 3,
+						vol->upcase, vol->upcase_len))
+					forbidden = TRUE;
+				break;
+			}
+		}
+	}
+
 	if (forbidden)
 		errno = EINVAL;
 	return (forbidden);

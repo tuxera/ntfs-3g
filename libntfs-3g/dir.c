@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2005-2007 Yura Pakhuchiy
- * Copyright (c) 2008-2010 Jean-Pierre Andre
+ * Copyright (c) 2008-2014 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -2650,7 +2650,8 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	if (shortlen > MAX_DOS_NAME_LENGTH)
 		shortlen = MAX_DOS_NAME_LENGTH;
 			/* make sure the short name has valid chars */
-	if ((shortlen < 0) || ntfs_forbidden_chars(shortname,shortlen)) {
+	if ((shortlen < 0)
+	    || ntfs_forbidden_names(ni->vol,shortname,shortlen)) {
 		ntfs_inode_close_in_dir(ni,dir_ni);
 		ntfs_inode_close(dir_ni);
 		res = -errno;
@@ -2661,7 +2662,7 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	if (longlen > 0) {
 		oldlen = get_dos_name(ni, dnum, oldname);
 		if ((oldlen >= 0)
-		    && !ntfs_forbidden_chars(longname, longlen)) {
+		    && !ntfs_forbidden_names(ni->vol, longname, longlen)) {
 			if (oldlen > 0) {
 				if (flags & XATTR_CREATE) {
 					res = -1;

@@ -250,10 +250,24 @@ adjusted to the latest name.
 .TP
 .B windows_names
 This option prevents files, directories and extended attributes to be
-created with a name not allowed by windows, either because it contains
-some not allowed character (which are the nine characters " * / : < > ? \\ | and
-those whose code is less than 0x20) or because the last character is a space
-or a dot. Existing such files can still be read (and renamed).
+created with a name not allowed by windows, because
+.RS
+.RS
+.sp
+- it contains some not allowed character,
+.br
+- or the last character is a space or a dot,
+.br
+- or the name is reserved.
+.sp
+.RE
+The forbidden characters are the nine characters " * / : < > ? \\ | and
+those whose code is less than 0x20, and
+the reserved names are CON, PRN, AUX, NUL, COM1..COM9, LPT1..LPT9,
+with no suffix or followed by a dot.
+.sp
+Existing such files can still be read (and renamed).
+.RE
 .TP
 .B allow_other
 This option overrides the security measure restricting file access

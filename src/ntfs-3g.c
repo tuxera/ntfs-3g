@@ -1636,7 +1636,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	uname_len = ntfs_mbstoucs(name, &uname);
 	if ((uname_len < 0)
 	    || (ctx->windows_names
-		&& ntfs_forbidden_chars(uname,uname_len))) {
+		&& ntfs_forbidden_names(ctx->vol,uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -1840,7 +1840,8 @@ static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev,
 	if (stream_name_len
 	    && (!S_ISREG(mode)
 		|| (ctx->windows_names
-		    && ntfs_forbidden_chars(stream_name,stream_name_len)))) {
+		    && ntfs_forbidden_names(ctx->vol,stream_name,
+					stream_name_len)))) {
 		res = -EINVAL;
 		goto exit;
 	}
@@ -1909,7 +1910,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	uname_len = ntfs_mbstoucs(name, &uname);
 	if ((uname_len < 0)
 	    || (ctx->windows_names
-		&& ntfs_forbidden_chars(uname,uname_len))) {
+		&& ntfs_forbidden_names(ctx->vol,uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
