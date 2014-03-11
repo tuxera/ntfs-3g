@@ -65,6 +65,7 @@
 #include "dir.h"
 #include "layout.h"
 /* #include "version.h" */
+#include "misc.h"
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
 
@@ -129,6 +130,7 @@ struct options {
 	int force;		/* Override common sense */
 	int quiet;		/* Less output */
 	int verbose;		/* Extra output */
+	int encrypt;		/* Encrypt */
 };
 
 static const char *EXEC_NAME = "ntfsdecrypt";
@@ -168,6 +170,7 @@ static void usage(void)
 	ntfs_log_info("\nUsage: %s [options] -k name.pfx device [file]\n\n"
 	       "    -i, --inode num         Display this inode\n\n"
 	       "    -k  --keyfile name.pfx  Use file name as the user's private key file.\n"
+	       "    -e  --encrypt           Update an encrypted file\n"
 	       "    -f  --force             Use less caution\n"
 	       "    -h  --help              Print this help\n"
 	       "    -q  --quiet             Less output\n"
@@ -188,8 +191,9 @@ static void usage(void)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-fh?i:k:qVv";
+	static const char *sopt = "-fh?ei:k:qVv";
 	static const struct option lopt[] = {
+		{"encrypt", no_argument, NULL, 'e'},
 		{"force", no_argument, NULL, 'f'},
 		{"help", no_argument, NULL, 'h'},
 		{"inode", required_argument, NULL, 'i'},
@@ -221,6 +225,9 @@ static int parse_options(int argc, char **argv)
 					"file.\n");
 				err++;
 			}
+			break;
+		case 'e':
+			opts.encrypt++;
 			break;
 		case 'f':
 			opts.force++;
@@ -893,6 +900,25 @@ static void ntfs_desx_decrypt(ntfs_fek *fek, u8 *outbuf, const u8 *inbuf)
 	*(u64*)outbuf ^= ctx->in_whitening;
 }
 
+/**
+ * ntfs_desx_encrypt
+ */
+static void ntfs_desx_encrypt(ntfs_fek *fek, u8 *outbuf, const u8 *inbuf)
+{
+	gcry_error_t err;
+	ntfs_desx_ctx *ctx = &fek->desx_ctx;
+
+	err = gcry_cipher_reset(fek->gcry_cipher_hd);
+	if (err != GPG_ERR_NO_ERROR)
+		ntfs_log_error("Failed to reset des cipher (error 0x%x).\n",
+				err);
+	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->in_whitening;
+	err = gcry_cipher_decrypt(fek->gcry_cipher_hd, outbuf, 8, NULL, 0);
+	if (err != GPG_ERR_NO_ERROR)
+		ntfs_log_error("Des decryption failed (error 0x%x).\n", err);
+	*(u64*)outbuf ^= ctx->out_whitening;
+}
+
 //#define DO_CRYPTO_TESTS 1
 
 #ifdef DO_CRYPTO_TESTS
@@ -1284,6 +1310,48 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 }
 
 /**
+ * ntfs_fek_encrypt_sector
+ */
+static int ntfs_fek_encrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
+{
+	gcry_error_t err;
+
+	err = gcry_cipher_reset(fek->gcry_cipher_hd);
+	if (err != GPG_ERR_NO_ERROR) {
+		ntfs_log_error("Failed to reset cipher: %s\n",
+				gcry_strerror(err));
+		return -1;
+	}
+	/*
+	 * Note: You may wonder why we are not calling gcry_cipher_setiv() here
+	 * instead of doing it by hand after the decryption.  The answer is
+	 * that gcry_cipher_setiv() wants an iv of length 8 bytes but we give
+	 * it a length of 16 for AES256 so it does not like it.
+	 */
+	/* Apply the IV. */
+	if (fek->alg_id == CALG_AES_256) {
+		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
+		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
+	} else {
+		/* All other algos (Des, 3Des, DesX) use the same IV. */
+		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
+	}
+	if (fek->alg_id == CALG_DESX) {
+		int k;
+
+		for (k=0; k<512; k+=8) {
+			ntfs_desx_encrypt(fek, &data[k], &data[k]);
+		}
+	} else
+		err = gcry_cipher_encrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);
+	if (err != GPG_ERR_NO_ERROR) {
+		ntfs_log_error("Encryption failed: %s\n", gcry_strerror(err));
+		return -1;
+	}
+	return 512;
+}
+
+/**
  * ntfs_cat_decrypt - Decrypt the contents of an encrypted file to stdout.
  * @inode:	An encrypted file's inode structure, as obtained by
  * 		ntfs_inode_open().
@@ -1353,6 +1421,104 @@ static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 }
 
 /**
+ * ntfs_feed_encrypt - Encrypt the contents of stdin to an encrypted file
+ * @inode:	An encrypted file's inode structure, as obtained by
+ * 		ntfs_inode_open().
+ * @fek:	A file encryption key. As obtained by ntfs_inode_fek_get().
+ */
+static int ntfs_feed_encrypt(ntfs_inode *inode, ntfs_fek *fek)
+{
+	const int bufsize = 512;
+	unsigned char *buffer;
+	ntfs_attr *attr;
+	s64 bytes_read, written, offset, total;
+	unsigned char *b;
+	long val;
+	int count;
+	int i;
+
+	buffer = (unsigned char*)malloc(bufsize);
+	if (!buffer)
+		return 1;
+	attr = ntfs_attr_open(inode, AT_DATA, NULL, 0);
+	if (!attr) {
+		ntfs_log_error("Cannot feed into a directory.\n");
+		goto rejected;
+	}
+	total = 0;
+
+	if (!(attr->data_flags & ATTR_IS_ENCRYPTED)) {
+		ntfs_log_error("The data stream was not encrypted\n");
+		goto rejected;
+	}
+	inode->vol->efs_raw = TRUE;
+
+	if (ntfs_attr_truncate(attr, 0)) {
+		ntfs_log_error("Failed to truncate the data stream\n");
+		goto rejected;
+	}
+	offset = 0;
+	do {
+		bytes_read = fread(buffer, 1, bufsize, stdin);
+		if (bytes_read <= 0) {
+			if (bytes_read < 0)
+				ntfs_log_perror("ERROR: Couldn't read data");
+		} else {
+			if (bytes_read < bufsize) {
+				/* Fill with random data */
+				srandom((unsigned int)(sle64_to_cpu(
+					inode->last_data_change_time)
+					/100000000));
+				count = bufsize - bytes_read;
+				b = &buffer[bytes_read];
+				do {
+					val = random();
+					switch (count) {
+						default :
+							*b++ = val;
+							val >>= 8;
+						case 3 :
+							*b++ = val;
+							val >>= 8;
+						case 2 :
+							*b++ = val;
+							val >>= 8;
+						case 1 :
+							*b++ = val;
+							val >>= 8;
+					}
+					count -= 4;
+				} while (count > 0);
+			}
+			if ((i = ntfs_fek_encrypt_sector(fek, buffer, offset))
+					< bufsize) {
+				ntfs_log_perror("ERROR: Couldn't encrypt all data!");
+				ntfs_log_error("%u/%lld/%lld/%lld\n", i,
+					(long long)bytes_read, (long long)offset,
+					(long long)total);
+				break;
+			}
+		written = ntfs_attr_pwrite(attr, offset, bufsize, buffer);
+		if (written != bufsize) {
+			ntfs_log_perror("ERROR: Couldn't output all data!");
+			break;
+		}
+		offset += bufsize;
+		total += bytes_read;
+		}
+	} while (bytes_read == bufsize);
+	ntfs_attr_truncate(attr, total);
+	inode->last_data_change_time = ntfs_current_time();
+	NAttrSetEncrypted(attr);
+	ntfs_attr_close(attr);
+	free(buffer);
+	return 0;
+rejected :
+	free(buffer);
+	return (-1);
+}
+
+/**
  * main - Begin here
  *
  * Start from here.
@@ -1412,7 +1578,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	/* Mount the ntfs volume. */
-	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
+	vol = utils_mount_volume(opts.device,
+			(opts.encrypt ? 0 :  NTFS_MNT_RDONLY) |
 			(opts.force ? NTFS_MNT_RECOVER : 0));
 	if (!vol) {
 		ntfs_log_error("Failed to mount ntfs volume.  Aborting.\n");
@@ -1437,7 +1604,10 @@ int main(int argc, char *argv[])
 			sizeof(thumbprint), df_type);
 	ntfs_rsa_private_key_release(rsa_key);
 	if (fek) {
-		res = ntfs_cat_decrypt(inode, fek);
+		if (opts.encrypt)
+			res = ntfs_feed_encrypt(inode, fek);
+		else
+			res = ntfs_cat_decrypt(inode, fek);
 		ntfs_fek_release(fek);
 	} else {
 		ntfs_log_error("Failed to obtain file encryption key.  "

@@ -6108,7 +6108,8 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 
 	/* If the attribute now has zero size, make it resident. */
 	if (!newsize) {
-		if (ntfs_attr_make_resident(na, ctx)) {
+		if (!(na->data_flags & ATTR_IS_ENCRYPTED)
+		    && ntfs_attr_make_resident(na, ctx)) {
 			/* If couldn't make resident, just continue. */
 			if (errno != EPERM)
 				ntfs_log_error("Failed to make attribute "
@@ -6436,7 +6437,7 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
 	 * Encrypted attributes are not supported. We return access denied,
 	 * which is what Windows NT4 does, too.
 	 */
-	if (na->data_flags & ATTR_IS_ENCRYPTED) {
+	if ((na->data_flags & ATTR_IS_ENCRYPTED) && !na->ni->vol->efs_raw) {
 		errno = EACCES;
 		ntfs_log_trace("Cannot truncate encrypted attribute\n");
 		goto out;
