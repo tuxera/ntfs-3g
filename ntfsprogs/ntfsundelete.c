@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Holger Ohmacht
  * Copyright (c) 2005      Anton Altaparmakov
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2013      Jean-Pierre Andre
+ * Copyright (c) 2013-2014 Jean-Pierre Andre
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -176,7 +176,7 @@ static BOOL patmatch(regex_t *re, const ntfschar *f, int flen,
 		    && ((*f == *p)
 			|| (*p == const_cpu_to_le16('?'))
 			|| ((c = le16_to_cpu(*f)) < pre->upcase_len
-				? pre->upcase[c] : c) == *p)) {
+				? pre->upcase[c] : *f) == *p)) {
 			flen--;
 			if (*f++ == const_cpu_to_le16('.'))
 				dot = TRUE;
@@ -392,7 +392,7 @@ static void version(void)
 			"Copyright (c) 2004-2005 Holger Ohmacht\n"
 			"Copyright (c) 2005      Anton Altaparmakov\n"
 			"Copyright (c) 2007      Yura Pakhuchiy\n"
-			"Copyright (c) 2013      Jean-Pierre Andre\n");
+			"Copyright (c) 2013-2014 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
