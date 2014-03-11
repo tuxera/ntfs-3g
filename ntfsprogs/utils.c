@@ -5,6 +5,7 @@
  * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
  * Copyright (c) 2005-2007 Yura Pakhuchiy
+ * Copyright (c) 2014      Jean-Pierre Andre
  *
  * A set of shared functions for ntfs utilities
  *
@@ -1025,8 +1026,26 @@ int mft_next_record(struct mft_search_ctx *ctx)
 
 			ctx->inode = ntfs_inode_open(ctx->vol, (MFT_REF) ctx->mft_num);
 			if (ctx->inode == NULL) {
-				ntfs_log_error("Error reading inode %llu.\n", (unsigned
-						long long) ctx->mft_num);
+				MFT_RECORD *mrec;
+				int r;
+				MFT_REF base_inode;
+
+				mrec = (MFT_RECORD*)NULL;
+				r = ntfs_file_record_read(ctx->vol,
+					(MFT_REF) ctx->mft_num, &mrec, NULL);
+				if (r || !mrec || !mrec->base_mft_record)
+					ntfs_log_error(
+						"Error reading inode %lld.\n",
+						(long long)ctx->mft_num);
+				else {
+					base_inode = le64_to_cpu(
+						mrec->base_mft_record);
+					ntfs_log_error("Inode %lld is an "
+						"extent of inode %lld.\n",
+						(long long)ctx->mft_num,
+						(long long)MREF(base_inode));
+				}
+				free (mrec);
 				continue;
 			}
 
