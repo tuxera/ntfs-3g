@@ -306,12 +306,12 @@ directories marked for compression. A directory is marked for compression by
 setting the bit 11 (value 0x00000800) in its Windows attribute. In such a
 directory, new files are created compressed and new subdirectories are
 themselves marked for compression. The option and the flag have no effect
-on existing files.
+on existing files. Currently this is the default option.
 .TP
 .B nocompression
 This option disables creating new transparently compressed files in directories
 marked for compression. Existing compressed files can still be read and
-updated. Currently this is the default option.
+updated.
 .TP
 .B big_writes
 This option prevents fuse from splitting write buffers into 4K chunks,
