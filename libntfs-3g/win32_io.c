@@ -6,7 +6,7 @@
  * Copyright (c) 2003-2004 Lode Leroy
  * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yuval Fledel
- * Copyright (c) 2012-2013 Jean-Pierre Andre
+ * Copyright (c) 2012-2014 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1547,6 +1547,7 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 		rvl = NtClose(fd->handle) == STATUS_SUCCESS;
 	} else
 		rvl = CloseHandle(fd->handle);
+	NDevClearOpen(dev);
 	free(fd);
 	if (!rvl) {
 		errno = ntfs_w32error_to_errno(GetLastError());
