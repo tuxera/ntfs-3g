@@ -1267,9 +1267,7 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 	 
 	/* Map the runlist to be able to update mapping pairs later. */
 #if PARTIAL_RUNLIST_UPDATING
-	if ((!na->rl
-	    || ((na->data_flags & ATTR_COMPRESSION_MASK)
-			&& !NAttrDataAppending(na)))) {
+	if (!na->rl) {
 		if (ntfs_attr_map_whole_runlist(na))
 			goto err_out;
 	} else {
@@ -1363,6 +1361,7 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 		na->compressed_size += need << vol->cluster_size_bits;
 	
 	*rl = ntfs_runlists_merge(na->rl, rlc);
+	NAttrSetRunlistDirty(na);
 		/*
 		 * For a compressed attribute, we must be sure there are two
 		 * available entries, so reserve them before it gets too late.
@@ -1592,6 +1591,7 @@ ntfs_log_error("No free run, case 4\n");
 				rl = ++(*prl);
 			}
 		}
+	NAttrSetRunlistDirty(na);
 	if ((*update_from == -1) || ((*prl)->vcn < *update_from))
 		*update_from = (*prl)->vcn;
 	}
@@ -1728,6 +1728,7 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 				zrl->length = endblock - allocated;
 				zrl[1].length -= zrl->length;
 				zrl[1].vcn = zrl->vcn + zrl->length;
+				NAttrSetRunlistDirty(na);
 			}
 		}
 		if (*prl) {
@@ -1796,8 +1797,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	} need_to = { 0, 0 };
 	BOOL wasnonresident = FALSE;
 	BOOL compressed;
-	BOOL updatemap;
-	BOOL mustupdate = FALSE;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
 		       "0x%llx.\n", (long long)na->ni->mft_no, na->type,
@@ -2155,8 +2154,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			if (ntfs_attr_fill_hole(na, fullcount, &ofs, &rl,
 					 &update_from))
 				goto err_out;
-		if (!compressed)
-			mustupdate = TRUE;
 		}
 		if (compressed) {
 			while (rl->length
@@ -2255,14 +2252,7 @@ done:
 		 * of the mapping list. This makes a difference only if
 		 * inode extents were needed.
 		 */
-#if PARTIAL_RUNLIST_UPDATING
-	updatemap = NAttrFullyMapped(na) || NAttrDataAppending(na);
-	if (mustupdate) updatemap = TRUE;
-#else
-	updatemap = (compressed
-			? NAttrFullyMapped(na) != 0 : update_from != -1);
-#endif
-	if (updatemap) {
+	if (NAttrRunlistDirty(na)) {
 		if (ntfs_attr_update_mapping_pairs(na,
 				(update_from < 0 ? 0 : update_from))) {
 			/*
@@ -2332,9 +2322,7 @@ err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
-	updatemap = (compressed
-			? NAttrFullyMapped(na) != 0 : update_from != -1);
-	if (updatemap)
+	if (NAttrRunlistDirty(na))
 		ntfs_attr_update_mapping_pairs(na, 0);
 	/* Restore original data_size if needed. */
 	if (need_to.undo_data_size
@@ -5937,6 +5925,7 @@ retry:
 			break;
 	}
 ok:
+	NAttrClearRunlistDirty(na);
 	ret = 0;
 out:
 	return ret;
@@ -6064,6 +6053,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			ntfs_log_trace("Eeek! Run list truncation failed.\n");
 			return -1;
 		}
+		NAttrSetRunlistDirty(na);
 
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
@@ -6279,6 +6269,7 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 			return -1;
 		}
 		na->rl = rln;
+		NAttrSetRunlistDirty(na);
 
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
@@ -6364,6 +6355,7 @@ rollback:
 		na->rl = NULL;
 		ntfs_log_perror("Couldn't truncate runlist. Rollback failed");
 	} else {
+		NAttrSetRunlistDirty(na);
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = org_alloc_size;
 		/* Restore mapping pairs. */
