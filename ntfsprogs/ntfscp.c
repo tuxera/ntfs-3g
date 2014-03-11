@@ -984,7 +984,7 @@ int main(int argc, char *argv[])
 			strcat(overwrite_filename, "/");
 		}
 		strcat(overwrite_filename, filename);
-		ni = ntfs_pathname_to_inode(vol, NULL, overwrite_filename);
+		ni = ntfs_pathname_to_inode(vol, dir_ni, overwrite_filename);
 		/* Does a file with the same name exist in the dest dir? */
 		if (ni) {
 			ntfs_log_verbose("Destination path has a file with "
