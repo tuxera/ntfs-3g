@@ -914,7 +914,10 @@ int main(int argc, char *argv[])
 		}
 		dirname_last_whack = strrchr(parent_dirname, '/');
 		if (dirname_last_whack) {
-			dirname_last_whack[1] = 0;
+			if (dirname_last_whack == parent_dirname)
+				dirname_last_whack[1] = 0;
+			else
+				*dirname_last_whack = 0;
 			dir_ni = ntfs_pathname_to_inode(vol, NULL,
 					parent_dirname);
 		} else {
