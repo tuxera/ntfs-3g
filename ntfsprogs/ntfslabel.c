@@ -4,7 +4,7 @@
  * Copyright (c) 2002 Matthew J. Fanto
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
- * Copyright (c) 2012      Jean-Pierre Andre
+ * Copyright (c) 2012-2014 Jean-Pierre Andre
  *
  * This utility will display/change the label on an NTFS partition.
  *
@@ -64,7 +64,7 @@ static struct options {
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
 	int	 new_serial;	/* Change the serial number */
-	long long serial;	/* Forced serial number value */
+	unsigned long long serial;	/* Forced serial number value */
 	int	 noaction;	/* Do not write to disk */
 } opts;
 
@@ -166,7 +166,7 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'I' :	/* not proposed as a short option letter */
 			if (optarg) {
-				opts.serial = strtoll(optarg, &endserial, 16);
+				opts.serial = strtoull(optarg, &endserial, 16);
 				if (*endserial)
 					ntfs_log_error("Bad hexadecimal serial number.\n");
 			}
@@ -174,7 +174,7 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'i' :	/* not proposed as a short option letter */
 			if (optarg) {
-				opts.serial = strtoll(optarg, &endserial, 16)
+				opts.serial = strtoull(optarg, &endserial, 16)
 							<< 32;
 				if (*endserial)
 					ntfs_log_error("Bad hexadecimal serial number.\n");
