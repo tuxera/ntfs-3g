@@ -676,7 +676,8 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 
 	name    = NULL;
 	namelen = attr->name_length;
-	if (ntfs_ucstombs((ntfschar *)((char *)attr + attr->name_offset),
+	if (ntfs_ucstombs((ntfschar *)((char *)attr
+					+ le16_to_cpu(attr->name_offset)),
 				namelen, &name, 0) < 0) {
 		ntfs_log_error("Couldn't translate attribute name to current "
 				"locale.\n");

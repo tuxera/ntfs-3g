@@ -68,7 +68,8 @@ int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void 
 		while ((rec = find_attribute(AT_UNUSED, a_ctx))) {
 
 			if (!rec->non_resident) {
-				ntfs_log_verbose("0x%02x skipped - attr is resident\n", a_ctx->attr->type);
+				ntfs_log_verbose("0x%02x skipped - attr is resident\n",
+					(int)le32_to_cpu(a_ctx->attr->type));
 				continue;
 			}
 
@@ -78,7 +79,8 @@ int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void 
 				goto done;
 			}
 
-			ntfs_log_verbose("\t[0x%02X]\n", a_ctx->attr->type);
+			ntfs_log_verbose("\t[0x%02X]\n",
+					(int)le32_to_cpu(a_ctx->attr->type));
 
 			ntfs_log_verbose("\t\tVCN\tLCN\tLength\n");
 			for (j = 0; runs[j].length > 0; j++) {

@@ -397,7 +397,7 @@ static int dump_file(ntfs_volume *vol, ntfs_inode *ino)
 	ctx = ntfs_attr_get_search_ctx(ino, NULL);
 
 	while ((rec = find_attribute(AT_UNUSED, ctx))) {
-		ntfs_log_info("    0x%02x - ", rec->type);
+		ntfs_log_info("    0x%02x - ", (int)le32_to_cpu(rec->type));
 		if (rec->non_resident) {
 			ntfs_log_info("non-resident\n");
 			runs = ntfs_mapping_pairs_decompress(vol, rec, NULL);
