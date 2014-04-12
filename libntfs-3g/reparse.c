@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2008-2013 Jean-Pierre Andre
+ * Copyright (c) 2008-2014 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1117,7 +1117,11 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
 	ntfs_index_context *xr;
 
 	res = 0;
-	if (ni && valid_reparse_data(ni, (const REPARSE_POINT*)value, size)) {
+			/* reparse data is not compatible with EA */
+	if (ni
+	    && !ntfs_attr_exist(ni, AT_EA_INFORMATION, AT_UNNAMED, 0)
+	    && !ntfs_attr_exist(ni, AT_EA, AT_UNNAMED, 0)
+	    && valid_reparse_data(ni, (const REPARSE_POINT*)value, size)) {
 		xr = open_reparse_index(ni->vol);
 		if (xr) {
 			if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,

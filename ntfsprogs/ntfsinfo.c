@@ -1979,9 +1979,12 @@ static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
  */
 static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 {
-	EA_ATTR *ea;
+	const EA_ATTR *ea;
+	const u8 *pvalue;
 	u8 *buf = NULL;
-	le32 *pval;
+	const le32 *pval;
+	int offset;
+	int cnt;
 	s64 data_size;
 
 	if (attr->non_resident) {
@@ -2019,6 +2022,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			return;
 		ea = (EA_ATTR*)((u8*)attr + le16_to_cpu(attr->value_offset));
 	}
+	offset = 0;
 	while (1) {
 		printf("\n\tEA flags:\t\t ");
 		if (ea->flags) {
@@ -2035,21 +2039,36 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		printf("\tValue length:\t %d (0x%x)\n",
 				(unsigned)le16_to_cpu(ea->value_length),
 				(unsigned)le16_to_cpu(ea->value_length));
+			/* Name expected to be null terminated ? */
 		printf("\tName:\t\t '%s'\n", ea->name);
 		printf("\tValue:\t\t ");
 		if (ea->name_length == 11 &&
 				!strncmp((const char*)"SETFILEBITS",
 				(const char*)ea->name, 11)) {
-			pval = (le32*)(ea->value + ea->name_length + 1);
+			pval = (const le32*)(ea->value + ea->name_length + 1);
 			printf("0%lo\n", (unsigned long)le32_to_cpu(*pval));
+		} else {
+			/* No alignment for value */
+			pvalue = ea->value + ea->name_length + 1;
+			/* Hex show a maximum of 32 bytes */
+			cnt = le16_to_cpu(ea->value_length);
+			printf(cnt ? "0x" : "(NONE)");
+			if (cnt > 32)
+				cnt = 32;
+			while (cnt-- > 0)
+				printf("%02x",*pvalue++);
+			if (le16_to_cpu(ea->value_length) > 32)
+				printf("...\n");
+			else
+				printf("\n");
+		}
+		if (ea->next_entry_offset) {
+			offset += le32_to_cpu(ea->next_entry_offset);
+			ea = (const EA_ATTR*)((const u8*)ea
+					+ le32_to_cpu(ea->next_entry_offset));
 		} else
-			printf("'%s'\n", ea->value + ea->name_length + 1);
-		if (ea->next_entry_offset)
-			ea = (EA_ATTR*)((u8*)ea +
-					le32_to_cpu(ea->next_entry_offset));
-		else
 			break;
-		if ((u8*)ea - buf >= data_size)
+		if (offset >= data_size)
 			break;
 	}
 	free(buf);
