@@ -27,6 +27,17 @@ web site at
 
 	http://www.tuxera.com/community/
 
+LICENSES
+========
+
+All the NTFS related components : the file system drivers, the ntfsprogs
+utilities and the shared library libntfs-3g are distributed under the terms
+of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version. See the included file COPYING.
+
+The fuse-lite library is distributed under the terms of the GNU LGPLv2.
+See the included file COPYING.LIB.
 
 QUICK INSTALLATION
 ==================
