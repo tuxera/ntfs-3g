@@ -1272,9 +1272,10 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 			goto err_out;
 	} else {
 		/* make sure the run ahead of hole is mapped */
-		if (((*rl)->lcn == LCN_HOLE) && cur_vcn) {
-			if (ntfs_attr_map_partial_runlist(na, cur_vcn - 1))
-				goto err_out;
+		if ((*rl)->lcn == LCN_HOLE) {
+			if (ntfs_attr_map_partial_runlist(na,
+				(cur_vcn ? cur_vcn - 1 : cur_vcn)))
+					goto err_out;
 		}
 	}
 #else
