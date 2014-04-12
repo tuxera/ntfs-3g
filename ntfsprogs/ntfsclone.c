@@ -115,7 +115,7 @@ int setmode(int, int); /* from msvcrt.dll */
 #define srandom(seed) srand(seed)
 #define random() rand()
 #define fsync(fd) (0)
-#define ioctl(fd,code,buf) (0)
+#define ioctl(fd,code,buf) (-1)
 #define ftruncate(fd, size) ntfs_device_win32_ftruncate(dev_out, size)
 #define BINWMODE "wb"
 #else
