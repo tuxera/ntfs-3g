@@ -896,7 +896,7 @@ exit:
 
 static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 {
-	char *path;
+	char *path = NULL;
 	ntfschar *stream_name;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
@@ -1617,7 +1617,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *dir_path;
 	le32 securid;
-	char *path;
+	char *path = NULL;
 	gid_t gid;
 	mode_t dsetgid;
 	ntfschar *stream_name;
