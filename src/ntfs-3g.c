@@ -524,8 +524,11 @@ static int ntfs_fuse_parse_path(const char *org_path, char **path,
 		if (stream_name_mbs) {
 			*stream_name = NULL;
 			res = ntfs_mbstoucs(stream_name_mbs, stream_name);
-			if (res < 0)
+			if (res < 0) {
+				free(*path);
+				*path = NULL;
 				return -errno;
+			}
 			return res;
 		}
 	} else
