@@ -78,7 +78,9 @@
 
 #if defined(__APPLE__) || defined(__DARWIN__)
 #include <sys/dirent.h>
-#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+#elif defined(__sun) && defined (__SVR4)
+#include <param.h>
+#endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 
 #include "compat.h"
 #include "attrib.h"
@@ -1057,7 +1059,25 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 			memset(filename + MAXNAMLEN, 0, filenamelen - MAXNAMLEN);
 			ntfs_log_debug("   after: '%s'\n", filename);
 		}
-#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+#elif defined(__sun) && defined (__SVR4)
+		/*
+		 * Returning file names larger than MAXNAMELEN (256) bytes
+		 * causes Solaris/Illumos to return an I/O error from the system
+		 * call.
+		 * However we also need space for a terminating NULL, or user
+		 * space tools will bug out since they expect a NULL terminator.
+		 * Effectively the maximum length of a file name is MAXNAMELEN -
+		 * 1 (255).
+		 */
+		if (filenamelen > (MAXNAMELEN - 1)) {
+			ntfs_log_debug("Truncating %d byte filename to %d "
+				"bytes.\n", filenamelen, MAXNAMELEN - 1);
+			ntfs_log_debug("  before: '%s'\n", filename);
+			memset(&filename[MAXNAMELEN - 1], 0,
+				filenamelen - (MAXNAMELEN - 1));
+			ntfs_log_debug("   after: '%s'\n", filename);
+		}
+#endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 	
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
