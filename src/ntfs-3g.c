@@ -79,7 +79,7 @@
 #if defined(__APPLE__) || defined(__DARWIN__)
 #include <sys/dirent.h>
 #elif defined(__sun) && defined (__SVR4)
-#include <param.h>
+#include <sys/param.h>
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 
 #include "compat.h"
