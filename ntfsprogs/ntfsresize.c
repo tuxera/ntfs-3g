@@ -2357,6 +2357,8 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	lcnbmp_na->data_size = bm_bsize;
 	lcnbmp_na->initialized_size = bm_bsize;
 	lcnbmp_na->allocated_size = nr_bm_clusters << vol->cluster_size_bits;
+	vol->lcnbmp_ni->data_size = bm_bsize;
+	vol->lcnbmp_ni->allocated_size = lcnbmp_na->allocated_size;
 	a->highest_vcn = cpu_to_sle64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_sle64(nr_bm_clusters * vol->cluster_size);
 	a->data_size = cpu_to_sle64(bm_bsize);
@@ -2553,6 +2555,12 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 			     resize->ctx->mrec))
 			perr_exit("Couldn't update $Bitmap");
 	}
+
+		/* If successful, update cache and sync $Bitmap */
+	memcpy(vol->lcnbmp_ni->mrec,resize->ctx->mrec,vol->mft_record_size);
+	ntfs_inode_mark_dirty(vol->lcnbmp_ni);
+	NInoFileNameSetDirty(vol->lcnbmp_ni);
+	ntfs_inode_sync(vol->lcnbmp_ni);
 
 #if CLEAN_EXIT
 	close_inode_and_context(resize->ctx);
