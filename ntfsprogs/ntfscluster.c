@@ -169,12 +169,6 @@ static int parse_options(int argc, char **argv)
 			opts.force++;
 			break;
 		case 'h':
-		case '?':
-			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
-				if (!ntfs_log_parse_option (argv[optind-1]))
-					err++;
-				break;
-			}
 			help++;
 			break;
 		case 'I':
@@ -217,6 +211,13 @@ static int parse_options(int argc, char **argv)
 		case 'V':
 			ver++;
 			break;
+		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
+			/* fall through */
 		default:
 			if ((optopt == 'c') || (optopt == 's'))
 				ntfs_log_error("Option '%s' requires an argument.\n", argv[optind-1]);
@@ -267,7 +268,8 @@ static int parse_options(int argc, char **argv)
 	if (help || err)
 		usage();
 
-	return (!err && !help && !ver);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver ? 0 : -1));
 }
 
 
@@ -482,12 +484,14 @@ int main(int argc, char *argv[])
 	ntfs_volume *vol;
 	ntfs_inode *ino = NULL;
 	struct match m;
+	int res;
 	int result = 1;
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
-	if (!parse_options(argc, argv))
-		return 1;
+	res = parse_options(argc, argv);
+	if (res >= 0)
+		return (res);
 
 	utils_set_locale();
 

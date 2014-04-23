@@ -333,7 +333,7 @@ static void perr_exit(const char *fmt, ...)
  * Return:  none
  */
 __attribute__((noreturn))
-static void usage(void)
+static void usage(int ret)
 {
 
 	printf("\nUsage: %s [OPTIONS] DEVICE\n"
@@ -364,7 +364,7 @@ static void usage(void)
 		"\n", EXEC_NAME);
 	printf("%s%s", ntfs_bugs, ntfs_home);
 	printf("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
-	exit(1);
+	exit(ret);
 }
 
 /**
@@ -433,7 +433,7 @@ static s64 get_new_volume_size(char *s)
 	if (strlen(suffix) == 2 && suffix[1] == 'i')
 		prefix_kind = 1024;
 	else if (strlen(suffix) > 1)
-		usage();
+		usage(1);
 
 	/* We follow the SI prefixes:
 	   http://physics.nist.gov/cuu/Units/prefixes.html
@@ -457,7 +457,7 @@ static s64 get_new_volume_size(char *s)
 		size *= prefix_kind;
 		break;
 	default:
-		usage();
+		usage(1);
 	}
 
 	return size;
@@ -523,7 +523,6 @@ static int parse_options(int argc, char **argv)
 			opt.force++;
 			break;
 		case 'h':
-		case '?':
 			help++;
 			break;
 		case 'i':
@@ -554,6 +553,7 @@ static int parse_options(int argc, char **argv)
 		case 'x':
 			opt.expand++;
 			break;
+		case '?':
 		default:
 			if (optopt == 's') {
 				printf("Option '%s' requires an argument.\n", argv[optind-1]);
@@ -578,12 +578,12 @@ static int parse_options(int argc, char **argv)
 		    && (opt.expand || opt.info || opt.infombonly)) {
 			printf(NERR_PREFIX "Options --info(-mb-only) and --expand "
 					"cannot be used with --size.\n");
-			usage();
+			usage(1);
 		}
 		if (opt.expand && opt.infombonly) {
 			printf(NERR_PREFIX "Options --info-mb-only "
 					"cannot be used with --expand.\n");
-			usage();
+			usage(1);
 		}
 	}
 
@@ -604,9 +604,10 @@ static int parse_options(int argc, char **argv)
 	if (ver)
 		version();
 	if (help || err)
-		usage();
+		usage(err > 0);
 
-	return (!err && !help && !ver);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver ? 0 : -1));
 }
 
 static void print_advise(ntfs_volume *vol, s64 supp_lcn)
@@ -4370,13 +4371,15 @@ int main(int argc, char **argv)
 	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
 	ntfs_volume *vol = NULL;
+	int res;
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	printf("%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 
-	if (!parse_options(argc, argv))
-		return 1;
+	res = parse_options(argc, argv);
+	if (res >= 0)
+		return (res);
 
 	utils_set_locale();
 

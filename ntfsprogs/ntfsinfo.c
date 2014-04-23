@@ -8,7 +8,7 @@
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
- * Copyright (c) 2011-2012 Jean-Pierre Andre
+ * Copyright (c) 2011-2014 Jean-Pierre Andre
  *
  * This utility will dump a file's attributes.
  *
@@ -119,7 +119,7 @@ static void version(void)
 	printf("    2003      Leonard Norrgård\n");
 	printf("    2004-2005 Yuval Fledel\n");
 	printf("    2004-2007 Yura Pakhuchiy\n");
-	printf("    2011-2012 Jean-Pierre Andre\n");
+	printf("    2011-2014 Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -304,7 +304,8 @@ static int parse_options(int argc, char *argv[])
 	if (help || err)
 		usage();
 
-	return (!err && !help && !ver);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver ? 0 : -1));
 }
 
 
@@ -2346,15 +2347,17 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
+	int res;
 
 	setlinebuf(stdout);
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
-	if (!parse_options(argc, argv)) {
+	res = parse_options(argc, argv);
+	if (res > 0)
 		printf("Failed to parse command line options\n");
-		exit(1);
-	}
+	if (res >= 0)
+		exit(res);
 
 	utils_set_locale();
 

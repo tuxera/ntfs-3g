@@ -6,7 +6,7 @@
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2010      Jean-Pierre Andre
+ * Copyright (c) 2010-2014 Jean-Pierre Andre
  *
  * This utility will create an NTFS 1.2 or 3.1 volume on a user
  * specified (block) device.
@@ -287,7 +287,7 @@ static void mkntfs_version(void)
 	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
 	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
 	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
-	ntfs_log_info("Copyright (c) 2010-2012 Jean-Pierre Andre\n");
+	ntfs_log_info("Copyright (c) 2010-2014 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -590,7 +590,7 @@ static void mkntfs_init_options(struct mkntfs_options *opts2)
 /**
  * mkntfs_parse_options
  */
-static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
+static int mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
 {
 	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TUvVz:";
 	static const struct option lopt[] = {
@@ -620,6 +620,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 
 	int c = -1;
 	int lic = 0;
+	int help = 0;
 	int err = 0;
 	int ver = 0;
 
@@ -661,7 +662,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 				err++;
 			break;
 		case 'h':
-			err++;	/* display help */
+			help++;	/* display help */
 			break;
 		case 'I':
 			opts2->disable_indexing = TRUE;
@@ -745,7 +746,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		}
 	}
 
-	if (!err && !ver && !lic) {
+	if (!err && !help && !ver && !lic) {
 		if (opts2->dev_name == NULL) {
 			if (argc > 1)
 				ntfs_log_error("You must specify a device.\n");
@@ -757,10 +758,11 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		mkntfs_version();
 	if (lic)
 		mkntfs_license();
-	if (err)
+	if (err || help)
 		mkntfs_usage();
 
-	return (!err && !ver && !lic);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver || lic ? 0 : -1));
 }
 
 
@@ -5168,10 +5170,11 @@ int main(int argc, char *argv[])
 
 	mkntfs_init_options(&opts);			/* Set up the options */
 
-	if (!mkntfs_parse_options(argc, argv, &opts))	/* Read the command line options */
-		goto done;
+			/* Read the command line options */
+	result = mkntfs_parse_options(argc, argv, &opts);
 
-	result = mkntfs_redirect(&opts);
-done:
+	if (result < 0)
+		result = mkntfs_redirect(&opts);
+
 	return result;
 }

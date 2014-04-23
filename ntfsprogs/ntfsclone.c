@@ -347,7 +347,7 @@ static void perr_exit(const char *fmt, ...)
 
 
 __attribute__((noreturn))
-static void usage(void)
+static void usage(int ret)
 {
 	fprintf(stderr, "\nUsage: %s [OPTIONS] SOURCE\n"
 		"    Efficiently clone NTFS to a sparse file, image, device or standard output.\n"
@@ -375,7 +375,7 @@ static void usage(void)
 		"    and --restore-image is used then read the image from the standard input.\n"
 		"\n", EXEC_NAME);
 	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
-	exit(1);
+	exit(ret);
 }
 
 /**
@@ -390,7 +390,7 @@ static void version(void)
 		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2010-2014 Jean-Pierre Andre\n\n");
 	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
-	exit(1);
+	exit(0);
 }
 
 static void parse_options(int argc, char **argv)
@@ -426,7 +426,7 @@ static void parse_options(int argc, char **argv)
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (opt.volume)
-				usage();
+				usage(1);
 			opt.volume = argv[optind-1];
 			break;
 		case 'd':
@@ -439,8 +439,9 @@ static void parse_options(int argc, char **argv)
 			opt.force++;
 			break;
 		case 'h':
+			usage(0);
 		case '?':
-			usage();
+			usage(1);
 		case 'i':	/* not proposed as a short option */
 			opt.new_serial |= 1;
 			break;
@@ -457,7 +458,7 @@ static void parse_options(int argc, char **argv)
 			opt.overwrite++;
 		case 'o':
 			if (opt.output)
-				usage();
+				usage(1);
 			opt.output = optarg;
 			break;
 		case 'r':
@@ -480,13 +481,13 @@ static void parse_options(int argc, char **argv)
 			break;
 		default:
 			err_printf("Unknown option '%s'.\n", argv[optind-1]);
-			usage();
+			usage(1);
 		}
 	}
 
 	if (!opt.no_action && (opt.output == NULL)) {
 		err_printf("You must specify an output file.\n");
-		usage();
+		usage(1);
 	}
 
 	if (!opt.no_action && (strcmp(opt.output, "-") == 0))
@@ -494,12 +495,12 @@ static void parse_options(int argc, char **argv)
 
 	if (opt.volume == NULL) {
 		err_printf("You must specify a device file.\n");
-		usage();
+		usage(1);
 	}
 
 	if (!opt.restore_image && !strcmp(opt.volume, "-")) {
 		err_printf("Only special images can be read from standard input\n");
-		usage();
+		usage(1);
 	}
 
 	if (opt.metadata && opt.save_image) {

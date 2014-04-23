@@ -137,7 +137,7 @@ static void license(void)
  * usage - print a list of the parameters to the program
  */
 __attribute__((noreturn))
-static void usage(void)
+static void usage(int ret)
 {
 	copyright();
 	fprintf(stderr, "Usage: %s [options] device inode [attr-type "
@@ -155,7 +155,7 @@ static void usage(void)
 			"    -l    Display licensing information\n"
 			"    -h    Display this help\n", EXEC_NAME);
 	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
-	exit(1);
+	exit(ret);
 }
 
 /**
@@ -194,12 +194,13 @@ static void parse_options(int argc, char *argv[])
 			license();
 			exit(0);
 		case 'h':
+			usage(0);
 		case '?':
 		default:
-			usage();
+			usage(1);
 		}
 	if (optind == argc)
-		usage();
+		usage(1);
 
 	if (opts.verbose > 1)
 		ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
@@ -210,7 +211,7 @@ static void parse_options(int argc, char *argv[])
 	ntfs_log_verbose("device name = %s\n", dev_name);
 
 	if (optind == argc)
-		usage();
+		usage(1);
 
 	/* Get the inode. */
 	ll = strtoll(argv[optind++], &s, 0);
@@ -220,7 +221,7 @@ static void parse_options(int argc, char *argv[])
 	ntfs_log_verbose("inode = %lli\n", (long long)inode);
 
 	if (optind == argc)
-		usage();
+		usage(1);
 
 	/* Get the attribute type, if specified. */
 	s = argv[optind++];
@@ -251,7 +252,7 @@ static void parse_options(int argc, char *argv[])
 
 			s = argv[optind++];
 			if (optind != argc)
-				usage();
+				usage(1);
 		} else {
 			attr_name = AT_UNNAMED;
 			attr_name_len = 0;

@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2012 Jean-Pierre Andre
+ * Copyright (c) 2011-2014 Jean-Pierre Andre
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -123,7 +123,7 @@ struct MFT_SELF_LOCATED {
  * usage
  */
 __attribute__((noreturn))
-static void usage(void)
+static void usage(int ret)
 {
 	ntfs_log_info("%s v%s (libntfs-3g)\n"
 		   "\n"
@@ -140,7 +140,7 @@ static void usage(void)
 		   EXEC_NAME, VERSION, EXEC_NAME,
 		   EXEC_NAME);
 	ntfs_log_info("%s%s", ntfs_bugs, ntfs_home);
-	exit(1);
+	exit(ret);
 }
 
 /**
@@ -154,10 +154,10 @@ static void version(void)
 		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2007      Yura Pakhuchiy\n"
-		   "Copyright (c) 2011-2012 Jean-Pierre Andre\n\n",
+		   "Copyright (c) 2011-2014 Jean-Pierre Andre\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
-	exit(1);
+	exit(0);
 }
 
 /**
@@ -185,7 +185,7 @@ static void parse_options(int argc, char **argv)
 				opt.volume = argv[optind - 1];
 			else {
 				ntfs_log_info("ERROR: Too many arguments.\n");
-				usage();
+				usage(1);
 			}
 			break;
 		case 'b':
@@ -198,20 +198,21 @@ static void parse_options(int argc, char **argv)
 			opt.no_action = TRUE;
 			break;
 		case 'h':
+			usage(0);
 		case '?':
-			usage();
+			usage(1);
 			/* fall through */
 		case 'V':
 			version();
 		default:
 			ntfs_log_info("ERROR: Unknown option '%s'.\n", argv[optind - 1]);
-			usage();
+			usage(1);
 		}
 	}
 
 	if (opt.volume == NULL) {
 		ntfs_log_info("ERROR: You must specify a device.\n");
-		usage();
+		usage(1);
 	}
 }
 

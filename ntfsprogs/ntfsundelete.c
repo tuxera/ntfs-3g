@@ -680,10 +680,13 @@ static int parse_options(int argc, char *argv[])
 			opts.force++;
 			break;
 		case 'h':
+			help++;
+			break;
 		case '?':
 			if (ntfs_log_parse_option (argv[optind-1]))
 				break;
-			help++;
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
+			err++;
 			break;
 		case 'i':
 			end = NULL;
@@ -878,7 +881,8 @@ static int parse_options(int argc, char *argv[])
 	if (help || err)
 		usage();
 
-	return (!err && !help && !ver);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver ? 0 : -1));
 }
 
 /**
@@ -2442,7 +2446,8 @@ int main(int argc, char *argv[])
 	with_regex = 0;
 	avoid_duplicate_printing = 0;
 
-	if (!parse_options(argc, argv))
+	result = parse_options(argc, argv);
+	if (result >= 0)
 		goto free;
 
 	utils_set_locale();

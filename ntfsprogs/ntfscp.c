@@ -215,12 +215,6 @@ static int parse_options(int argc, char **argv)
 			opts.force++;
 			break;
 		case 'h':
-		case '?':
-			if (strncmp(argv[optind - 1], "--log-", 6) == 0) {
-				if (!ntfs_log_parse_option(argv[optind - 1]))
-					err++;
-				break;
-			}
 			help++;
 			break;
 		case 'm':
@@ -248,6 +242,13 @@ static int parse_options(int argc, char **argv)
 			opts.verbose++;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
+		case '?':
+			if (strncmp(argv[optind - 1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option(argv[optind - 1]))
+					err++;
+				break;
+			}
+			/* fall through */
 		default:
 			ntfs_log_error("Unknown option '%s'.\n",
 					argv[optind - 1]);
@@ -290,7 +291,8 @@ static int parse_options(int argc, char **argv)
 	if (help || err)
 		usage();
 
-	return (!err && !help && !ver);
+		/* tri-state 0 : done, 1 : error, -1 : proceed */
+	return (err ? 1 : (help || ver ? 0 : -1));
 }
 
 /**
@@ -824,6 +826,7 @@ int main(int argc, char *argv[])
 	ntfs_inode *out;
 	ntfs_attr *na;
 	int flags = 0;
+	int res;
 	int result = 1;
 	s64 new_size;
 	u64 offset;
@@ -834,8 +837,9 @@ int main(int argc, char *argv[])
 
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
-	if (!parse_options(argc, argv))
-		return 1;
+	res = parse_options(argc, argv);
+	if (res >= 0)
+		return (res);
 
 	utils_set_locale();
 
