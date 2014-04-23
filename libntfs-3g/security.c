@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2012 Jean-Pierre Andre
+ * Copyright (c) 2007-2014 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -514,8 +514,18 @@ static int entersecurity_data(ntfs_volume *vol,
 			STREAM_SDS, 4, fullattr, fullsz,
 			offs - gap + ALIGN_SDS_BLOCK);
 		if ((written1 == fullsz)
-		     && (written2 == written1))
-			res = 0;
+		     && (written2 == written1)) {
+			/*
+			 * Make sure the data size for $SDS marks the end
+			 * of the last security attribute. Windows uses
+			 * this to determine where the next attribute will
+			 * be written, which causes issues if chkdsk had
+			 * previously deleted the last entries without
+			 * adjusting the size.
+			 */
+			res = ntfs_attr_shrink_size(vol->secure_ni,STREAM_SDS,
+				4, offs - gap + ALIGN_SDS_BLOCK + fullsz);
+		}
 		else
 			errno = ENOSPC;
 		free(fullattr);
@@ -707,10 +717,24 @@ static le32 entersecurityattr(ntfs_volume *vol,
 					       sizeof(SII_INDEX_KEY), xsii);
 				if (!found && (errno != ENOENT)) {
 					ntfs_log_perror("Index $SII is broken");
+					psii = (struct SII*)NULL;
 				} else {
 						/* restore errno */
 					errno = olderrno;
 					entry = xsii->entry;
+					psii = (struct SII*)entry;
+				}
+				if (psii
+				    && !(psii->flags & INDEX_ENTRY_END)) {
+						/* save first key and */
+						/* available position */
+					keyid = psii->keysecurid;
+					realign.parts.dataoffsh
+							 = psii->dataoffsh;
+					realign.parts.dataoffsl
+							 = psii->dataoffsl;
+					offs = le64_to_cpu(realign.all);
+					size = le32_to_cpu(psii->datasize);
 				}
 				retries++;
 			}
@@ -725,7 +749,8 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		securid = const_cpu_to_le32(0);
 		na = ntfs_attr_open(vol->secure_ni,AT_INDEX_ROOT,sii_stream,4);
 		if (na) {
-			if ((size_t)na->data_size < sizeof(struct SII)) {
+			if ((size_t)na->data_size < (sizeof(struct SII)
+					+ sizeof(INDEX_ENTRY_HEADER))) {
 				ntfs_log_error("Creating the first security_id\n");
 				securid = const_cpu_to_le32(FIRST_SECURITY_ID);
 			}
@@ -1814,11 +1839,13 @@ static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
 		 * with a default security descriptor inserted in an
 		 * attribute
 		 */
-	if (test_nino_flag(ni, v3_Extensions)
-			&& vol->secure_ni && ni->security_id) {
-			/* get v3.x descriptor in $Secure */
-		securid.security_id = ni->security_id;
-		securattr = retrievesecurityattr(vol,securid);
+	if (test_nino_flag(ni, v3_Extensions) && vol->secure_ni) {
+		if (ni->security_id) {
+				/* get v3.x descriptor in $Secure */
+			securid.security_id = ni->security_id;
+			securattr = retrievesecurityattr(vol,securid);
+		} else
+			securattr = (char*)NULL;
 		if (!securattr)
 			ntfs_log_error("Bad security descriptor for 0x%lx\n",
 					(long)le32_to_cpu(ni->security_id));

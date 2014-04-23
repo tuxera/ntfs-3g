@@ -396,6 +396,8 @@ extern int ntfs_attr_data_read(ntfs_inode *ni,
 extern int ntfs_attr_data_write(ntfs_inode *ni,
 		ntfschar *stream_name, int stream_name_len,
 		const char *buf, size_t size, off_t offset);
+extern int ntfs_attr_shrink_size(ntfs_inode *ni, ntfschar *stream_name,
+		int stream_name_len, off_t offset);
 
 #endif /* defined _NTFS_ATTRIB_H */
 

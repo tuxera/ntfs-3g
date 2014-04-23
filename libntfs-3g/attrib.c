@@ -6735,6 +6735,42 @@ exit:
 	return res;
 }
 
+/*
+ *		Shrink the size of a data attribute if needed
+ *
+ *	For non-resident attributes only.
+ *	The space remains allocated.
+ *
+ *	Returns 0 if successful
+ *		-1 if failed, with errno telling why
+ */
+
+
+int ntfs_attr_shrink_size(ntfs_inode *ni, ntfschar *stream_name,
+		int stream_name_len, off_t offset)
+{
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *a;
+	int res;
+
+	res = -1;
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (ctx) {
+		if (!ntfs_attr_lookup(AT_DATA, stream_name, stream_name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			a = ctx->attr;
+
+			if (a->non_resident
+			    && (sle64_to_cpu(a->initialized_size) > offset)) {
+				a->initialized_size = cpu_to_le64(offset);
+				a->data_size = a->initialized_size;
+			}
+			res = 0;
+		}
+		ntfs_attr_put_search_ctx(ctx);
+	}
+	return (res);
+}
 
 int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, const ntfschar *name,
 		    u32 name_len)
