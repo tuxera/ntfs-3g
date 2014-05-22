@@ -1510,8 +1510,12 @@ static int ntfs_fuse_chmod(const char *path,
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 
-	  /* JPA return unsupported if no user mapping has been defined */
-	if (!ntfs_fuse_fill_security_context(&security)) {
+		/*
+		 * Return unsupported if no user mapping has been defined
+		 * or enforcing Windows-type inheritance
+		 */
+	if (ctx->inherit
+	    || !ntfs_fuse_fill_security_context(&security)) {
 		if (ctx->silent)
 			res = 0;
 		else
@@ -1550,7 +1554,12 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	if (!ntfs_fuse_fill_security_context(&security)) {
+		/*
+		 * Return unsupported if no user mapping has been defined
+		 * or enforcing Windows-type inheritance
+		 */
+	if (ctx->inherit
+	    || !ntfs_fuse_fill_security_context(&security)) {
 		if (ctx->silent)
 			return 0;
 		if (uid == ctx->uid && gid == ctx->gid)
@@ -2520,14 +2529,19 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 			 || (attr == XATTR_POSIX_DEF);
 		/*
 		 * When accessing Posix ACL, return unsupported if ACL
-		 * were disabled or no user mapping has been defined.
+		 * were disabled or no user mapping has been defined,
+		 * or trying to change a Windows-inherited ACL.
 		 * However no error will be returned to getfacl
 		 */
-		if ((!ntfs_fuse_fill_security_context(security)
+		if (((!ntfs_fuse_fill_security_context(security)
 			|| (ctx->secure_flags
 			    & ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW))))
+			|| (setting && ctx->inherit))
 		    && foracl) {
-			errno = EOPNOTSUPP;
+			if (ctx->silent)
+				errno = 0;
+			else
+				errno = EOPNOTSUPP;
 		} else {
 				/*
 				 * parent directory must be executable, and

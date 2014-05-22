@@ -1432,15 +1432,17 @@ static int ntfs_fuse_chmod(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	int res = 0;
 	ntfs_inode *ni;
 
-	  /* return unsupported if no user mapping has been defined */
-	if (!scx->mapping[MAPUSERS] && !ctx->silent) {
+	  /* Unsupported if inherit or no user mapping has been defined */
+	if ((!scx->mapping[MAPUSERS] || ctx->inherit)
+	    && !ctx->silent) {
 		res = -EOPNOTSUPP;
 	} else {
 		ni = ntfs_inode_open(ctx->vol, INODE(ino));
 		if (!ni)
 			res = -errno;
 		else {
-			if (scx->mapping[MAPUSERS]) {
+			/* ignore if Windows inheritance is forced */
+			if (scx->mapping[MAPUSERS] && !ctx->inherit) {
 				if (ntfs_set_mode(scx, ni, mode))
 					res = -errno;
 				else {
@@ -1469,7 +1471,8 @@ static int ntfs_fuse_chown(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	ntfs_inode *ni;
 	int res;
 
-	if (!scx->mapping[MAPUSERS]
+	  /* Unsupported if inherit or no user mapping has been defined */
+	if ((!scx->mapping[MAPUSERS] || ctx->inherit)
 			&& !ctx->silent
 			&& ((uid != ctx->uid) || (gid != ctx->gid)))
 		res = -EOPNOTSUPP;
@@ -1479,7 +1482,9 @@ static int ntfs_fuse_chown(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		if (!ni)
 			res = -errno;
 		else {
+			/* ignore if Windows inheritance is forced */
 			if (scx->mapping[MAPUSERS]
+			  && !ctx->inherit
 			  && (((int)uid != -1) || ((int)gid != -1))) {
 				if (ntfs_set_owner(scx, ni, uid, gid))
 					res = -errno;
@@ -1508,7 +1513,8 @@ static int ntfs_fuse_chownmod(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	ntfs_inode *ni;
 	int res;
 
-	if (!scx->mapping[MAPUSERS]
+	  /* Unsupported if inherit or no user mapping has been defined */
+	if ((!scx->mapping[MAPUSERS] || ctx->inherit)
 			&& !ctx->silent
 			&& ((uid != ctx->uid) || (gid != ctx->gid)))
 		res = -EOPNOTSUPP;
@@ -1518,7 +1524,8 @@ static int ntfs_fuse_chownmod(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		if (!ni)
 			res = -errno;
 		else {
-			if (scx->mapping[MAPUSERS]) {
+			/* ignore if Windows inheritance is forced */
+			if (scx->mapping[MAPUSERS] && !ctx->inherit) {
 				if (ntfs_set_ownmod(scx, ni, uid, gid, mode))
 					res = -errno;
 				else {
@@ -2684,14 +2691,19 @@ static ntfs_inode *ntfs_check_access_xattr(fuse_req_t req,
 		 || (attr == XATTR_POSIX_DEF);
 	/*
 	 * When accessing Posix ACL, return unsupported if ACL
-	 * were disabled or no user mapping has been defined.
+	 * were disabled or no user mapping has been defined,
+	 * or trying to change a Windows-inherited ACL.
 	 * However no error will be returned to getfacl
 	 */
-	if ((!ntfs_fuse_fill_security_context(req, security)
+	if (((!ntfs_fuse_fill_security_context(req, security)
 		|| (ctx->secure_flags
 		    & ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW))))
+		|| (setting && ctx->inherit))
 	    && foracl) {
-		errno = EOPNOTSUPP;
+		if (ctx->silent)
+			errno = 0;
+		else
+			errno = EOPNOTSUPP;
 	} else {
 			/*
 			 * parent directory must be executable, and
