@@ -206,6 +206,8 @@
  *
  *  Sep 2013, version 1.4.1
  *     - silenced an aliasing warning by gcc >= 4.8
+ *
+ *     - decoded GENERIC_ALL permissions
  */
 
 /*
