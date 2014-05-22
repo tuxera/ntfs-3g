@@ -3941,12 +3941,14 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 	securid = const_cpu_to_le32(0);
 	cached = (struct CACHED_PERMISSIONS*)NULL;
 		/*
-		 * Try to get inherited id from cache
+		 * Try to get inherited id from cache, possible when
+		 * the current process owns the parent directory
 		 */
 	if (test_nino_flag(dir_ni, v3_Extensions)
 			&& dir_ni->security_id) {
 		cached = fetch_cache(scx, dir_ni);
-		if (cached)
+		if (cached
+		    && (cached->uid == scx->uid) && (cached->gid == scx->gid))
 			securid = (fordir ? cached->inh_dirid
 					: cached->inh_fileid);
 	}
@@ -3962,10 +3964,13 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 			free(parentattr);
 			/*
 			 * Store the result into cache for further use
+			 * if the current process owns the parent directory
 			 */
 			if (securid) {
 				cached = fetch_cache(scx, dir_ni);
-				if (cached) {
+				if (cached
+				    && (cached->uid == scx->uid)
+				    && (cached->gid == scx->gid)) {
 					if (fordir)
 						cached->inh_dirid = securid;
 					else
