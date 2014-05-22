@@ -3787,7 +3787,6 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	BIGSID defusid;
 	BIGSID defgsid;
 	int offpacl;
-	int offowner;
 	int offgroup;
 	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
 	ACL *pnacl;
@@ -3805,10 +3804,22 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	if (scx->mapping[MAPUSERS]) {
 		usid = ntfs_find_usid(scx->mapping[MAPUSERS], scx->uid, (SID*)&defusid);
 		gsid = ntfs_find_gsid(scx->mapping[MAPGROUPS], scx->gid, (SID*)&defgsid);
+#if OWNERFROMACL
+			/* Get approximation of parent owner when cannot map */
+		if (!gsid)
+			gsid = adminsid;
+		if (!usid) {
+			usid = ntfs_acl_owner(parentattr);
+			if (!ntfs_is_user_sid(gsid))
+				gsid = usid;
+		}
+#else
+			/* Define owner as root when cannot map */
 		if (!usid)
 			usid = adminsid;
 		if (!gsid)
 			gsid = adminsid;
+#endif
 	} else {
 		/*
 		 * If there is no user mapping, we have to copy owner
@@ -3816,8 +3827,14 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * Windows never has to do that, because it can always
 		 * rely on a user mapping
 		 */
+#if OWNERFROMACL
+		usid = ntfs_acl_owner(parentattr);
+#else
+		int offowner;
+
 		offowner = le32_to_cpu(pphead->owner);
 		usid = (const SID*)&parentattr[offowner];
+#endif
 		offgroup = le32_to_cpu(pphead->group);
 		gsid = (const SID*)&parentattr[offgroup];
 	}
