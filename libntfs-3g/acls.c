@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2012 Jean-Pierre Andre
+ * Copyright (c) 2007-2014 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -269,6 +269,25 @@ BOOL ntfs_is_user_sid(const SID *usid)
 	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && (usid->sub_authority[0] ==  const_cpu_to_le32(21)));
+}
+
+/*
+ *		Test whether a SID means "some special group"
+ *	Currently we only check for a few S-1-5-n but we should
+ *	probably test for other configurations.
+ *
+ *	This is useful for granting access to /Users/Public for
+ *	specific users when the Posix ACLs are enabled.
+ */
+
+static BOOL ntfs_known_group_sid(const SID *usid)
+{
+			/* count == 1 excludes S-1-5-5-X-Y (logon) */
+	return ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
+	    && (le32_to_cpu(usid->sub_authority[0]) >=  1)
+	    && (le32_to_cpu(usid->sub_authority[0]) <=  6));
 }
 
 /*
@@ -4044,7 +4063,8 @@ static SID *encodesid(const char *sidstr)
 			cnt++;
 		}
 		bsid->sub_authority_count = cnt;
-		if ((cnt > 0) && ntfs_valid_sid(bsid) && ntfs_is_user_sid(bsid)) {
+		if ((cnt > 0) && ntfs_valid_sid(bsid)
+		    && (ntfs_is_user_sid(bsid) || ntfs_known_group_sid(bsid))) {
 			sid = (SID*) ntfs_malloc(4 * cnt + 8);
 			if (sid)
 				memcpy(sid, bsid, 4 * cnt + 8);
@@ -4253,6 +4273,12 @@ struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 		if (uid
 		   || (!item->uidstr[0] && !item->gidstr[0])) {
 			sid = encodesid(item->sidstr);
+			if (sid && ntfs_known_group_sid(sid)) {
+				ntfs_log_error("Bad user SID %s\n",
+					item->sidstr);
+				free(sid);
+				sid = (SID*)NULL;
+			}
 			if (sid && !item->uidstr[0] && !item->gidstr[0]
 			    && !ntfs_valid_pattern(sid)) {
 				ntfs_log_error("Bad implicit SID pattern %s\n",
