@@ -3903,6 +3903,7 @@ int main(int argc, char *argv[])
 #endif /* KERNELPERMS */
 		permissions_mode = "User mapping built";
 #endif /* POSIXACLS */
+		ctx->dmask = ctx->fmask = 0;
 	} else {
 		ctx->security.uid = ctx->uid;
 		ctx->security.gid = ctx->gid;
