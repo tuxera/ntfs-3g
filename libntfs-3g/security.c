@@ -1980,7 +1980,7 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 				for (i=pxdesc->acccnt-1; i>=0 ; i--) {
 					pxace = &pxdesc->acl.ace[i];
 					if ((pxace->tag == POSIX_ACL_GROUP)
-					    && groupmember(scx, uid, pxace->id)) {
+					    && groupmember(scx, scx->uid, pxace->id)) {
 						if (!(~pxace->perms & request & mask))
 							groupperms = pxace->perms;
 						somegroup = TRUE;
