@@ -717,8 +717,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
 	ACCESS_ALLOWED_ACE *pauthace;
+	ACCESS_ALLOWED_ACE *pownerace;
 
 	pauthace = (ACCESS_ALLOWED_ACE*)NULL;
+	pownerace = (ACCESS_ALLOWED_ACE*)NULL;
 	usidsz = ntfs_sid_size(usid);
 	gsidsz = ntfs_sid_size(gsid);
 
@@ -736,12 +738,24 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
 		src += acesz;
-			/*
-			 * Inheritance for access, unless this is inheriting
-			 * an inherited ACL to a directory.
-			 */
+		/*
+		 * Extract inheritance for access, including inheritance for
+		 * access from an ACE with is both applied and inheritable.
+		 *
+		 * must not output OBJECT_INHERIT_ACE or CONTAINER_INHERIT_ACE
+		 *
+		 *	According to MSDN :
+		 * "For a case in which a container object inherits an ACE
+		 * "that is both effective on the container and inheritable
+		 * "by its descendants, the container may inherit two ACEs.
+		 * "This occurs if the inheritable ACE contains generic
+		 * "information."
+		 */
 		if ((poldace->flags & selection)
-		    && !(fordir && inherited)
+		    && (!fordir
+			|| (poldace->flags & NO_PROPAGATE_INHERIT_ACE)
+			|| (poldace->mask & (GENERIC_ALL | GENERIC_READ
+					| GENERIC_WRITE | GENERIC_EXECUTE)))
 		    && !ntfs_same_sid(&poldace->sid, ownersid)
 		    && !ntfs_same_sid(&poldace->sid, groupsid)) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
@@ -804,8 +818,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			 * Group similar ACE for authenticated users
 			 * (should probably be done for other SIDs)
 			 */
-			if (!fordir
-			    && (poldace->type == ACCESS_ALLOWED_ACE_TYPE)
+			if ((poldace->type == ACCESS_ALLOWED_ACE_TYPE)
 			    && ntfs_same_sid(&poldace->sid, authsid)) {
 				if (pauthace) {
 					pauthace->flags |= pnewace->flags;
@@ -848,8 +861,14 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 						| INHERIT_ONLY_ACE);
 				if (inherited)
 					pnewace->flags |= INHERITED_ACE;
-				dst += usidsz + 8;
-				newcnt++;
+				if ((pnewace->type == ACCESS_ALLOWED_ACE_TYPE)
+				    && pownerace
+				    && !(pnewace->flags & ~pownerace->flags)) {
+					pownerace->mask |= pnewace->mask;
+				} else {
+					dst += usidsz + 8;
+					newcnt++;
+				}
 			}
 			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
 				memcpy(&pnewace->sid, gsid, gsidsz);
@@ -865,15 +884,52 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			}
 		}
 
-			/* inheritance for further inheritance */
+			/*
+			 * inheritance for further inheritance
+			 *
+			 * Situations leading to output CONTAINER_INHERIT_ACE
+			 * 	or OBJECT_INHERIT_ACE
+			 */
 		if (fordir
 		   && (poldace->flags
 			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE))) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
+			if ((poldace->flags & OBJECT_INHERIT_ACE)
+			   && !(poldace->flags & (CONTAINER_INHERIT_ACE
+					| NO_PROPAGATE_INHERIT_ACE)))
+				pnewace->flags |= INHERIT_ONLY_ACE;
+			if ((poldace->flags & CONTAINER_INHERIT_ACE)
+			    && !(poldace->flags & NO_PROPAGATE_INHERIT_ACE)
+			    && !ntfs_same_sid(&poldace->sid, ownersid)
+			    && !ntfs_same_sid(&poldace->sid, groupsid)) {
+				if ((poldace->mask & (GENERIC_ALL | GENERIC_READ
+					| GENERIC_WRITE | GENERIC_EXECUTE)))
+					pnewace->flags |= INHERIT_ONLY_ACE;
+				else
+					pnewace->flags &= ~INHERIT_ONLY_ACE;
+			}
 			if (inherited)
 				pnewace->flags |= INHERITED_ACE;
+			/*
+			 * Prepare grouping similar ACE for authenticated users
+			 */
+			if ((poldace->type == ACCESS_ALLOWED_ACE_TYPE)
+			    && !pauthace
+			    && !(pnewace->flags & INHERIT_ONLY_ACE)
+			    && ntfs_same_sid(&poldace->sid, authsid)) {
+				pauthace = pnewace;
+			}
+			/*
+			 * Prepare grouping similar ACE for owner
+			 */
+			if ((poldace->type == ACCESS_ALLOWED_ACE_TYPE)
+			    && !pownerace
+			    && !(pnewace->flags & INHERIT_ONLY_ACE)
+			    && ntfs_same_sid(&poldace->sid, usid)) {
+				pownerace = pnewace;
+			}
 			dst += acesz;
 			newcnt++;
 		}
