@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2013 Jean-Pierre Andre
+ * Copyright (c) 2007-2014 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -208,6 +208,7 @@
  *     - silenced an aliasing warning by gcc >= 4.8
  *
  *     - decoded GENERIC_ALL permissions
+ *     - decoded more "well-known" and generic SIDs
  */
 
 /*
@@ -1449,6 +1450,26 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 				break;
 			case 5 :
 				switch (first) {
+				case 1 :
+					known = TRUE;
+					printf("%*cDialup SID\n",-level,marker);
+					break;
+				case 2 :
+					known = TRUE;
+					printf("%*cNetwork SID\n",-level,marker);
+					break;
+				case 3 :
+					known = TRUE;
+					printf("%*cBatch SID\n",-level,marker);
+					break;
+				case 4 :
+					known = TRUE;
+					printf("%*cInteractive SID\n",-level,marker);
+					break;
+				case 6 :
+					known = TRUE;
+					printf("%*cService SID\n",-level,marker);
+					break;
 				case 7 :
 					known = TRUE;
 					printf("%*cAnonymous logon SID\n",-level,marker);
@@ -1503,8 +1524,13 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 			case 5 :
 				if (first == 21) {
 					known = TRUE;
-					switch (last)
-						{
+					switch (last) {
+						case 500 :
+							printf("%*cSystem admin SID\n",-level,marker);
+							break;
+						case 501 :
+							printf("%*cGuest SID\n",-level,marker);
+							break;
 						case 512 :
 							printf("%*cLocal admins SID\n",-level,marker);
 							break;
