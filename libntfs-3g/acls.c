@@ -136,6 +136,8 @@ static const char worldsidbytes[] = {
 		0, 0, 0, 0	/* 1st level */
 } ;
 
+const SID *worldsid = (const SID*)worldsidbytes;
+
 /*
  *		SID for authenticated user (S-1-5-11)
  */
@@ -148,8 +150,6 @@ static const char authsidbytes[] = {
 };
 	        
 static const SID *authsid = (const SID*)authsidbytes;
-
-const SID *worldsid = (const SID*)worldsidbytes;
 
 /*
  *		SID for administrator
@@ -230,7 +230,11 @@ BOOL ntfs_same_sid(const SID *first, const SID *second)
 
 /*
  *		Test whether a SID means "world user"
- *	Local users group also recognized as world
+ *	Local users group recognized as world
+ *	Also interactive users so that /Users/Public is world accessible,
+ *	but only if Posix ACLs are not enabled (if Posix ACLs are enabled,
+ *	access to /Users/Public should be done by defining interactive users
+ *	as a mapped group.)
  */
 
 static int is_world_sid(const SID * usid)
@@ -254,6 +258,14 @@ static int is_world_sid(const SID * usid)
 	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && (usid->sub_authority[0] == const_cpu_to_le32(11)))
+
+#if !POSIXACLS
+	     /* check whether S-1-5-4 : interactive user */
+	  ||   ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
+	    && (usid->sub_authority[0] == const_cpu_to_le32(4)))
+#endif /* !POSIXACLS */
 		);
 }
 
