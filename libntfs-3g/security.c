@@ -3822,21 +3822,30 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 #endif
 	} else {
 		/*
-		 * If there is no user mapping, we have to copy owner
-		 * and group from parent directory.
+		 * If there is no user mapping and this is not a root
+		 * user, we have to get owner and group from somewhere,
+		 * and the parent directory has to contribute.
 		 * Windows never has to do that, because it can always
 		 * rely on a user mapping
 		 */
+		if (!scx->uid)
+			usid = adminsid;
+		else {
 #if OWNERFROMACL
-		usid = ntfs_acl_owner(parentattr);
+			usid = ntfs_acl_owner(parentattr);
 #else
-		int offowner;
+			int offowner;
 
-		offowner = le32_to_cpu(pphead->owner);
-		usid = (const SID*)&parentattr[offowner];
+			offowner = le32_to_cpu(pphead->owner);
+			usid = (const SID*)&parentattr[offowner];
 #endif
-		offgroup = le32_to_cpu(pphead->group);
-		gsid = (const SID*)&parentattr[offgroup];
+		}
+		if (!scx->gid)
+			gsid = adminsid;
+		else {
+			offgroup = le32_to_cpu(pphead->group);
+			gsid = (const SID*)&parentattr[offgroup];
+		}
 	}
 		/*
 		 * new attribute is smaller than parent's
