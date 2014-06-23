@@ -2,7 +2,7 @@
  *               Windows to Linux user mapping for ntfs-3g
  *
  * 
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2014 Jean-Pierre Andre
  *
  *    A quick'n dirty program scanning owners of files in
  *      "c:\Documents and Settings" (and "c:\Users")
@@ -48,6 +48,9 @@
  *
  *  Apr 2014 Version 1.1.5
  *     - displayed the parent directory of selected files
+ *
+ *  May 2014 Version 1.1.6
+ *     - fixed a wrong function header
  */
 
 /*
@@ -86,7 +89,7 @@
 #define INIT_FILE_SECURITY "ntfs_initialize_file_security"
 #define LEAVE_FILE_SECURITY "ntfs_leave_file_security"
 
-#define VERSION "1.1.5"
+#define VERSION "1.1.6"
 #define MAPDIR ".NTFS-3G"
 #define MAPFILE "UserMapping"
 #define MAXATTRSZ 2048
@@ -172,7 +175,7 @@ BOOL ntfs_set_file_security(void *scapi,
 BOOL ntfs_read_directory(void *scapi,
 		const char *path, dircallback callback, void *context);
 void *ntfs_initialize_file_security(const char *device,
-                                int flags);
+                                unsigned long flags);
 BOOL ntfs_leave_file_security(void *scapi);
 
 #else
@@ -187,7 +190,7 @@ BOOL (*ntfs_set_file_security)(void *scapi,
 BOOL (*ntfs_read_directory)(void *scapi,
 		const char *path, dircallback callback, void *context);
 void *(*ntfs_initialize_file_security)(const char *device,
-                                int flags);
+                                unsigned long flags);
 BOOL (*ntfs_leave_file_security)(void *scapi);
 
 #endif
