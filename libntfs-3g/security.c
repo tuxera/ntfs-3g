@@ -1340,6 +1340,48 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 
 #endif /* defined(__sun) && defined (__SVR4) */
 
+#if POSIXACLS
+
+/*
+ *		Extract the basic permissions from a Posix ACL
+ *
+ *	This is only to be used when Posix ACLs are compiled in,
+ *	but not enabled in the mount options.
+ *
+ *	it replaces the permission mask by the group permissions.
+ *	If special groups are mapped, they are also considered as world.
+ */
+
+static int ntfs_basic_perms(const struct SECURITY_CONTEXT *scx,
+			const struct POSIX_SECURITY *pxdesc)
+{
+	int k;
+	int perms;
+	const struct POSIX_ACE *pace;
+	const struct MAPPING* group;
+
+	k = 0;
+	perms = pxdesc->mode;
+	for (k=0; k < pxdesc->acccnt; k++) {
+		pace = &pxdesc->acl.ace[k];
+		if (pace->tag == POSIX_ACL_GROUP_OBJ)
+			perms = (perms & 07707)
+				| ((pace->perms & 7) << 3);
+		else
+			if (pace->tag == POSIX_ACL_GROUP) {
+				group = scx->mapping[MAPGROUPS];
+				while (group && (group->xid != pace->id))
+					group = group->next;
+				if (group && group->grcnt
+				    && (*(group->groups) == (gid_t)pace->id))
+					perms |= pace->perms & 7;
+			}
+	}
+	return (perms);
+}
+
+#endif /* POSIXACLS */
+
 /*
  *	Cacheing is done two-way :
  *	- from uid, gid and perm to securid (CACHED_SECURID)
@@ -1883,7 +1925,9 @@ static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
  *		Determine which access types to a file are allowed
  *	according to the relation of current process to the file
  *
- *	Do not call if default_permissions is set
+ *	When Posix ACLs are compiled in but not enabled in the mount
+ *	options POSIX_ACL_USER, POSIX_ACL_GROUP and POSIX_ACL_MASK
+ *	are ignored.
  */
 
 static int access_check_posix(struct SECURITY_CONTEXT *scx,
@@ -1896,10 +1940,15 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 	int mask;
 	BOOL somegroup;
 	BOOL needgroups;
+	BOOL noacl;
 	mode_t perms;
 	int i;
 
-	perms = pxdesc->mode;
+	noacl = !(scx->vol->secure_flags & (1 << SECURITY_ACL));
+	if (noacl)
+		perms = ntfs_basic_perms(scx, pxdesc);
+	else
+		perms = pxdesc->mode;
 					/* owner and root access */
 	if (!scx->uid || (uid == scx->uid)) {
 		if (!scx->uid) {
@@ -1915,11 +1964,16 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 					switch (pxace->tag) {
 					case POSIX_ACL_USER_OBJ :
 					case POSIX_ACL_GROUP_OBJ :
-					case POSIX_ACL_GROUP :
 						groupperms |= pxace->perms;
 						break;
+					case POSIX_ACL_GROUP :
+						if (!noacl)
+							groupperms
+							    |= pxace->perms;
+						break;
 					case POSIX_ACL_MASK :
-						mask = pxace->perms & 7;
+						if (!noacl)
+							mask = pxace->perms & 7;
 						break;
 					default :
 						break;
@@ -1946,16 +2000,23 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 			pxace = &pxdesc->acl.ace[i];
 			switch (pxace->tag) {
 			case POSIX_ACL_USER :
-				if ((uid_t)pxace->id == scx->uid)
+				if (!noacl
+				    && ((uid_t)pxace->id == scx->uid))
 					userperms = pxace->perms;
 				break;
 			case POSIX_ACL_MASK :
-				mask = pxace->perms & 7;
+				if (!noacl)
+					mask = pxace->perms & 7;
 				break;
 			case POSIX_ACL_GROUP_OBJ :
-			case POSIX_ACL_GROUP :
 				if (((pxace->perms & mask) ^ perms)
 				    & (request >> 6) & 7)
+					needgroups = TRUE;
+				break;
+			case POSIX_ACL_GROUP :
+				if (!noacl
+				    && (((pxace->perms & mask) ^ perms)
+					    & (request >> 6) & 7))
 					needgroups = TRUE;
 				break;
 			default :
@@ -1973,7 +2034,7 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 			    && ((gid == scx->gid)
 				|| groupmember(scx, scx->uid, gid)))
 				perms &= 07070;
-			else {
+			else if (!noacl) {
 					/* other groups */
 				groupperms = -1;
 				somegroup = FALSE;
@@ -1993,7 +2054,8 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 						perms = 0;
 					else
 						perms &= 07007;
-			}
+			} else
+				perms &= 07007;
 		}
 	}
 	return (perms);
@@ -2398,7 +2460,13 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			/* check whether available in cache */
 		cached = fetch_cache(scx,ni);
 		if (cached) {
-			perm = cached->mode;
+#if POSIXACLS
+			if (!(scx->vol->secure_flags & (1 << SECURITY_ACL))
+			    && cached->pxdesc)
+				perm = ntfs_basic_perms(scx,cached->pxdesc);
+			else
+#endif
+				perm = cached->mode;
 			stbuf->st_uid = cached->uid;
 			stbuf->st_gid = cached->gid;
 			stbuf->st_mode = (stbuf->st_mode & ~07777) + perm;
@@ -2420,11 +2488,17 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					  securattr[le32_to_cpu(phead->owner)];
 #endif
 #if POSIXACLS
-				pxdesc = ntfs_build_permissions_posix(scx->mapping, securattr,
-					  usid, gsid, isdir);
-				if (pxdesc)
-					perm = pxdesc->mode & 07777;
-				else
+				pxdesc = ntfs_build_permissions_posix(
+						scx->mapping, securattr,
+					usid, gsid, isdir);
+				if (pxdesc) {
+					if (!(scx->vol->secure_flags
+					    & (1 << SECURITY_ACL)))
+						perm = ntfs_basic_perms(scx,
+								pxdesc);
+					else
+						perm = pxdesc->mode & 07777;
+				} else
 					perm = -1;
 #else
 				perm = ntfs_build_permissions(securattr,

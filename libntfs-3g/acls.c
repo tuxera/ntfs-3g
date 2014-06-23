@@ -4478,7 +4478,15 @@ struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 					if (mapping) {
 						mapping->sid = sid;
 						mapping->xid = gid;
-						mapping->grcnt = 0;
+					/* special groups point to themselves */
+						if (ntfs_known_group_sid(sid)) {
+							mapping->groups =
+							  (gid_t*)&mapping->xid;
+							mapping->grcnt = 1;
+						} else
+							mapping->grcnt = 0;
+
+
 						mapping->next = (struct MAPPING*)NULL;
 						if (lastmapping)
 							lastmapping->next = mapping;
