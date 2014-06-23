@@ -1303,6 +1303,45 @@ struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 	return (newpxdesc);
 }
 
+struct POSIX_SECURITY *ntfs_build_basic_posix(
+		const struct POSIX_SECURITY *pxdesc __attribute__((unused)),
+		mode_t mode, mode_t mask, BOOL isdir __attribute__((unused)))
+{
+	struct POSIX_SECURITY *pydesc;
+	struct POSIX_ACE *pyace;
+
+	pydesc = (struct POSIX_SECURITY*)malloc(
+		sizeof(struct POSIX_SECURITY) + 3*sizeof(struct POSIX_ACE));
+	if (pydesc) {
+			/*
+			 * Copy inherited tags and adapt perms
+			 * Use requested mode, ignoring umask
+			 * (not possible with older versions of fuse)
+			 */
+		pyace = &pydesc->acl.ace[0];
+		pyace->tag = POSIX_ACL_USER_OBJ;
+		pyace->perms = ((mode & ~mask) >> 6) & 7;
+		pyace->id = -1;
+		pyace = &pydesc->acl.ace[1];
+		pyace->tag = POSIX_ACL_GROUP_OBJ;
+		pyace->perms = ((mode & ~mask) >> 3) & 7;
+		pyace->id = -1;
+		pyace = &pydesc->acl.ace[2];
+		pyace->tag = POSIX_ACL_OTHER;
+		pyace->perms = (mode & ~mask) & 7;
+		pyace->id = -1;
+		pydesc->mode = mode;
+		pydesc->tagsset = POSIX_ACL_USER_OBJ
+				| POSIX_ACL_GROUP_OBJ
+				| POSIX_ACL_OTHER;
+		pydesc->acccnt = 3;
+		pydesc->defcnt = 0;
+		pydesc->firstdef = 6;
+	} else
+		errno = ENOMEM;
+	return (pydesc);
+}
+
 /*
  *		Build an inherited Posix descriptor from parent
  *	descriptor (if any) restricted to creation mode

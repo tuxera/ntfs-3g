@@ -2698,6 +2698,7 @@ static ntfs_inode *ntfs_check_access_xattr(fuse_req_t req,
 	if (((!ntfs_fuse_fill_security_context(req, security)
 		|| (ctx->secure_flags
 		    & ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW))))
+		|| !(ctx->secure_flags & (1 << SECURITY_ACL))
 		|| (setting && ctx->inherit))
 	    && foracl) {
 		if (ctx->silent)
