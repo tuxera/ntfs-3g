@@ -1634,7 +1634,8 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 {
 	s64 old_pos, to_write, i, bw = 0;
 	win32_fd *fd = (win32_fd *)dev->d_private;
-	BYTE *alignedbuffer;
+	const BYTE *alignedbuffer;
+	BYTE *readbuffer;
 	int old_ofs, ofs;
 
 	old_pos = fd->pos;
@@ -1659,15 +1660,16 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 	if (!count)
 		return 0;
 	NDevSetDirty(dev);
+	readbuffer = (BYTE*)NULL;
 	if (!((unsigned long)b & (fd->geo_sector_size - 1)) && !old_ofs &&
 			!(count & (fd->geo_sector_size - 1)))
-		alignedbuffer = (BYTE *)b;
+		alignedbuffer = (const BYTE *)b;
 	else {
 		s64 end;
 
-		alignedbuffer = (BYTE *)VirtualAlloc(NULL, to_write,
+		readbuffer = (BYTE *)VirtualAlloc(NULL, to_write,
 				MEM_COMMIT, PAGE_READWRITE);
-		if (!alignedbuffer) {
+		if (!readbuffer) {
 			errno = ntfs_w32error_to_errno(GetLastError());
 			ntfs_log_trace("VirtualAlloc failed for write.\n");
 			return -1;
@@ -1676,7 +1678,7 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 		if (ofs) {
 			i = ntfs_device_win32_pread_simple(fd,
 					old_pos & ~(s64)(fd->geo_sector_size - 1),
-					fd->geo_sector_size, alignedbuffer);
+					fd->geo_sector_size, readbuffer);
 			if (i != fd->geo_sector_size) {
 				if (i >= 0)
 					errno = EIO;
@@ -1694,7 +1696,7 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 				((to_write > fd->geo_sector_size) || !ofs)) {
 			i = ntfs_device_win32_pread_simple(fd,
 					end & ~(s64)(fd->geo_sector_size - 1),
-					fd->geo_sector_size, alignedbuffer +
+					fd->geo_sector_size, readbuffer +
 					to_write - fd->geo_sector_size);
 			if (i != fd->geo_sector_size) {
 				if (i >= 0)
@@ -1702,8 +1704,9 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 				goto write_error;
 			}
 		}
-		/* Copy the data to be written into @alignedbuffer. */
-		memcpy(alignedbuffer + ofs, b, count);
+		/* Copy the data to be written into @readbuffer. */
+		memcpy(readbuffer + ofs, b, count);
+		alignedbuffer = readbuffer;
 	}
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && old_pos < fd->geo_size) {
 		s64 vol_to_write = fd->geo_size - old_pos;
@@ -1741,8 +1744,8 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 		bw = count;
 	fd->pos = old_pos + bw;
 write_partial:
-	if (alignedbuffer != b)
-		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
+	if (readbuffer)
+		VirtualFree(readbuffer, 0, MEM_RELEASE);
 	return bw;
 write_error:
 	bw = -1;
