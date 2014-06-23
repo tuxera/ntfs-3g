@@ -17,8 +17,9 @@ if ENABLE_NTFSPROGS
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
-EXTRA_PROGRAM_NAMES	= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsmftalloc ntfsck
+EXTRA_PROGRAM_NAMES	= ntfswipe ntfstruncate
+
+QUARANTINED_PROGRAM_NAMES = ntfsdump_logfile ntfsmftalloc ntfsmove ntfsck
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -36,6 +37,9 @@ endif
 
 if ENABLE_EXTRAS
 bin_PROGRAMS		+= $(EXTRA_PROGRAM_NAMES)
+if ENABLE_QUARANTINED
+bin_PROGRAMS		+= $(QUARANTINED_PROGRAM_NAMES)
+endif
 else
 EXTRA_PROGRAMS		= $(EXTRA_PROGRAM_NAMES)
 endif
