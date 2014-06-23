@@ -19,7 +19,8 @@ sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAM_NAMES	= ntfswipe ntfstruncate
 
-QUARANTINED_PROGRAM_NAMES = ntfsdump_logfile ntfsmftalloc ntfsmove ntfsck
+QUARANTINED_PROGRAM_NAMES = ntfsdump_logfile ntfsmftalloc ntfsmove ntfsck \
+			   ntfsfallocate
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -121,6 +122,10 @@ ntfswipe_LDFLAGS	= $(AM_LFLAGS)
 ntfsdump_logfile_SOURCES= ntfsdump_logfile.c
 ntfsdump_logfile_LDADD	= $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
+
+ntfsfallocate_SOURCES	= ntfsfallocate.c utils.c utils.h
+ntfsfallocate_LDADD	= $(AM_LIBS)
+ntfsfallocate_LDFLAGS	= $(AM_LFLAGS)
 
 if ENABLE_CRYPTO
 ntfsdecrypt_SOURCES	= ntfsdecrypt.c utils.c utils.h
