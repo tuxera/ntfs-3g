@@ -3872,6 +3872,7 @@ int main(int argc, char *argv[])
 	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path,
 		(ctx->vol->secure_flags
 			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_ACL)))
+		&& !ctx->inherit
 		&& !(ctx->vol->secure_flags & (1 << SECURITY_WANTED)))) {
 #if POSIXACLS
 		/* use basic permissions if requested */
