@@ -1303,6 +1303,11 @@ struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 	return (newpxdesc);
 }
 
+/*
+ *		Build a basic Posix ACL from a mode and umask,
+ *	ignoring inheritance from the parent directory
+ */
+
 struct POSIX_SECURITY *ntfs_build_basic_posix(
 		const struct POSIX_SECURITY *pxdesc __attribute__((unused)),
 		mode_t mode, mode_t mask, BOOL isdir __attribute__((unused)))
@@ -1313,11 +1318,6 @@ struct POSIX_SECURITY *ntfs_build_basic_posix(
 	pydesc = (struct POSIX_SECURITY*)malloc(
 		sizeof(struct POSIX_SECURITY) + 3*sizeof(struct POSIX_ACE));
 	if (pydesc) {
-			/*
-			 * Copy inherited tags and adapt perms
-			 * Use requested mode, ignoring umask
-			 * (not possible with older versions of fuse)
-			 */
 		pyace = &pydesc->acl.ace[0];
 		pyace->tag = POSIX_ACL_USER_OBJ;
 		pyace->perms = ((mode & ~mask) >> 6) & 7;
