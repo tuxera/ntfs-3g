@@ -207,9 +207,11 @@
  *  Sep 2013, version 1.4.1
  *     - silenced an aliasing warning by gcc >= 4.8
  *
+ *  May 2014, version 1.4.2
  *     - decoded GENERIC_ALL permissions
  *     - decoded more "well-known" and generic SIDs
  *     - showed Windows ownership in verbose situations
+ *     - fixed apparent const violations
  */
 
 /*
@@ -233,7 +235,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.1"
+#define AUDT_VERSION "1.4.2"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2397,7 +2399,7 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 #ifdef WIN32
 /* TODO : check whether the device can store acls */
 		strcpy(mapfile,"x:\\" MAPDIR "\\" MAPFILE);
-		if (((le16*)usermap_path)[1] == ':')
+		if (((const le16*)usermap_path)[1] == ':')
   			mapfile[0] = usermap_path[0];
 		else {
 			GetModuleFileName(NULL, currpath, 261);
@@ -2745,8 +2747,9 @@ BOOL applyattr(const char *fullname, const char *attr,
 				}
 			}
 		}
+		/* const missing from stupid prototype */
 		bad = !SetFileSecurityW((LPCWSTR)fullname,
-			selection, (char*)curattr);
+			selection, (PSECURITY_DESCRIPTOR)(LONG_PTR)curattr);
 		if (bad)
 			switch (GetLastError()) {
 			case 1307 :
@@ -2755,9 +2758,12 @@ BOOL applyattr(const char *fullname, const char *attr,
 				printname(stdout,fullname);
 				printf(", retrying with no owner or SACL setting\n");
 				warnings++;
+				/* const missing from stupid prototype */
 				bad = !SetFileSecurityW((LPCWSTR)fullname,
 					selection & ~OWNER_SECURITY_INFORMATION
-					& ~SACL_SECURITY_INFORMATION, (char*)curattr);
+					& ~SACL_SECURITY_INFORMATION,
+					(PSECURITY_DESCRIPTOR)
+							(LONG_PTR)curattr);
 				break;
 			default :
 				break;
