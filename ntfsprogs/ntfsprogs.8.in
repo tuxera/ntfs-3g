@@ -47,8 +47,14 @@ perform a thorough check next time it boots.
 .BR ntfsresize (8)
 \- Resize NTFS without losing data.
 .PP
+.BR ntfstruncate (8)
+\- Truncate a file on an NTFS volume.
+.PP
 .BR ntfsundelete (8)
 \- Recover deleted files from NTFS.
+.PP
+.BR ntfswipe (8)
+\- Overwrite unused space on an NTFS volume.
 .SH AUTHORS
 .PP
 The tools were written by Anton Altaparmakov, Carmelo Kintana, Cristian Klein,
