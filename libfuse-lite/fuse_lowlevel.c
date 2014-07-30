@@ -333,12 +333,8 @@ int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e)
 
     memset(&arg, 0, sizeof(arg));
     fill_entry(&arg, e);
-#ifdef POSIXACLS
     return send_reply_ok(req, &arg, (req->f->conn.proto_minor >= 12 
 			? sizeof(arg) : FUSE_COMPAT_ENTRY_OUT_SIZE));
-#else
-    return send_reply_ok(req, &arg, sizeof(arg));
-#endif
 }
 
 int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
@@ -351,7 +347,6 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
 
     memset(&arg, 0, sizeof(arg));
     fill_entry(&arg.e, e);
-#ifdef POSIXACLS
     if (req->f->conn.proto_minor < 12) {
 	fill_open((struct fuse_open_out*)
 		((char*)&arg + FUSE_COMPAT_ENTRY_OUT_SIZE), f);
@@ -361,10 +356,6 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
     	fill_open(&arg.o, f);
     	return send_reply_ok(req, &arg, sizeof(arg));
     }
-#else
-    fill_open(&arg.o, f);
-    return send_reply_ok(req, &arg, sizeof(arg));
-#endif
 }
 
 int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
@@ -377,12 +368,8 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
     arg.attr_valid_nsec = calc_timeout_nsec(attr_timeout);
     convert_stat(attr, &arg.attr);
 
-#ifdef POSIXACLS
     return send_reply_ok(req, &arg, (req->f->conn.proto_minor >= 12
 			? sizeof(arg) : FUSE_COMPAT_FUSE_ATTR_OUT_SIZE));
-#else
-    return send_reply_ok(req, &arg, sizeof(arg));
-#endif
 }
 
 int fuse_reply_readlink(fuse_req_t req, const char *linkname)
@@ -462,6 +449,28 @@ int fuse_reply_bmap(fuse_req_t req, uint64_t idx)
     return send_reply_ok(req, &arg, sizeof(arg));
 }
 
+int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+{
+    struct fuse_ioctl_out arg;
+    struct iovec iov[3];
+    size_t count = 1;
+
+    memset(&arg, 0, sizeof(arg));
+    arg.result = result;
+    iov[count].iov_base = &arg;
+    iov[count].iov_len = sizeof(arg);
+    count++;
+
+    if (size) {
+		/* Note : const qualifier dropped */
+	iov[count].iov_base = (char *)(uintptr_t) buf;
+	iov[count].iov_len = size;
+	count++;
+    }
+
+    return send_reply_iov(req, 0, iov, count);
+}
+
 static void do_lookup(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 {
     const char *name = (const char *) inarg;
@@ -538,11 +547,9 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     const struct fuse_mknod_in *arg = (const struct fuse_mknod_in *) inarg;
     const char *name = PARAM(arg);
 
-#ifdef POSIXACLS
     if (req->f->conn.proto_minor >= 12)
 	req->ctx.umask = arg->umask;
     else
-#endif
 	name = (const char *) inarg + FUSE_COMPAT_MKNOD_IN_SIZE;
 
     if (req->f->op.mknod)
@@ -555,10 +562,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 {
     const struct fuse_mkdir_in *arg = (const struct fuse_mkdir_in *) inarg;
 
-#ifdef POSIXACLS
     if (req->f->conn.proto_minor >= 12)
 	req->ctx.umask = arg->umask;
-#endif
 
     if (req->f->op.mkdir)
         req->f->op.mkdir(req, nodeid, PARAM(arg), arg->mode);
@@ -630,11 +635,9 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
         memset(&fi, 0, sizeof(fi));
         fi.flags = arg->flags;
 
-#ifdef POSIXACLS
 	if (req->f->conn.proto_minor >= 12)
 		req->ctx.umask = arg->umask;
 	else
-#endif
 		name = (const char *) inarg + sizeof(struct fuse_open_in);
 
 	req->f->op.create(req, nodeid, name, arg->mode, &fi);
@@ -682,7 +685,6 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     fi.writepage = arg->write_flags & 1;
 
     if (req->f->op.write) {
-#ifdef POSIXACLS
 	const char *buf;
 
 	if (req->f->conn.proto_minor >= 12)
@@ -690,9 +692,6 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	else
 		buf = ((const char*)arg) + FUSE_COMPAT_WRITE_IN_SIZE;
         req->f->op.write(req, nodeid, buf, arg->size, arg->offset, &fi);
-#else
-        req->f->op.write(req, nodeid, PARAM(arg), arg->size, arg->offset, &fi);
-#endif
     } else
         fuse_reply_err(req, ENOSYS);
 }
@@ -1011,6 +1010,39 @@ static void do_bmap(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
         fuse_reply_err(req, ENOSYS);
 }
 
+static void do_ioctl(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+{
+    const struct fuse_ioctl_in *arg = (const struct fuse_ioctl_in *) inarg;
+    unsigned int flags = arg->flags;
+    const void *in_buf = arg->in_size ? PARAM(arg) : NULL;
+    struct fuse_file_info fi;
+
+    if (flags & FUSE_IOCTL_DIR &&
+        !(req->f->conn.want & FUSE_CAP_IOCTL_DIR)) {
+    	fuse_reply_err(req, ENOTTY);
+    	return;
+    }
+
+    memset(&fi, 0, sizeof(fi));
+    fi.fh = arg->fh;
+
+/* TODO JPA (need req->ioctl_64bit in obscure fuse_req_t)
+// probably a 64 bit ioctl on a 32-bit cpu
+// this is to forward a request from the kernel
+    if (sizeof(void *) == 4 && req->f->conn.proto_minor >= 16 &&
+		!(flags & FUSE_IOCTL_32BIT)) {
+    	req->ioctl_64bit = 1;
+    }
+*/
+
+    if (req->f->op.ioctl)
+    	req->f->op.ioctl(req, nodeid, arg->cmd,
+    			 (void *)(uintptr_t)arg->arg, &fi, flags,
+    			 in_buf, arg->in_size, arg->out_size);
+    else
+    	fuse_reply_err(req, ENOSYS);
+}
+
 static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 {
     const struct fuse_init_in *arg = (const struct fuse_init_in *) inarg;
@@ -1047,6 +1079,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #endif
 	if (arg->flags & FUSE_BIG_WRITES)
 	    f->conn.capable |= FUSE_CAP_BIG_WRITES;
+	if (arg->flags & FUSE_HAS_IOCTL_DIR)
+	    f->conn.capable |= FUSE_CAP_IOCTL_DIR;
     } else {
         f->conn.async_read = 0;
         f->conn.max_readahead = 0;
@@ -1069,28 +1103,28 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     memset(&outarg, 0, sizeof(outarg));
     outarg.major = FUSE_KERNEL_VERSION;
 	/*
-	 * if POSIXACLS is not set, protocol 7.8 provides a good
-	 * compatibility with older kernel modules.
-	 * if POSIXACLS is set, we try to use protocol 7.12 supposed
-	 * to have the ability to process the umask conditionnally,
-	 * but, when using an older kernel module, we fallback to 7.8
+	 * Suggest using protocol 7.18 when available, and fallback
+	 * to 7.8 when running on an old kernel.
+	 * Protocol 7.12 has the ability to process the umask
+	 * conditionnally (as needed if POSIXACLS is set)
+	 * Protocol 7.18 has the ability to process the ioctls
 	 */
-#ifdef POSIXACLS
-    if (arg->major > 7 || (arg->major == 7 && arg->minor >= 12))
+    if (arg->major > 7 || (arg->major == 7 && arg->minor >= 18)) {
 	    outarg.minor = FUSE_KERNEL_MINOR_VERSION;
-    else
-	    outarg.minor = FUSE_KERNEL_MINOR_FALLBACK;
-#else
-    outarg.minor = FUSE_KERNEL_MINOR_VERSION;
+	    if (f->conn.want & FUSE_CAP_IOCTL_DIR)
+		outarg.flags |= FUSE_HAS_IOCTL_DIR;
+#ifdef POSIXACLS
+	    if (f->conn.want & FUSE_CAP_DONT_MASK)
+		outarg.flags |= FUSE_DONT_MASK;
 #endif
+    } else {
+	    outarg.major = FUSE_KERNEL_MAJOR_FALLBACK;
+	    outarg.minor = FUSE_KERNEL_MINOR_FALLBACK;
+    }
     if (f->conn.async_read)
         outarg.flags |= FUSE_ASYNC_READ;
     if (f->op.getlk && f->op.setlk)
         outarg.flags |= FUSE_POSIX_LOCKS;
-#ifdef POSIXACLS
-    if (f->conn.want & FUSE_CAP_DONT_MASK)
-	outarg.flags |= FUSE_DONT_MASK;
-#endif
     if (f->conn.want & FUSE_CAP_BIG_WRITES)
 	outarg.flags |= FUSE_BIG_WRITES;
     outarg.max_readahead = f->conn.max_readahead;
@@ -1191,6 +1225,7 @@ static struct {
     [FUSE_CREATE]      = { do_create,      "CREATE"      },
     [FUSE_INTERRUPT]   = { do_interrupt,   "INTERRUPT"   },
     [FUSE_BMAP]        = { do_bmap,        "BMAP"        },
+    [FUSE_IOCTL]       = { do_ioctl,       "IOCTL"       },
     [FUSE_DESTROY]     = { do_destroy,     "DESTROY"     },
 };
 

@@ -49,6 +49,22 @@ extern "C" {
 #endif
 
 #define FUSE_CAP_BIG_WRITES	(1 << 5)
+#define FUSE_CAP_IOCTL_DIR	(1 << 11)
+
+/**
+ * Ioctl flags
+ *
+ * FUSE_IOCTL_COMPAT: 32bit compat ioctl on 64bit machine
+ * FUSE_IOCTL_UNRESTRICTED: not restricted to well-formed ioctls, retry allowed
+ * FUSE_IOCTL_RETRY: retry with new iovecs
+ * FUSE_IOCTL_DIR: is a directory 
+ */
+#define FUSE_IOCTL_COMPAT	(1 << 0)
+#define FUSE_IOCTL_UNRESTRICTED (1 << 1)
+#define FUSE_IOCTL_RETRY	(1 << 2)
+#define FUSE_IOCTL_DIR		(1 << 4)
+
+#define FUSE_IOCTL_MAX_IOV	256
 
 /**
  * Information about open files
