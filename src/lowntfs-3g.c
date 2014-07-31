@@ -83,7 +83,12 @@
 #include <sys/param.h>
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 
+#ifdef HAVE_LINUX_FS_H
+#include <linux/fs.h>
+#endif
+
 #include "compat.h"
+#include "bitmap.h"
 #include "attrib.h"
 #include "inode.h"
 #include "volume.h"
@@ -99,6 +104,7 @@
 #include "logging.h"
 #include "xattrs.h"
 #include "misc.h"
+#include "ioctl.h"
 
 #include "ntfs-3g_common.h"
 
@@ -566,8 +572,6 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 }
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
-#if defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_BIG_WRITES) \
-		|| (defined(__APPLE__) || defined(__DARWIN__))
 static void ntfs_init(void *userdata __attribute__((unused)),
 			struct fuse_conn_info *conn)
 {
@@ -584,8 +588,8 @@ static void ntfs_init(void *userdata __attribute__((unused)),
 			>= SAFE_CAPACITY_FOR_BIG_WRITES))
 		conn->want |= FUSE_CAP_BIG_WRITES;
 #endif
+	conn->want |= FUSE_CAP_IOCTL_DIR;
 }
-#endif /* defined(FUSE_CAP_DONT_MASK) || (defined(__APPLE__) || defined(__DARWIN__)) */
 
 static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 				ntfs_inode *ni, struct stat *stbuf)
@@ -2600,6 +2604,48 @@ static void ntfs_fuse_fsync(fuse_req_t req,
 		fuse_reply_err(req, 0);
 }
 
+static void ntfs_fuse_ioctl(fuse_req_t req __attribute__((unused)),
+			fuse_ino_t ino __attribute__((unused)),
+			int cmd, void *arg,
+			struct fuse_file_info *fi __attribute__((unused)),
+			unsigned flags, const void *data,
+			size_t in_bufsz, size_t out_bufsz)
+{
+	ntfs_inode *ni;
+	char *buf = (char*)NULL;
+	int bufsz;
+	int ret = 0;
+
+	if (flags & FUSE_IOCTL_COMPAT) {
+		ret = -ENOSYS;
+	} else {
+		ni = ntfs_inode_open(ctx->vol, INODE(ino));
+		if (!ni) {
+			ret = -errno;
+			goto fail;
+		}
+		bufsz = (in_bufsz > out_bufsz ? in_bufsz : out_bufsz);
+		if (bufsz) {
+			buf = ntfs_malloc(bufsz);
+			if (!buf) {
+				ret = ENOMEM;
+				goto fail;
+			}
+			memcpy(buf, data, in_bufsz);
+		}
+		ret = ntfs_ioctl(ni, cmd, arg, flags, buf);
+		if (ntfs_inode_close (ni))
+			set_fuse_error(&ret);
+	}
+	if (ret)
+fail :
+		fuse_reply_err(req, -ret);
+	else
+		fuse_reply_ioctl(req, 0, buf, out_bufsz);
+	if (buf)
+		free(buf);
+}
+
 static void ntfs_fuse_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
 		      uint64_t vidx)
 {
@@ -3551,6 +3597,7 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 	.fsyncdir	= ntfs_fuse_fsync,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy	= ntfs_fuse_destroy2,
+	.ioctl		= ntfs_fuse_ioctl,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	.access 	= ntfs_fuse_access,
 #endif
@@ -3567,10 +3614,7 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 	.setbkuptime	= ntfs_macfuse_setbkuptime,
 	.setchgtime	= ntfs_macfuse_setchgtime,
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
-#if defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_BIG_WRITES) \
-		|| (defined(__APPLE__) || defined(__DARWIN__))
 	.init		= ntfs_init
-#endif
 };
 
 static int ntfs_fuse_init(void)

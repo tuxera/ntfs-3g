@@ -36,9 +36,7 @@
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
+	/* Do not #include <sys/mount.h> here : conflicts with <linux/fs.h> */
 #ifdef HAVE_MNTENT_H
 #include <mntent.h>
 #endif

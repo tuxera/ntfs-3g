@@ -471,7 +471,8 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	regex.h endian.h byteswap.h sys/byteorder.h sys/disk.h sys/endian.h \
 	sys/param.h sys/ioctl.h sys/mkdev.h sys/mount.h sys/stat.h sys/types.h \
 	sys/vfs.h sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h \
-	linux/hdreg.h machine/endian.h windows.h syslog.h pwd.h malloc.h])
+	linux/fs.h inttypes.h linux/hdreg.h \
+	machine/endian.h windows.h syslog.h pwd.h malloc.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

@@ -98,6 +98,7 @@
 #include "logging.h"
 #include "xattrs.h"
 #include "misc.h"
+#include "ioctl.h"
 
 #include "ntfs-3g_common.h"
 
@@ -641,8 +642,6 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 }
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
-#if defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_BIG_WRITES) \
-		|| (defined(__APPLE__) || defined(__DARWIN__))
 static void *ntfs_init(struct fuse_conn_info *conn)
 {
 #if defined(__APPLE__) || defined(__DARWIN__)
@@ -658,9 +657,9 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 			>= SAFE_CAPACITY_FOR_BIG_WRITES))
 		conn->want |= FUSE_CAP_BIG_WRITES;
 #endif
+	conn->want |= FUSE_CAP_IOCTL_DIR;
 	return NULL;
 }
-#endif /* defined(FUSE_CAP_DONT_MASK) || (defined(__APPLE__) || defined(__DARWIN__)) */
 
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
@@ -2445,6 +2444,28 @@ static int ntfs_fuse_fsync(const char *path __attribute__((unused)),
 	return (ret);
 }
 
+static int ntfs_fuse_ioctl(const char *path,
+			int cmd, void *arg,
+			struct fuse_file_info *fi __attribute__((unused)),
+			unsigned int flags, void *data)
+{
+	ntfs_inode *ni;
+	int ret;
+
+	if (flags & FUSE_IOCTL_COMPAT)
+		return -ENOSYS;
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+
+	ret = ntfs_ioctl(ni, cmd, arg, flags, data);
+
+	if (ntfs_inode_close (ni))
+		set_fuse_error(&ret);
+	return ret;
+}
+
 static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
 	ntfs_inode *ni;
@@ -3396,6 +3417,7 @@ static struct fuse_operations ntfs_3g_ops = {
 	.fsyncdir	= ntfs_fuse_fsync,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
+        .ioctl		= ntfs_fuse_ioctl,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	.access		= ntfs_fuse_access,
 	.opendir	= ntfs_fuse_opendir,
@@ -3413,10 +3435,7 @@ static struct fuse_operations ntfs_3g_ops = {
 	.setbkuptime	= ntfs_macfuse_setbkuptime,
 	.setchgtime	= ntfs_macfuse_setchgtime,
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
-#if defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_BIG_WRITES) \
-		|| (defined(__APPLE__) || defined(__DARWIN__))
 	.init		= ntfs_init
-#endif
 };
 
 static int ntfs_fuse_init(void)
