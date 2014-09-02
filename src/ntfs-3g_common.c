@@ -531,8 +531,10 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 		ctx->secure_flags |= (1 << SECURITY_ACL);
 	if (want_permissions)
 		ctx->secure_flags |= (1 << SECURITY_WANTED);
-	if (ctx->ro)
+	if (ctx->ro) {
 		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
+		ctx->hiberfile = FALSE;
+	}
 exit:
 	free(options);
 	return ret;
