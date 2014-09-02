@@ -169,6 +169,7 @@ static void usage(void)
 		"    -p       --pagefile    Wipe pagefile (swap space)\n"
 		"    -t       --tails       Wipe file tails\n"
 		"    -u       --unused      Wipe unused clusters\n"
+		"    -U       --unused-fast Wipe unused clusters (fast)\n"
 		"    -s       --undel       Wipe undelete data\n"
 		"\n"
 		"    -a       --all         Wipe all unused space\n"
@@ -262,7 +263,7 @@ static int parse_list(char *list, int **result)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-ab:c:dfh?ilmnpqtuvVs";
+	static const char *sopt = "-ab:c:dfh?ilmnpqtuUvVs";
 	static struct option lopt[] = {
 		{ "all",	no_argument,		NULL, 'a' },
 		{ "bytes",	required_argument,	NULL, 'b' },
@@ -279,6 +280,7 @@ static int parse_options(int argc, char *argv[])
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "tails",	no_argument,		NULL, 't' },
 		{ "unused",	no_argument,		NULL, 'u' },
+		{ "unused-fast",no_argument,		NULL, 'U' },
 		{ "undel",	no_argument,		NULL, 's' },
 		{ "verbose",	no_argument,		NULL, 'v' },
 		{ "version",	no_argument,		NULL, 'V' },
@@ -370,6 +372,9 @@ static int parse_options(int argc, char *argv[])
 		case 'u':
 			opts.unused++;
 			break;
+		case 'U':
+			opts.unused_fast++;
+			break;
 		case 'v':
 			opts.verbose++;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
@@ -442,7 +447,7 @@ static int parse_options(int argc, char *argv[])
 
 		if (!opts.directory && !opts.logfile && !opts.mft &&
 		    !opts.pagefile && !opts.tails && !opts.unused &&
-		    !opts.undel) {
+		    !opts.unused_fast && !opts.undel) {
 			opts.info = 1;
 		}
 	}
@@ -508,6 +513,120 @@ static s64 wipe_unused(ntfs_volume *vol, int byte, enum action act)
 	ntfs_log_quiet("wipe_unused 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
 	free(buffer);
+	return total;
+}
+
+/**
+ * wipe_unused_fast - Faster wipe unused clusters
+ * @vol:   An ntfs volume obtained from ntfs_mount
+ * @byte:  Overwrite with this value
+ * @act:   Wipe, test or info
+ *
+ * Read $Bitmap and wipe any clusters that are marked as not in use.
+ *
+ * - read/write on a block basis (64 clusters, arbitrary)
+ * - skip of fully used block
+ * - skip non-used block already wiped
+ *
+ * Return: >0  Success, the attribute was wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
+ */
+static s64 wipe_unused_fast(ntfs_volume *vol, int byte, enum action act)
+{
+	s64 i;
+	s64 total = 0;
+	s64 unused = 0;
+	s64 result;
+	u8 *buffer;
+	u8 *big_buffer;
+	u32 *u32_buffer;
+	u32 u32_bytes;
+	unsigned int blksize;
+	unsigned int j,k;
+	BOOL wipe_needed;
+
+	if (!vol || (byte < 0))
+		return -1;
+
+	big_buffer = (u8*)malloc(vol->cluster_size*64);
+	if (!big_buffer) {
+		ntfs_log_error("malloc failed\n");
+		return -1;
+	}
+
+	for (i = 0; i < vol->nr_clusters; i+=64) {
+		blksize = vol->nr_clusters - i;
+		if (blksize > 64)
+			blksize = 64;
+	   /* if all clusters in this block are used, ignore the block */
+		result = 0;
+		for (j = 0; j < blksize; j++) {
+			if (utils_cluster_in_use(vol, i+j))
+				result++;
+		}
+		unused += (blksize - result) * vol->cluster_size;
+
+		if (result == blksize) {
+			continue;
+		}
+		/*
+		 * if all unused clusters in this block are already wiped,
+		 * ignore the block
+		 */
+		if (ntfs_pread(vol->dev, vol->cluster_size * i,
+					vol->cluster_size * blksize, big_buffer)
+				!= vol->cluster_size * blksize) {
+			ntfs_log_error("Read failed at cluster %lld\n",
+					(long long)i);
+			goto free;
+		}
+
+		result = 0;
+		wipe_needed = FALSE;
+		u32_bytes = (byte & 255)*0x01010101;
+		buffer = big_buffer;
+		for (j = 0; (j < blksize) && !wipe_needed; j++) {
+			u32_buffer = (u32*)buffer;
+			if (!utils_cluster_in_use(vol, i+j)) {
+				for (k = 0; (k < vol->cluster_size)
+					&& (*u32_buffer++ == u32_bytes); k+=4) {
+				}
+				if (k < vol->cluster_size)
+					wipe_needed = TRUE;
+			}
+			buffer += vol->cluster_size;
+		}
+
+		if (!wipe_needed) { 
+			continue;
+		}
+			/* else wipe unused clusters in the block */
+		buffer = big_buffer;
+
+		for (j = 0; j < blksize; j++) {
+			if (!utils_cluster_in_use(vol, i+j)) {
+				memset(buffer, byte, vol->cluster_size);
+				total += vol->cluster_size;
+			}
+			buffer += vol->cluster_size;
+		}
+
+		if ((act == act_wipe)
+			&& (ntfs_pwrite(vol->dev, vol->cluster_size * i,
+				vol->cluster_size * blksize, big_buffer)
+					!= vol->cluster_size * blksize)) {
+			ntfs_log_error("Write failed at cluster %lld\n",
+					(long long)i);
+			goto free;
+		}
+	}
+
+	ntfs_log_quiet("wipe_unused_fast 0x%02x, %lld bytes"
+			" already wiped, %lld more bytes wiped\n",
+			byte, (long long)(unused - total), (long long)total);
+free:
+	free(big_buffer);
 	return total;
 }
 
@@ -1959,6 +2078,8 @@ static void print_summary(void)
 	ntfs_log_quiet("%s is about to wipe:\n", EXEC_NAME);
 	if (opts.unused)
 		ntfs_log_quiet("\tunused disk space\n");
+	if (opts.unused_fast)
+		ntfs_log_quiet("\tunused disk space (fast)\n");
 	if (opts.tails)
 		ntfs_log_quiet("\tfile tails\n");
 	if (opts.mft)
@@ -2099,8 +2220,12 @@ int main(int argc, char *argv[])
 					total += wiped;
 			}
 
-			if (opts.unused) {
-				wiped = wipe_unused(vol, byte, act);
+			if (opts.unused || opts.unused_fast) {
+				if (opts.unused_fast)
+					wiped = wipe_unused_fast(vol, byte,
+								act);
+				else
+					wiped = wipe_unused(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else

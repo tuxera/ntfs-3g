@@ -77,6 +77,10 @@ because the allocations are always done by full clusters.
 Overwrite the space which is currently not allocated to any file (but
 may have been used in the past).
 .TP
+\fB\-U\fR, \fB\-\-unused-fast\fR
+Overwrite the space which is currently not allocated to any file, trying
+not to overwrite the space not written to since the previous wiping.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 Display more debug/warning/error messages.
 .TP
