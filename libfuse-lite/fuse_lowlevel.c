@@ -185,7 +185,8 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
     struct iovec iov[2];
     int count = 1;
     if (argsize) {
-        iov[1].iov_base = (void *) arg;
+		/* Note : const qualifier dropped */
+        iov[1].iov_base = (void *)(uintptr_t) arg;
         iov[1].iov_len = argsize;
         count++;
     }
