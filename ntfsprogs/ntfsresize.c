@@ -3105,7 +3105,8 @@ static u8 *get_mft_bitmap(expand_t *expand)
 			for (prl=rl; prl->length && ok; prl++) {
 				lseek_to_cluster(vol,
 					prl->lcn + expand->cluster_increment);
-				ok = !read_all(vol->dev, expand->mft_bitmap,
+				ok = !read_all(vol->dev, expand->mft_bitmap
+					+ (prl->vcn << vol->cluster_size_bits),
 					prl->length << vol->cluster_size_bits);
 			}
 			if (!ok) {
