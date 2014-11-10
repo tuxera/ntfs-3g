@@ -56,11 +56,12 @@
 #define FUSE_KERNEL_MINOR_VERSION 18
 
 /*
- * For binary compatibility with old kernels we accept falling back to 7.8
+ * For binary compatibility with old kernels we accept falling back
+ * to 7.12 or earlier maximum version supported by the kernel
  */
 
 #define FUSE_KERNEL_MAJOR_FALLBACK 7
-#define FUSE_KERNEL_MINOR_FALLBACK 8
+#define FUSE_KERNEL_MINOR_FALLBACK 12
 
 /** The node ID of the root inode */
 #define FUSE_ROOT_ID 1

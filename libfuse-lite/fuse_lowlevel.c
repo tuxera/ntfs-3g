@@ -1105,7 +1105,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     outarg.major = FUSE_KERNEL_VERSION;
 	/*
 	 * Suggest using protocol 7.18 when available, and fallback
-	 * to 7.8 when running on an old kernel.
+	 * to 7.12 or even earlier when running on an old kernel.
 	 * Protocol 7.12 has the ability to process the umask
 	 * conditionnally (as needed if POSIXACLS is set)
 	 * Protocol 7.18 has the ability to process the ioctls
@@ -1119,8 +1119,20 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		outarg.flags |= FUSE_DONT_MASK;
 #endif
     } else {
+	/* Never use a version more recent than supported by the kernel */
+	if ((arg->major < FUSE_KERNEL_MAJOR_FALLBACK)
+	    || ((arg->major == FUSE_KERNEL_MAJOR_FALLBACK)
+		&& (arg->minor < FUSE_KERNEL_MINOR_FALLBACK))) {
+	    outarg.major = arg->major;
+	    outarg.minor = arg->minor;
+	} else {
 	    outarg.major = FUSE_KERNEL_MAJOR_FALLBACK;
 	    outarg.minor = FUSE_KERNEL_MINOR_FALLBACK;
+#ifdef POSIXACLS
+	    if (f->conn.want & FUSE_CAP_DONT_MASK)
+		outarg.flags |= FUSE_DONT_MASK;
+#endif
+    	}
     }
     if (f->conn.async_read)
         outarg.flags |= FUSE_ASYNC_READ;
