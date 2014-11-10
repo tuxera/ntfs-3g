@@ -1881,13 +1881,11 @@ static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
 		 * with a default security descriptor inserted in an
 		 * attribute
 		 */
-	if (test_nino_flag(ni, v3_Extensions) && vol->secure_ni) {
-		if (ni->security_id) {
-				/* get v3.x descriptor in $Secure */
-			securid.security_id = ni->security_id;
-			securattr = retrievesecurityattr(vol,securid);
-		} else
-			securattr = (char*)NULL;
+	if (test_nino_flag(ni, v3_Extensions)
+	    && vol->secure_ni && ni->security_id) {
+			/* get v3.x descriptor in $Secure */
+		securid.security_id = ni->security_id;
+		securattr = retrievesecurityattr(vol,securid);
 		if (!securattr)
 			ntfs_log_error("Bad security descriptor for 0x%lx\n",
 					(long)le32_to_cpu(ni->security_id));
