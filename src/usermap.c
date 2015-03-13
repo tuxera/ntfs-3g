@@ -1353,6 +1353,9 @@ int main(int argc, char *argv[])
 			ok = process(argc,argv);
 			if (!close_security_api()) ok = DENIED;
 		}
+		else {
+			ok = DENIED;
+		}
 #endif
 	} else
 		ok = DENIED;
