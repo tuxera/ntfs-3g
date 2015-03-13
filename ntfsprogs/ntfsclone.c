@@ -61,6 +61,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
 
 /*
  * FIXME: ntfsclone do bad things about endians handling. Fix it and remove
