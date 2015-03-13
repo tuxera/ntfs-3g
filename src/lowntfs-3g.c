@@ -2982,7 +2982,6 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 					set_fuse_error(&res);
 			} else
 				res = -errno;
-		}
 #else
 			/*
 			 * Standard access control has been done by fuse/kernel
@@ -3004,9 +3003,9 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 					set_fuse_error(&res);
 			} else
 				res = -errno;
+#endif
 		} else
 			res = -errno;
-#endif
 		if (res < 0)
 			fuse_reply_err(req, -res);
 		else
