@@ -657,9 +657,9 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 			>= SAFE_CAPACITY_FOR_BIG_WRITES))
 		conn->want |= FUSE_CAP_BIG_WRITES;
 #endif
-#if FUSE_VERSION >= 28
+#ifdef FUSE_CAP_IOCTL_DIR
 	conn->want |= FUSE_CAP_IOCTL_DIR;
-#endif /* FUSE_VERSION >= 28 */
+#endif /* defined(FUSE_CAP_IOCTL_DIR) */
 	return NULL;
 }
 
