@@ -2446,7 +2446,7 @@ static int ntfs_fuse_fsync(const char *path __attribute__((unused)),
 	return (ret);
 }
 
-#if FUSE_VERSION >= 28
+#if defined(FUSE_INTERNAL) || (FUSE_VERSION >= 28)
 static int ntfs_fuse_ioctl(const char *path,
 			int cmd, void *arg,
 			struct fuse_file_info *fi __attribute__((unused)),
@@ -2468,7 +2468,7 @@ static int ntfs_fuse_ioctl(const char *path,
 		set_fuse_error(&ret);
 	return ret;
 }
-#endif /* FUSE_VERSION >= 28 */
+#endif /* defined(FUSE_INTERNAL) || (FUSE_VERSION >= 28) */
 
 static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
@@ -3421,9 +3421,9 @@ static struct fuse_operations ntfs_3g_ops = {
 	.fsyncdir	= ntfs_fuse_fsync,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
-#if FUSE_VERSION >= 28
+#if defined(FUSE_INTERNAL) || (FUSE_VERSION >= 28)
         .ioctl		= ntfs_fuse_ioctl,
-#endif /* FUSE_VERSION >= 28 */
+#endif /* defined(FUSE_INTERNAL) || (FUSE_VERSION >= 28) */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	.access		= ntfs_fuse_access,
 	.opendir	= ntfs_fuse_opendir,
