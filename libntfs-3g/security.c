@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2014 Jean-Pierre Andre
+ * Copyright (c) 2007-2015 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -2916,6 +2916,14 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		if (cached) {
 			ni->security_id = cached->securid;
 			NInoSetDirty(ni);
+				/* adjust Windows read-only flag */
+			if (!isdir) {
+				if (mode & S_IWUSR)
+					ni->flags &= ~FILE_ATTR_READONLY;
+				else
+					ni->flags |= FILE_ATTR_READONLY;
+				NInoFileNameSetDirty(ni);
+			}
 		}
 	} else cached = (struct CACHED_SECURID*)NULL;
 
