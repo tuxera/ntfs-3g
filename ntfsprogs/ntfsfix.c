@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2014 Jean-Pierre Andre
+ * Copyright (c) 2011-2015 Jean-Pierre Andre
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -154,7 +154,7 @@ static void version(void)
 		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2007      Yura Pakhuchiy\n"
-		   "Copyright (c) 2011-2014 Jean-Pierre Andre\n\n",
+		   "Copyright (c) 2011-2015 Jean-Pierre Andre\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(0);
@@ -1646,8 +1646,10 @@ int main(int argc, char **argv)
 	/* Set return code to 0. */
 	ret = 0;
 error_exit:
-	if (ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
+	if (ntfs_umount(vol, 1)) {
+		ntfs_log_info("Failed to unmount partition\n");
+		ret = 1;
+	}
 	if (ret)
 		exit(ret);
 	return ret;
