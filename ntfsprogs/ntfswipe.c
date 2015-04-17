@@ -2261,9 +2261,14 @@ int main(int argc, char *argv[])
 				break;
 		}
 
-		ntfs_log_info(
-			"%lld bytes were wiped (excluding undelete data)\n",
-			(long long)total);
+		if (opts.noaction || opts.info)
+			ntfs_log_info("%lld bytes would be wiped"
+					" (excluding undelete data)\n",
+					(long long)total);
+		else
+			ntfs_log_info("%lld bytes were wiped"
+					" (excluding undelete data)\n",
+					(long long)total);
 	}
 	result = 0;
 umount:
