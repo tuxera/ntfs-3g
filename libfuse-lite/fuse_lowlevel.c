@@ -69,7 +69,13 @@ static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
     attr->nlink     = stbuf->st_nlink;
     attr->uid       = stbuf->st_uid;
     attr->gid       = stbuf->st_gid;
+#if defined(__SOLARIS__) && defined(_LP64)
+	/* Must pack the device the old way (attr->rdev limited to 32 bits) */
+    attr->rdev      = ((major(stbuf->st_rdev) & 0x3fff) << 18)
+			| (minor(stbuf->st_rdev) & 0x3ffff);
+#else
     attr->rdev      = stbuf->st_rdev;
+#endif
     attr->size      = stbuf->st_size;
     attr->blocks    = stbuf->st_blocks;
     attr->atime     = stbuf->st_atime;
@@ -553,9 +559,16 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     else
 	name = (const char *) inarg + FUSE_COMPAT_MKNOD_IN_SIZE;
 
-    if (req->f->op.mknod)
+    if (req->f->op.mknod) {
+#if defined(__SOLARIS__) && defined(_LP64)
+	/* Must unpack the device, as arg->rdev is limited to 32 bits */
+	req->f->op.mknod(req, nodeid, name, arg->mode,
+		makedev((arg->rdev >> 18) & 0x3ffff,
+			arg->rdev & 0x3fff));
+#else
 	req->f->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
-    else
+#endif
+    } else
         fuse_reply_err(req, ENOSYS);
 }
 
