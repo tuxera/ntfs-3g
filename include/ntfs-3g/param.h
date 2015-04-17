@@ -77,6 +77,14 @@ enum {
 #define PARTIAL_RUNLIST_UPDATING 1
 
 /*
+ *		Parameters for upper-case table
+ */
+
+	/* Create upper-case tables as defined by Windows 6.1 (Win7) */
+#define UPCASE_MAJOR 6
+#define UPCASE_MINOR 1
+
+/*
  *		Parameters for user and xattr mappings
  */
 
