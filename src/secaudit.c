@@ -212,6 +212,9 @@
  *     - decoded more "well-known" and generic SIDs
  *     - showed Windows ownership in verbose situations
  *     - fixed apparent const violations
+ *
+ *  Dec 2014, version 1.4.3
+ *     - fixed displaying "UserMapping" as a file name
  */
 
 /*
@@ -235,7 +238,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.2"
+#define AUDT_VERSION "1.4.3"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -4834,9 +4837,9 @@ BOOL proposal(const char *name, const char *attr)
 			printf("# and gid of the Linux owner and group of ");
 			printname(stdout,name);
 			printf(", then\n");
-			printf("# insert the modified lines into .NTFS-3G/Usermapping, with .NTFS-3G\n");
+			printf("# insert the modified lines into .NTFS-3G/UserMapping, with .NTFS-3G\n");
 		} else
-			printf("# Insert the above lines into .NTFS-3G/Usermapping, with .NTFS-3G\n");
+			printf("# Insert the above lines into .NTFS-3G/UserMapping, with .NTFS-3G\n");
 #ifdef WIN32
 		printf("# being a directory of the root of the NTFS file system.\n");
 
