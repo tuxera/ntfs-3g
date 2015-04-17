@@ -1620,7 +1620,6 @@ err_out:
  * when reading the bitmap but if we are careful, we should be able to avoid
  * all problems.
  */
-//ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 {
 	s64 ll, bit;
