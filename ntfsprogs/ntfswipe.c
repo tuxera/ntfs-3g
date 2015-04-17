@@ -881,7 +881,10 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 		ntfs_log_verbose("Inode %lld - ", (long long)inode_num);
 		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
-			ntfs_log_verbose("Could not open inode\n");
+			if (opts.verbose)
+				ntfs_log_verbose("Could not open inode\n");
+			else
+				ntfs_log_verbose("\r");
 			continue;
 		}
 
