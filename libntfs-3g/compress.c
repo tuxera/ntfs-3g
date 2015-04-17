@@ -1131,6 +1131,7 @@ static s32 ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
 			outbuf[compsz++] = 0;
 			/* write a full cluster, to avoid partial reading */
 			rounded = ((compsz - 1) | (clsz - 1)) + 1;
+			memset(&outbuf[compsz], 0, rounded - compsz);
 			written = write_clusters(vol, rl, offs, rounded, outbuf);
 			if (written != rounded) {
 				/*
