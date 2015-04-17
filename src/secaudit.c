@@ -7272,9 +7272,15 @@ void dumpalloc(const char *txt)
 	if (firstalloc) {
 		printf("alloc table at %s\n",txt);
 		for (q=firstalloc; q; q=q->next)
+#ifdef __x86_64__
+			printf("%08llx : %u bytes at %08llx allocated at %s line %d\n",
+				(long long)q,(unsigned int)q->size,
+				(long long)q->alloc,q->file,q->line);
+#else
 			printf("%08lx : %u bytes at %08lx allocated at %s line %d\n",
 				(long)q,(unsigned int)q->size,
 				(long)q->alloc,q->file,q->line);
+#endif
 	}
 }
 
@@ -7364,7 +7370,13 @@ BOOL chkisalloc(void *p, const char *file, int line)
 	} else
 		q = (struct CHKALLOC*)NULL;
 	if (!p || !q) {
-		printf("error in %s %d : 0x%lx not allocated\n",file,line,(long)p);
+#ifdef __x86_64__
+		printf("error in %s %d : 0x%llx not allocated\n",file,line,
+					(long long)p);
+#else
+		printf("error in %s %d : 0x%lx not allocated\n",file,line,
+					(long)p);
+#endif
 	}
 	return (p && q);
 }
