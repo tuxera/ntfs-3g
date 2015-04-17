@@ -1171,6 +1171,16 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	fill = (ntfs_fuse_fill_context_t*)(long)fi->fh;
 	if (fill && (fill->ino == ino)) {
+		if (fill->filled && !off) {
+			/* Rewinding : make sure to clear existing results */   
+			current = fill->first;
+			while (current) {
+				current = current->next;
+				free(fill->first);
+				fill->first = current;
+			}
+			fill->filled = FALSE;
+		}
 		if (!fill->filled) {
 				/* initial call : build the full list */
 			first = (ntfs_fuse_fill_item_t*)ntfs_malloc
