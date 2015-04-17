@@ -368,7 +368,7 @@ int ntfs_ioctl(ntfs_inode *ni, int cmd, void *arg __attribute__((unused)),
 			ret = fstrim(ni->vol, data);
 		break;
 #else
-#warning FITRIM or BLKDISCARD not defined
+#warning Trimming not supported : FITRIM or BLKDISCARD not defined
 #endif
 	default :
 		ret = -EINVAL;
