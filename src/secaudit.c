@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2014 Jean-Pierre Andre
+ * Copyright (c) 2007-2015 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -215,6 +215,9 @@
  *
  *  Dec 2014, version 1.4.3
  *     - fixed displaying "UserMapping" as a file name
+ *
+ *  Mar 2015, version 1.4.5
+ *     - adapted to new NTFS ACLs when owner is same as group
  */
 
 /*
@@ -238,7 +241,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.3"
+#define AUDT_VERSION "1.4.5"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -3732,14 +3735,14 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 		24064, 28160,
 		24064, 28160,
 		24064, 28160,
-		25416, 29512
+		24904, 29000
 	} ;
 	u32 expecthash[] = {
 		0x8f80865b, 0x7bc7960,
 		0x8fd9ecfe, 0xddd4db0,
 		0xa8b07400, 0xa189c20,
 		0xc5689a00, 0xb6c09000,
-		0x94bfb419, 0xa4311791
+		0xb040e509, 0x4f4db7f7
 	} ;
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
@@ -3881,7 +3884,8 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 		(unsigned long)count,(unsigned long)acecount,
 		(unsigned long)acecount/count,acecount*100L/count%100L);
 	if (acecount != expectcnt[kind]) {
-		printf("** Error : expected ACE count %lu\n",
+		printf("** Error : ACE count %lu instead of %lu\n",
+			(unsigned long)acecount,
 			(unsigned long)expectcnt[kind]);
 		errors++;
 	}
@@ -3895,7 +3899,8 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 		(unsigned long)pxcount,(unsigned long)pxacecount,
 		(unsigned long)pxacecount/pxcount,pxacecount*100L/pxcount%100L);
 	if (pxacecount != expectcnt[kind]) {
-		printf("** Error : expected ACE count %lu\n",
+		printf("** Error : ACE count %lu instead of %lu\n",
+			(unsigned long)pxacecount,
 			(unsigned long)expectcnt[kind]);
 		errors++;
 	}
