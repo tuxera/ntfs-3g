@@ -26,7 +26,8 @@ is equivalent to
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
-Wipe all unused space. This may take significant time.
+Wipe all unused space. This may take significant time. If the option 
+\-\-unused-fast (or -U) is also present, the faster wiping method is used.
 .TP
 \fB\-b\fR, \fB\-\-bytes\fR BYTE-LIST
 Define the allowed replacement bytes which are drawn randomly to overwrite
@@ -47,7 +48,7 @@ Use this option with caution.
 Show a list of options with a brief description of each one.
 .TP
 \fB\-i\fR, \fB\-\-info\fR
-Display details about unused space.
+Display details about unused space, without wiping anything.
 .TP
 \fB\-l\fR, \fB\-\-logfile\fR
 Overwrite the logfile (update journal).
@@ -82,7 +83,8 @@ Overwrite the space which is currently not allocated to any file, trying
 not to overwrite the space not written to since the previous wiping.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
-Display more debug/warning/error messages.
+Display more debug/warning/error messages. This option may be used twice
+to display even more messages.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Show the version number, copyright and license of
