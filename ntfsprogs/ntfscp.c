@@ -834,6 +834,9 @@ int main(int argc, char *argv[])
 	s64 br, bw;
 	ntfschar *attr_name;
 	int attr_name_len = 0;
+#ifdef HAVE_WINDOWS_H
+	char *unix_name;
+#endif
 
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
@@ -900,8 +903,17 @@ int main(int argc, char *argv[])
 			goto close_src;
 		}
 		out = ntfs_inode_open(vol, inode_num);
-	} else
+	} else {
+#ifdef HAVE_WINDOWS_H
+		unix_name = ntfs_utils_unix_path(opts.dest_file);
+		if (unix_name) {
+			out = ntfs_pathname_to_inode(vol, NULL, unix_name);
+  		} else
+			out = (ntfs_inode*)NULL;
+#else
 		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
+#endif
+	}
 	if (!out) {
 		/* Copy the file if the dest_file's parent dir can be opened. */
 		char *parent_dirname;
@@ -910,8 +922,13 @@ int main(int argc, char *argv[])
 		ntfs_inode *ni;
 		char *dirname_last_whack;
 
+#ifdef HAVE_WINDOWS_H
+		filename = basename(unix_name);
+		parent_dirname = strdup(unix_name);
+#else
 		filename = basename(opts.dest_file);
 		parent_dirname = strdup(opts.dest_file);
+#endif
 		if (!parent_dirname) {
 			ntfs_log_perror("strdup() failed");
 			goto close_src;
@@ -983,8 +1000,12 @@ int main(int argc, char *argv[])
 			ntfs_inode_close(out);
 			goto close_src;
 		}
+#ifdef HAVE_WINDOWS_H
+		strcpy(overwrite_filename, unix_name);
+#else
 		strcpy(overwrite_filename, opts.dest_file);
-		if (opts.dest_file[dest_dirname_len - 1] != '/') {
+#endif
+		if (overwrite_filename[dest_dirname_len - 1] != '/') {
 			strcat(overwrite_filename, "/");
 		}
 		strcat(overwrite_filename, filename);

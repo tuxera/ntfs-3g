@@ -2379,8 +2379,20 @@ int main(int argc, char **argv)
 		ntfs_inode *inode;
 		/* obtain the inode */
 		if (opts.filename) {
+#ifdef HAVE_WINDOWS_H
+			char *unix_name;
+
+			unix_name = ntfs_utils_unix_path(opts.filename);
+			if (unix_name) {
+				inode = ntfs_pathname_to_inode(vol, NULL,
+						unix_name);
+				free(unix_name);
+			} else
+				inode = (ntfs_inode*)NULL;
+#else
 			inode = ntfs_pathname_to_inode(vol, NULL,
 					opts.filename);
+#endif
 		} else {
 			inode = ntfs_inode_open(vol, MK_MREF(opts.inode, 0));
 		}

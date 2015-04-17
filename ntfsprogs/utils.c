@@ -1201,4 +1201,28 @@ char *ntfs_utils_reformat(char *out, int sz, const char *fmt)
 	return (out);
 }
 
+/*
+ *		Translate paths to files submitted from Windows
+ *
+ *	Translate Windows directory separators to Unix ones
+ *
+ *	Returns the translated path, to be freed by caller
+ *		NULL if there was an error, with errno set
+ */
+
+char *ntfs_utils_unix_path(const char *in)
+{
+	char *out;
+	int i;
+
+	out = strdup(in);
+	if (out) {
+		for (i=0; in[i]; i++)
+			if (in[i] == '\\')
+				out[i] = '/';
+	} else
+		errno = ENOMEM;
+	return (out);
+}
+
 #endif
