@@ -66,6 +66,7 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
         return -1;
     }
     if (res == 0) {
+        char *env = NULL;
         char templ[] = "/tmp/fusermountXXXXXX";
         char *tmp;
 
@@ -87,8 +88,8 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
             exit(1);
         }
         rmdir(tmp);
-        execl("/sbin/mount", "/sbin/mount", "-F", type, "-o", opts,
-              fsname, mnt, NULL);
+        execle("/sbin/mount", "/sbin/mount", "-F", type, "-o", opts,
+              fsname, mnt, NULL, &env);
         fprintf(stderr, "%s: failed to execute /sbin/mount: %s\n", progname,
                 strerror(errno));
         exit(1);
@@ -120,9 +121,16 @@ int fuse_mnt_umount(const char *progname, const char *mnt, int lazy)
         return -1;
     }
     if (res == 0) {
+        char *env = NULL;
+
         setuid(geteuid());
-        execl("/sbin/umount", "/sbin/umount", !lazy ? "-f" : NULL, mnt,
-              NULL);
+        if (lazy) {
+            execle("/sbin/umount", "/sbin/umount", mnt,
+                   NULL, &env);
+        } else {
+            execle("/sbin/umount", "/sbin/umount", "-f", mnt,
+                   NULL, &env);
+        }
         fprintf(stderr, "%s: failed to execute /sbin/umount: %s\n", progname,
                 strerror(errno));
         exit(1);
@@ -302,6 +310,7 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
         return 0;
     }
     if (res == 0) {
+        char *env = NULL;
         char templ[] = "/tmp/fusermountXXXXXX";
         char *tmp;
 
@@ -325,8 +334,8 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
             exit(1);
         }
         rmdir(tmp);
-        execl("/bin/mount", "/bin/mount", "-i", "-f", "-t", type, "-o", opts,
-              fsname, mnt, NULL);
+        execle("/bin/mount", "/bin/mount", "-i", "-f", "-t", type, "-o", opts,
+               fsname, mnt, NULL, &env);
         fprintf(stderr, "%s: failed to execute /bin/mount: %s\n", progname,
                 strerror(errno));
         exit(1);
@@ -353,11 +362,18 @@ int fuse_mnt_umount(const char *progname, const char *mnt, int lazy)
         return -1;
     }
     if (res == 0) {
+        char *env = NULL;
+
         if (setuid(geteuid()))
             fprintf(stderr, "%s: failed to setuid : %s\n", progname,
                          strerror(errno));
-        execl("/bin/umount", "/bin/umount", "-i", mnt, lazy ? "-l" : NULL,
-              NULL);
+        if (lazy) {
+            execle("/bin/umount", "/bin/umount", "-i", mnt, "-l",
+                   NULL, &env);
+        } else {
+            execle("/bin/umount", "/bin/umount", "-i", mnt,
+                   NULL, &env);
+        }
         fprintf(stderr, "%s: failed to execute /bin/umount: %s\n", progname,
                 strerror(errno));
         exit(1);
