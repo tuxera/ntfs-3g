@@ -1571,21 +1571,24 @@ int ntfs_set_char_encoding(const char *locale)
 
 int ntfs_macosx_normalize_filenames(int normalize) {
 #ifdef ENABLE_NFCONV
-	if(normalize == 0 || normalize == 1) {
+	if (normalize == 0 || normalize == 1) {
 		nfconvert_utf8 = normalize;
 		return 0;
 	}
-	else
+	else {
 		return -1;
+	}
 #else
 	return -1;
 #endif /* ENABLE_NFCONV */
 } 
 
 int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
- int composed) {
+		int composed)
+{
 #ifdef ENABLE_NFCONV
-	/* For this code to compile, the CoreFoundation framework must be fed to the linker. */
+	/* For this code to compile, the CoreFoundation framework must be fed to
+	 * the linker. */
 	CFStringRef cfSourceString;
 	CFMutableStringRef cfMutableString;
 	CFRange rangeToProcess;
@@ -1594,52 +1597,69 @@ int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
 	int resultLength = -1;
 	
 	/* Convert the UTF-8 string to a CFString. */
-	cfSourceString = CFStringCreateWithCString(kCFAllocatorDefault, utf8_string, kCFStringEncodingUTF8);
-	if(cfSourceString == NULL) {
+	cfSourceString = CFStringCreateWithCString(kCFAllocatorDefault,
+		utf8_string, kCFStringEncodingUTF8);
+	if (cfSourceString == NULL) {
 		ntfs_log_error("CFStringCreateWithCString failed!\n");
 		return -2;
 	}
-	
-	/* Create a mutable string from cfSourceString that we are free to modify. */
-	cfMutableString = CFStringCreateMutableCopy(kCFAllocatorDefault, 0, cfSourceString);
+
+	/* Create a mutable string from cfSourceString that we are free to
+	 * modify. */
+	cfMutableString = CFStringCreateMutableCopy(kCFAllocatorDefault, 0,
+		cfSourceString);
 	CFRelease(cfSourceString); /* End-of-life. */
-	if(cfMutableString == NULL) {
+	if (cfMutableString == NULL) {
 		ntfs_log_error("CFStringCreateMutableCopy failed!\n");
 		return -3;
 	}
-  
+
 	/* Normalize the mutable string to the desired normalization form. */
-	CFStringNormalize(cfMutableString, (composed != 0 ? kCFStringNormalizationFormC : kCFStringNormalizationFormD));
-	
-	/* Store the resulting string in a '\0'-terminated UTF-8 encoded char* buffer. */
+	CFStringNormalize(cfMutableString, (composed != 0 ?
+		kCFStringNormalizationFormC : kCFStringNormalizationFormD));
+
+	/* Store the resulting string in a '\0'-terminated UTF-8 encoded char*
+	 * buffer. */
 	rangeToProcess = CFRangeMake(0, CFStringGetLength(cfMutableString));
-	if(CFStringGetBytes(cfMutableString, rangeToProcess, kCFStringEncodingUTF8, 0, false, NULL, 0, &requiredBufferLength) > 0) {
-		resultLength = sizeof(char)*(requiredBufferLength + 1);
+	if (CFStringGetBytes(cfMutableString, rangeToProcess,
+		kCFStringEncodingUTF8, 0, false, NULL, 0,
+		&requiredBufferLength) > 0)
+	{
+		resultLength = sizeof(char) * (requiredBufferLength + 1);
 		result = ntfs_calloc(resultLength);
-		
-		if(result != NULL) {
-			if(CFStringGetBytes(cfMutableString, rangeToProcess, kCFStringEncodingUTF8,
-					    0, false, (UInt8*)result, resultLength-1, &requiredBufferLength) <= 0) {
-				ntfs_log_error("Could not perform UTF-8 conversion of normalized CFMutableString.\n");
+
+		if (result != NULL) {
+			if (CFStringGetBytes(cfMutableString, rangeToProcess,
+				kCFStringEncodingUTF8, 0, false,
+				(UInt8*) result, resultLength - 1,
+				&requiredBufferLength) <= 0)
+			{
+				ntfs_log_error("Could not perform UTF-8 "
+					"conversion of normalized "
+					"CFMutableString.\n");
 				free(result);
 				result = NULL;
 			}
 		}
-		else
-			ntfs_log_error("Could not perform a ntfs_calloc of %d bytes for char *result.\n", resultLength);
+		else {
+			ntfs_log_error("Could not perform a ntfs_calloc of %d "
+				"bytes for char *result.\n", resultLength);
+		}
 	}
-	else
-		ntfs_log_error("Could not perform check for required length of UTF-8 conversion of normalized CFMutableString.\n");
+	else {
+		ntfs_log_error("Could not perform check for required length of "
+			"UTF-8 conversion of normalized CFMutableString.\n");
+	}
 
-	
 	CFRelease(cfMutableString);
-	
-	if(result != NULL) {
+
+	if (result != NULL) {
 	 	*target = result;
 		return resultLength - 1;
 	}
-	else
+	else {
 		return -1;
+	}
 #else
 	return -1;
 #endif /* ENABLE_NFCONV */
