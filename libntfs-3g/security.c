@@ -224,7 +224,7 @@ int ntfs_sid_to_mbs_size(const SID *sid)
 {
 	int size, i;
 
-	if (!ntfs_sid_is_valid(sid)) {
+	if (!ntfs_valid_sid(sid)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -298,7 +298,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	 * No need to check @sid if !@sid_str since ntfs_sid_to_mbs_size() will
 	 * check @sid, too.  8 is the minimum SID string size.
 	 */
-	if (sid_str && (sid_str_size < 8 || !ntfs_sid_is_valid(sid))) {
+	if (sid_str && (sid_str_size < 8 || !ntfs_valid_sid(sid))) {
 		errno = EINVAL;
 		return NULL;
 	}

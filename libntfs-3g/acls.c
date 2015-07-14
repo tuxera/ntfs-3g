@@ -362,16 +362,18 @@ unsigned int ntfs_attr_size(const char *attr)
 	return (attrsz);
 }
 
-/*
- *		Do sanity checks on a SID read from storage
- *	(just check revision and number of authorities)
+/**
+ * ntfs_valid_sid - determine if a SID is valid
+ * @sid:	SID for which to determine if it is valid
+ *
+ * Determine if the SID pointed to by @sid is valid.
+ *
+ * Return TRUE if it is valid and FALSE otherwise.
  */
-
 BOOL ntfs_valid_sid(const SID *sid)
 {
-	return ((sid->revision == SID_REVISION)
-		&& (sid->sub_authority_count >= 1)
-		&& (sid->sub_authority_count <= 8));
+	return sid && sid->revision == SID_REVISION &&
+		sid->sub_authority_count <= SID_MAX_SUB_AUTHORITIES;
 }
 
 /*

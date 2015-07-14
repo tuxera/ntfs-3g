@@ -222,22 +222,6 @@ enum {
 extern BOOL ntfs_guid_is_zero(const GUID *guid);
 extern char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str);
 
-/**
- * ntfs_sid_is_valid - determine if a SID is valid
- * @sid:	SID for which to determine if it is valid
- *
- * Determine if the SID pointed to by @sid is valid.
- *
- * Return TRUE if it is valid and FALSE otherwise.
- */
-static __inline__ BOOL ntfs_sid_is_valid(const SID *sid)
-{
-	if (!sid || sid->revision != SID_REVISION ||
-			sid->sub_authority_count > SID_MAX_SUB_AUTHORITIES)
-		return FALSE;
-	return TRUE;
-}
-
 extern int ntfs_sid_to_mbs_size(const SID *sid);
 extern char *ntfs_sid_to_mbs(const SID *sid, char *sid_str,
 		size_t sid_str_size);
