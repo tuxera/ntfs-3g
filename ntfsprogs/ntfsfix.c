@@ -739,13 +739,14 @@ static ATTR_RECORD *find_unnamed_attr(MFT_RECORD *mrec, ATTR_TYPES type)
 			/* fetch the requested attribute */
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while ((a->type != AT_END)
-	    && ((a->type != type) || a->name_length)
-	    && (offset < le32_to_cpu(mrec->bytes_in_use))) {
+	while ((offset < le32_to_cpu(mrec->bytes_in_use))
+	    && (a->type != AT_END)
+	    && ((a->type != type) || a->name_length)) {
 		offset += le32_to_cpu(a->length);
 		a = (ATTR_RECORD*)((char*)mrec + offset);
 	}
-	if ((a->type != type)
+	if ((offset >= le32_to_cpu(mrec->bytes_in_use))
+	    || (a->type != type)
 	    || a->name_length)
 		a = (ATTR_RECORD*)NULL;
 	return (a);
