@@ -218,6 +218,9 @@
  *
  *  Mar 2015, version 1.4.5
  *     - adapted to new NTFS ACLs when owner is same as group
+ *
+ *  May 2015, version 1.4.6
+ *     - made to load shared library based on generic name
  */
 
 /*
@@ -241,7 +244,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.5"
+#define AUDT_VERSION "1.4.6"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
