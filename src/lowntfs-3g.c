@@ -170,6 +170,7 @@ typedef struct fill_item {
 typedef struct fill_context {
 	struct fill_item *first;
 	struct fill_item *last;
+	off_t off;
 	fuse_req_t req;
 	fuse_ino_t ino;
 	BOOL filled;
@@ -1052,7 +1053,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		sz = fuse_add_direntry(fill_ctx->req,
 				&current->buf[current->off],
 				current->bufsize - current->off,
-				filename, &st, current->off);
+				filename, &st, current->off + fill_ctx->off);
 		if (!sz || ((current->off + sz) > current->bufsize)) {
 			newone = (ntfs_fuse_fill_item_t*)ntfs_malloc
 				(sizeof(ntfs_fuse_fill_item_t)
@@ -1063,11 +1064,12 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 				newone->next = (ntfs_fuse_fill_item_t*)NULL;
 				current->next = newone;
 				fill_ctx->last = newone;
+				fill_ctx->off += current->off;
 				current = newone;
 				sz = fuse_add_direntry(fill_ctx->req,
 					current->buf,
 					current->bufsize - current->off,
-					filename, &st, current->off);
+					filename, &st, fill_ctx->off);
 				if (!sz) {
 					errno = EIO;
 					ntfs_log_error("Could not add a"
@@ -1124,6 +1126,7 @@ static void ntfs_fuse_opendir(fuse_req_t req, fuse_ino_t ino,
 					= (ntfs_fuse_fill_item_t*)NULL;
 				fill->filled = FALSE;
 				fill->ino = ino;
+				fill->off = 0;
 			}
 			fi->fh = (long)fill;
 		}
@@ -1192,6 +1195,7 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				fill->req = req;
 				fill->first = first;
 				fill->last = first;
+				fill->off = 0;
 				ni = ntfs_inode_open(ctx->vol,INODE(ino));
 				if (!ni)
 					err = -errno;
