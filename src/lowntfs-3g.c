@@ -1190,6 +1190,7 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		}
 		if (!fill->filled) {
 				/* initial call : build the full list */
+			current = (ntfs_fuse_fill_item_t*)NULL;
 			first = (ntfs_fuse_fill_item_t*)ntfs_malloc
 				(sizeof(ntfs_fuse_fill_item_t) + size);
 			if (first) {
@@ -1214,12 +1215,23 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					if (ntfs_inode_close(ni))
 						set_fuse_error(&err);
 				}
-				if (!err)
-					fuse_reply_buf(req, first->buf,
-							first->off);
-				/* reply sent, now must exit with no error */
-				fill->first = first->next;
-				free(first);
+				if (!err) {
+					off_t loc = 0;
+				/*
+				 * In some circumstances, the queue gets
+				 * reinitialized by releasedir() + opendir(),
+				 * apparently always on end of partial buffer.
+				 * Files may be missing or duplicated.
+				 */
+					while (first
+					    && ((loc < off) || !first->off)) {
+						loc += first->off;
+						fill->first = first->next;
+						free(first);
+						first = fill->first;
+					}
+					current = first;
+				}
 			} else
 				err = -errno;
 		} else {
@@ -1230,6 +1242,8 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				free(fill->first);
 				fill->first = current;
 			}
+		}
+		if (!err) {
 			if (current) {
 				fuse_reply_buf(req, current->buf, current->off);
 				fill->first = current->next;
