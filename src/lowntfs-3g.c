@@ -124,20 +124,24 @@
 #error "Incompatible options KERNELACLS and KERNELPERMS"
 #endif
 
-#if CACHEING & (KERNELACLS | !KERNELPERMS)
-#warning "Fuse cacheing is only usable with basic permissions checked by kernel"
-#endif
-
 #if !CACHEING
 #define ATTR_TIMEOUT 0.0
 #define ENTRY_TIMEOUT 0.0
 #else
+#if defined(__sun) && defined (__SVR4)
+#define ATTR_TIMEOUT 10.0
+#define ENTRY_TIMEOUT 10.0
+#else /* defined(__sun) && defined (__SVR4) */
 	/*
 	 * FUSE cacheing is only usable with basic permissions
 	 * checked by the kernel with external fuse >= 2.8
 	 */
+#if KERNELACLS | !KERNELPERMS
+#warning "Fuse cacheing is only usable with basic permissions checked by kernel"
+#endif
 #define ATTR_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
 #define ENTRY_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
+#endif /* defined(__sun) && defined (__SVR4) */
 #endif
 #define GHOSTLTH 40 /* max length of a ghost file name - see ghostformat */
 
