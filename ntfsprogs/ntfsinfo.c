@@ -8,7 +8,7 @@
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
- * Copyright (c) 2011-2014 Jean-Pierre Andre
+ * Copyright (c) 2011-2015 Jean-Pierre Andre
  *
  * This utility will dump a file's attributes.
  *
@@ -408,6 +408,23 @@ static char *ntfs_attr_get_name_mbs(ATTR_RECORD *attr)
 		return NULL;
 }
 
+static const char *reparse_type_name(le32 tag)
+{
+	const char *name;
+	le32 IO_REPARSE_TAG_WOF = const_cpu_to_le32(0x80000017); /* temporary */
+
+	if (tag == IO_REPARSE_TAG_MOUNT_POINT)
+		name = " (mount point)";
+	else
+		if (tag == IO_REPARSE_TAG_SYMLINK)
+			name = " (symlink)";
+		else
+			if (tag == IO_REPARSE_TAG_WOF)
+				name = " (Wof compressed)";
+			else
+				name = "";
+	return (name);
+}
 
 /* *************** functions for dumping global info ******************** */
 /**
@@ -776,6 +793,8 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 static void ntfs_dump_filename(const char *indent,
 		FILE_NAME_ATTR *file_name_attr)
 {
+	le32 tag;
+
 	printf("%sParent directory:\t %lld (0x%llx)\n", indent,
 			(long long)MREF_LE(file_name_attr->parent_directory),
 			(long long)MREF_LE(file_name_attr->parent_directory));
@@ -813,10 +832,12 @@ static void ntfs_dump_filename(const char *indent,
 			(unsigned)file_name_attr->file_name_length);
 	ntfs_dump_flags(indent, AT_FILE_NAME, file_name_attr->file_attributes);
 	if (file_name_attr->file_attributes & FILE_ATTR_REPARSE_POINT &&
-			file_name_attr->reparse_point_tag)
-		printf("%sReparse point tag:\t 0x%x\n", indent, (unsigned)
-				le32_to_cpu(file_name_attr->reparse_point_tag));
-	else if (file_name_attr->reparse_point_tag) {
+			file_name_attr->reparse_point_tag) {
+		tag = file_name_attr->reparse_point_tag;
+		printf("%sReparse point tag:\t 0x%08lx%s\n", indent,
+				(long)le32_to_cpu(tag),
+				reparse_type_name(tag));
+	} else if (file_name_attr->reparse_point_tag) {
 		printf("%sEA Length:\t\t %d (0x%x)\n", indent, (unsigned)
 				le16_to_cpu(file_name_attr->packed_ea_size),
 				(unsigned)
@@ -1431,6 +1452,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
 	char *sid;
 	char printable_GUID[37];
+	le32 tag;
 
 	switch (type) {
 	case INDEX_ATTR_SECURE_SII:
@@ -1454,8 +1476,10 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tKey GUID:\t\t %s\n", printable_GUID);
 		break;
 	case INDEX_ATTR_REPARSE_R:
-		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%08x\n", (unsigned)
-				le32_to_cpu(entry->key.reparse.reparse_tag));
+		tag = entry->key.reparse.reparse_tag;
+		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%08lx%s\n",
+				(long)le32_to_cpu(tag),
+				reparse_type_name(tag));
 		ntfs_log_verbose("\t\tKey file id:\t\t %llu (0x%llx)\n",
 				(unsigned long long)
 				le64_to_cpu(entry->key.reparse.file_id),
@@ -1946,9 +1970,49 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr __attribute__((unused)))
  *
  * of ntfs 3.x dumps the reparse_point attribute
  */
-static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr __attribute__((unused)))
+static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr
+			__attribute__((unused)), ntfs_inode *inode)
 {
-	/* TODO */
+	REPARSE_POINT *reparse;
+	le32 tag;
+	const char *name;
+	u8 *pvalue;
+	s64 size;
+	unsigned int length;
+	unsigned int cnt;
+
+	if (attr->non_resident) {
+		reparse = ntfs_attr_readall(inode, AT_REPARSE_POINT,
+						(ntfschar*)NULL, 0, &size);
+	} else {
+		reparse = (REPARSE_POINT*)((u8*)attr +
+				le16_to_cpu(attr->value_offset));
+	}
+	if (reparse) {
+		tag = reparse->reparse_tag;
+		name = reparse_type_name(tag);
+		printf("\tReparse tag:\t\t 0x%08lx%s\n",
+			(long)le32_to_cpu(tag),name);
+		length = le16_to_cpu(reparse->reparse_data_length);
+		printf("\tData length:\t\t %u (0x%x)\n",
+			(unsigned int)length,(unsigned int)length);
+		cnt = length;
+		pvalue = reparse->reparse_data;
+		printf("\tData:\t\t\t");
+		printf(cnt ? " 0x" : "(NONE)");
+		if (cnt > 32)
+			cnt = 32;
+		while (cnt-- > 0)
+			printf("%02x",*pvalue++);
+		if (length > 32)
+			printf("...\n");
+		else
+			printf("\n");
+		if (attr->non_resident)
+			free(reparse);
+	} else {
+		ntfs_log_perror("Failed to get the reparse data");
+	}
 }
 
 /**
@@ -2300,7 +2364,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_bitmap(ctx->attr);
 			break;
 		case AT_REPARSE_POINT:
-			ntfs_dump_attr_reparse_point(ctx->attr);
+			ntfs_dump_attr_reparse_point(ctx->attr, inode);
 			break;
 		case AT_EA_INFORMATION:
 			ntfs_dump_attr_ea_information(ctx->attr);
