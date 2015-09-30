@@ -156,7 +156,9 @@ omitted,
 .B mkntfs
 attempts to determine
 .I part\-start\-sect
-automatically and if that fails a default of 0 is used. Note that
+automatically and if that fails or the value is oversized, a
+default of 0 is used. The partition is usable despite a wrong value,
+however note that a correct
 .I part\-start\-sect
 is required for Windows to be able to boot from the created volume.
 .TP
