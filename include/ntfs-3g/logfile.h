@@ -308,24 +308,24 @@ typedef struct {
 typedef struct {
 /*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
 	NTFS_RECORD_TYPES magic;/* Usually the magic is "RCRD". */
-	u16 usa_ofs;		/* See NTFS_RECORD definition in layout.h.
+	le16 usa_ofs;		/* See NTFS_RECORD definition in layout.h.
 				   When creating, set this to be immediately
 				   after this header structure (without any
 				   alignment). */
-	u16 usa_count;		/* See NTFS_RECORD definition in layout.h. */
+	le16 usa_count;		/* See NTFS_RECORD definition in layout.h. */
 
 	union {
-		LSN last_lsn;
-		s64 file_offset;
+		leLSN last_lsn;
+		sle64 file_offset;
 	} __attribute__((__packed__)) copy;
-	u32 flags;
-	u16 page_count;
-	u16 page_position;
+	le32 flags;
+	le16 page_count;
+	le16 page_position;
 	union {
 		struct {
-			u16 next_record_offset;
+			le16 next_record_offset;
 			u8 reserved[6];
-			LSN last_end_lsn;
+			leLSN last_end_lsn;
 		} __attribute__((__packed__)) packed;
 	} __attribute__((__packed__)) header;
 } __attribute__((__packed__)) RECORD_PAGE_HEADER;
@@ -346,8 +346,8 @@ typedef enum {
  * struct LOG_CLIENT_ID - The log client id structure identifying a log client.
  */
 typedef struct {
-	u16 seq_number;
-	u16 client_index;
+	le16 seq_number;
+	le16 client_index;
 } __attribute__((__packed__)) LOG_CLIENT_ID;
 
 /**
@@ -356,34 +356,34 @@ typedef struct {
  * Each log record seems to have a constant size of 0x70 bytes.
  */
 typedef struct {
-	LSN this_lsn;
-	LSN client_previous_lsn;
-	LSN client_undo_next_lsn;
-	u32 client_data_length;
+	leLSN this_lsn;
+	leLSN client_previous_lsn;
+	leLSN client_undo_next_lsn;
+	le32 client_data_length;
 	LOG_CLIENT_ID client_id;
-	u32 record_type;
-	u32 transaction_id;
-	u16 flags;
-	u16 reserved_or_alignment[3];
+	le32 record_type;
+	le32 transaction_id;
+	le16 flags;
+	le16 reserved_or_alignment[3];
 /* Now are at ofs 0x30 into struct. */
-	u16 redo_operation;
-	u16 undo_operation;
-	u16 redo_offset;
-	u16 redo_length;
-	u16 undo_offset;
-	u16 undo_length;
-	u16 target_attribute;
-	u16 lcns_to_follow;		   /* Number of lcn_list entries
+	le16 redo_operation;
+	le16 undo_operation;
+	le16 redo_offset;
+	le16 redo_length;
+	le16 undo_offset;
+	le16 undo_length;
+	le16 target_attribute;
+	le16 lcns_to_follow;		   /* Number of lcn_list entries
 					      following this entry. */
 /* Now at ofs 0x40. */
-	u16 record_offset;
-	u16 attribute_offset;
-	u32 alignment_or_reserved;
-	VCN target_vcn;
+	le16 record_offset;
+	le16 attribute_offset;
+	le32 alignment_or_reserved;
+	leVCN target_vcn;
 /* Now at ofs 0x50. */
 	struct {			   /* Only present if lcns_to_follow
 					      is not 0. */
-		LCN lcn;
+		leLCN lcn;
 	} __attribute__((__packed__)) lcn_list[0];
 } __attribute__((__packed__)) LOG_RECORD;
 

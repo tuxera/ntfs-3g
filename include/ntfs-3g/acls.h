@@ -24,6 +24,8 @@
 #ifndef ACLS_H
 #define ACLS_H
 
+#include "endians.h"
+
 /*
  *	JPA configuration modes for security.c / acls.c
  *	should be moved to some config file
@@ -34,18 +36,6 @@
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_PERMISSIONS_BITS 6  /* log2 of unitary allocation of permissions */
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
-
-/*
- *	JPA The following must be in some library...
- *	but did not found out where
- */
-
-#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
-#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
-		| ((x & 0xff00) << 8) | ((x & 255) << 24))
-
-#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
-#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
 
 /*
  *		Macro definitions needed to share code with secaudit

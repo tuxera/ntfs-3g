@@ -29,21 +29,10 @@
 #include "layout.h"
 #include "inode.h"
 #include "dir.h"
+#include "endians.h"
 
 #ifndef POSIXACLS
 #define POSIXACLS 0
-#endif
-
-typedef u16 be16;
-typedef u32 be32;
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define const_cpu_to_be16(x) ((((x) & 255L) << 8) + (((x) >> 8) & 255L))
-#define const_cpu_to_be32(x) ((((x) & 255L) << 24) + (((x) & 0xff00L) << 8) \
-			+ (((x) >> 8) & 0xff00L) + (((x) >> 24) & 255L))
-#else
-#define const_cpu_to_be16(x) (x)
-#define const_cpu_to_be32(x) (x)
 #endif
 
 /*
