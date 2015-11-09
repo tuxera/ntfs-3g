@@ -17,7 +17,7 @@ if ENABLE_NTFSPROGS
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
-EXTRA_PROGRAM_NAMES	= ntfswipe ntfstruncate
+EXTRA_PROGRAM_NAMES	= ntfswipe ntfstruncate ntfsrecover
 
 QUARANTINED_PROGRAM_NAMES = ntfsdump_logfile ntfsmftalloc ntfsmove ntfsck \
 			   ntfsfallocate
@@ -26,7 +26,7 @@ man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
 			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8 \
 			  ntfscmp.8 ntfswipe.8 ntfstruncate.8 \
-			  ntfsdecrypt.8 ntfsfallocate.8
+			  ntfsdecrypt.8 ntfsfallocate.8 ntfsrecover.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
@@ -101,6 +101,10 @@ ntfsck_LDFLAGS		= $(AM_LFLAGS)
 ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
 ntfscmp_LDADD		= $(AM_LIBS)
 ntfscmp_LDFLAGS		= $(AM_LFLAGS)
+
+ntfsrecover_SOURCES	= playlog.c ntfsrecover.c utils.c utils.h ntfsrecover.h
+ntfsrecover_LDADD	= $(AM_LIBS) $(NTFSRECOVER_LIBS)
+ntfsrecover_LDFLAGS	= $(AM_LFLAGS)
 
 # We don't distribute these
 

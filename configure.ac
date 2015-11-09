@@ -657,6 +657,7 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfswipe.8
 	ntfsprogs/ntfstruncate.8
 	ntfsprogs/ntfsfallocate.8
+	ntfsprogs/ntfsrecover.8
 	src/Makefile
 	src/ntfs-3g.8
 	src/ntfs-3g.probe.8
