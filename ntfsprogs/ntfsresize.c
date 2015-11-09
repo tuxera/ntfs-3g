@@ -2569,8 +2569,13 @@ static int check_bad_sectors(ntfs_volume *vol)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *base_ni;
+	ntfs_attr *na;
 	runlist *rl;
 	s64 i, badclusters = 0;
+	static le16 Bad[4] = {
+		const_cpu_to_le16('$'), const_cpu_to_le16('B'),
+		const_cpu_to_le16('a'), const_cpu_to_le16('d')
+	} ;
 
 	ntfs_log_verbose("Checking for bad sectors ...\n");
 
@@ -2580,23 +2585,16 @@ static int check_bad_sectors(ntfs_volume *vol)
 	if (!base_ni)
 		base_ni = ctx->ntfs_ino;
 
-	if (NInoAttrList(base_ni)) {
-		err_printf("Too many bad sectors have been detected!\n");
-		printf("%s", many_bad_sectors_msg);
+	na = ntfs_attr_open(base_ni, AT_DATA, Bad, 4);
+	if (!na) {
+		err_printf("Could not access the bad sector list\n");
 		exit(1);
 	}
-
-	if (!ctx->attr->non_resident)
-		err_exit("Resident attribute in $BadClust! Please report to "
-			 "%s\n", NTFS_DEV_LIST);
-	/*
-	 * FIXME: The below would be partial for non-base records in the
-	 * not yet supported multi-record case. Alternatively use audited
-	 * ntfs_attr_truncate after an umount & mount.
-	 */
-	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
-		perr_exit("Decompressing $BadClust:$Bad mapping pairs failed");
-
+	if (ntfs_attr_map_whole_runlist(na) || !na->rl) {
+		err_printf("Could not decode the bad sector list\n");
+		exit(1);
+	}
+	rl = na->rl;
 	for (i = 0; rl[i].length; i++) {
 		/* CHECKME: LCN_RL_NOT_MAPPED check isn't needed */
 		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
@@ -2622,7 +2620,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 			       "problems and massive data loss!!!\n");
 	}
 
-	free(rl);
+	ntfs_attr_close(na);
 #if CLEAN_EXIT
 	close_inode_and_context(ctx);
 #else
