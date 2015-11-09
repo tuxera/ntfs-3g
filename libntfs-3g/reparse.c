@@ -422,8 +422,10 @@ static int ntfs_drive_letter(ntfs_volume *vol, ntfschar letter)
 /*
  *		Do some sanity checks on reparse data
  *
- *	The only general check is about the size (at least the tag must
- *	be present)
+ *	Microsoft reparse points have an 8-byte header whereas
+ *	non-Microsoft reparse points have a 24-byte header.  In each case,
+ *	'reparse_data_length' must equal the number of non-header bytes.
+ *
  *	If the reparse data looks like a junction point or symbolic
  *	link, more checks can be done.
  *
@@ -441,7 +443,9 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 	ok = ni && reparse_attr
 		&& (size >= sizeof(REPARSE_POINT))
 		&& (((size_t)le16_to_cpu(reparse_attr->reparse_data_length)
-				 + sizeof(REPARSE_POINT)) == size);
+			 + sizeof(REPARSE_POINT)
+			 + ((reparse_attr->reparse_tag &
+			     IO_REPARSE_TAG_IS_MICROSOFT) ? 0 : sizeof(GUID))) == size);
 	if (ok) {
 		switch (reparse_attr->reparse_tag) {
 		case IO_REPARSE_TAG_MOUNT_POINT :
