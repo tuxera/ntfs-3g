@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2014 Jean-Pierre Andre
+ * Copyright (c) 2011-2015 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -404,7 +404,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011-2014  Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2015  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1327,11 +1327,23 @@ static void expand_attribute_runlist(ntfs_volume *vol, struct DELAYED *delayed)
 #endif
 	type = delayed->type;
 	rl = delayed->rl;
-	ni = ntfs_inode_open(vol,mref);
+
+	/* The MFT inode is permanently open, do not reopen or close */
+	if (mref == FILE_MFT)
+		ni = vol->mft_ni;
+	else
+		ni = ntfs_inode_open(vol,mref);
 	if (ni) {
-		na = ntfs_attr_open(ni, type,
+		if (mref == FILE_MFT)
+			na = (type == AT_DATA ? vol->mft_na : vol->mftbmp_na);
+		else
+			na = ntfs_attr_open(ni, type,
 					delayed->attr_name, delayed->name_len);
 		if (na) {
+			/*
+			 * The runlist is first updated in memory, and
+			 * the updated one is used for updating on device
+			 */
 			if (!ntfs_attr_map_whole_runlist(na)) {
 				if (replace_runlist(na,rl,delayed->lowest_vcn)
 				    || ntfs_attr_update_mapping_pairs(na,0))
@@ -1341,17 +1353,103 @@ static void expand_attribute_runlist(ntfs_volume *vol, struct DELAYED *delayed)
 			} else
 				perr_exit("Could not map attribute 0x%lx in inode %lld",
 					(long)le32_to_cpu(type),(long long)mref);
-			ntfs_attr_close(na);
+			if (mref != FILE_MFT)
+				ntfs_attr_close(na);
 		} else
 			perr_exit("Could not open attribute 0x%lx in inode %lld",
 				(long)le32_to_cpu(type),(long long)mref);
 		ntfs_inode_mark_dirty(ni);
-		if (ntfs_inode_close(ni))
+		if ((mref != FILE_MFT) && ntfs_inode_close(ni))
 			perr_exit("Failed to close inode %lld through the library",
 				(long long)mref);
 	} else
 		perr_exit("Could not open inode %lld through the library",
 			(long long)mref);
+}
+
+/*
+ *		Reload the MFT before merging delayed updates of runlist
+ *
+ *	The delayed updates of runlists are those which imply updating
+ *	the runlists which overflow from their original MFT record.
+ *	Such updates must be done in the new location of the MFT and
+ *	the allocations must be recorded in the new location of the
+ *	MFT bitmap.
+ *	The MFT data and MFT bitmap may themselves have delayed parts
+ *	of their runlists, and at this stage, their runlists may have
+ *	been partially updated on disk, and partially to be updated.
+ *	Their in-memory runlists still point at the old location, they
+ *	are obsolete, and we have to read the partially updated runlist
+ *	from the device before merging the delayed updates.
+ *
+ *	Returns 0 if successful
+ *		-1 otherwise
+ */
+
+static int reload_mft(ntfs_resize_t *resize)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	int r;
+	int xi;
+
+	r = 0;
+		/* get the base inode */
+	ni = resize->vol->mft_ni;
+	if (!ntfs_file_record_read(resize->vol, FILE_MFT, &ni->mrec, NULL)) {
+		for (xi=0; !r && xi<resize->vol->mft_ni->nr_extents; xi++) {
+			r = ntfs_file_record_read(resize->vol,
+					ni->extent_nis[xi]->mft_no,
+					&ni->extent_nis[xi]->mrec, NULL);
+		}
+
+		if (!r) {
+			/* reopen the MFT bitmap, and swap vol->mftbmp_na */
+			na = ntfs_attr_open(resize->vol->mft_ni,
+						AT_BITMAP, NULL, 0);
+			if (na && !ntfs_attr_map_whole_runlist(na)) {
+				ntfs_attr_close(resize->vol->mftbmp_na);
+				resize->vol->mftbmp_na = na;
+			} else
+				r = -1;
+		}
+
+		if (!r) {
+			/* reopen the MFT data, and swap vol->mft_na */
+			na = ntfs_attr_open(resize->vol->mft_ni,
+						AT_DATA, NULL, 0);
+			if (na && !ntfs_attr_map_whole_runlist(na)) {
+				ntfs_attr_close(resize->vol->mft_na);
+				resize->vol->mft_na = na;
+			} else
+				r = -1;
+		}
+	} else
+		r = -1;
+	return (r);
+}
+
+/*
+ *		Re-record the MFT extents in MFT bitmap
+ *
+ *	When both MFT data and MFT bitmap have delayed runlists, MFT data
+ *	is updated first, and the extents may be recorded at old location.
+ */
+
+static int record_mft_in_bitmap(ntfs_resize_t *resize)
+{
+	ntfs_inode *ni;
+	int r;
+	int xi;
+
+	r = 0;
+		/* get the base inode */
+	ni = resize->vol->mft_ni;
+	for (xi=0; !r && xi<resize->vol->mft_ni->nr_extents; xi++) {
+		r = ntfs_bitmap_set_run(resize->vol->mftbmp_na,
+					ni->extent_nis[xi]->mft_no, 1);
+	}
+	return (r);
 }
 
 /*
@@ -1365,9 +1463,26 @@ static void delayed_updates(ntfs_resize_t *resize)
 	if (ntfs_volume_get_free_space(resize->vol))
 		err_exit("Failed to determine free space\n");
 
+	if (resize->delayed_runlists && reload_mft(resize))
+		err_exit("Failed to reload the MFT for delayed updates\n");
+
+		/*
+		 * Important : updates to MFT must come first, so that
+		 * the new location of MFT is used for adding needed extents.
+		 * Now, there are runlists in the MFT bitmap and MFT data.
+		 * Extents to MFT bitmap have to be stored in the new MFT
+		 * data, and extents to MFT data have to be recorded in
+		 * the MFT bitmap.
+		 * So we update MFT data first, and we record the MFT
+		 * extents again in the MFT bitmap if they were recorded
+		 * in the old location.
+		 */
+
 	while (resize->delayed_runlists) {
 		delayed = resize->delayed_runlists;
 		expand_attribute_runlist(resize->vol, delayed);
+		if ((delayed->mref == FILE_MFT) && (delayed->type == AT_BITMAP))
+			record_mft_in_bitmap(resize);
 		resize->delayed_runlists = resize->delayed_runlists->next;
 		if (delayed->attr_name)
 			free(delayed->attr_name);
@@ -1385,6 +1500,7 @@ static void delayed_updates(ntfs_resize_t *resize)
 static void replace_later(ntfs_resize_t *resize, runlist *rl, runlist *head_rl)
 {
 	struct DELAYED *delayed;
+	struct DELAYED *previous;
 	ATTR_RECORD *a;
 	MFT_REF mref;
 	leMFT_REF lemref;
@@ -1415,8 +1531,21 @@ static void replace_later(ntfs_resize_t *resize, runlist *rl, runlist *head_rl)
 		delayed->lowest_vcn = le64_to_cpu(a->lowest_vcn);
 		delayed->rl = rl;
 		delayed->head_rl = head_rl;
-		delayed->next = resize->delayed_runlists;
-		resize->delayed_runlists = delayed;
+		/* Queue ahead of list if this is MFT or head is not MFT */
+		if ((delayed->mref == FILE_MFT)
+		    || !resize->delayed_runlists
+		    || (resize->delayed_runlists->mref != FILE_MFT)) {
+			delayed->next = resize->delayed_runlists;
+			resize->delayed_runlists = delayed;
+		} else {
+			/* Queue after all MFTs is this is not MFT */
+			previous = resize->delayed_runlists;
+			while (previous->next
+			    && (previous->next->mref == FILE_MFT))
+				previous = previous->next;
+			delayed->next = previous->next;
+			previous->next = delayed;
+		}
 	} else
 		perr_exit("Could not store delayed update data");
 }
@@ -2514,6 +2643,7 @@ static void truncate_badclust_file(ntfs_resize_t *resize)
 
 	lookup_data_attr(resize->vol, FILE_BadClus, "$Bad", &resize->ctx);
 	/* FIXME: sanity_check_attr(ctx->attr); */
+	resize->mref = FILE_BadClus;
 	truncate_badclust_bad_attr(resize);
 
 	if (write_mft_record(resize->vol, resize->ctx->ntfs_ino->mft_no,
@@ -2539,6 +2669,7 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 	printf("Updating $Bitmap file ...\n");
 
 	lookup_data_attr(resize->vol, FILE_Bitmap, NULL, &resize->ctx);
+	resize->mref = FILE_Bitmap;
 	truncate_bitmap_data_attr(resize);
 
 	if (resize->new_mft_start) {
