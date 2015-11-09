@@ -1856,13 +1856,6 @@ int ntfs_index_remove(ntfs_inode *dir_ni, ntfs_inode *ni,
 		if (ntfs_index_lookup(key, keylen, icx))
 			goto err_out;
 
-		if ((((FILE_NAME_ATTR *)icx->data)->file_attributes &
-				FILE_ATTR_REPARSE_POINT)
-		   && !ntfs_possible_symlink(ni)) {
-			errno = EOPNOTSUPP;
-			goto err_out;
-		}
-
 		ret = ntfs_index_rm(icx);
 		if (ret == STATUS_ERROR)
 			goto err_out;
