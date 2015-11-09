@@ -1175,8 +1175,7 @@ retry :
 			 * index, we may have to move the root to an extent
 			 */
 		if ((errno == ENOSPC)
-		    && !ctx->al_entry
-		    && !ntfs_inode_add_attrlist(icx->ni)) {
+		    && (ctx->al_entry || !ntfs_inode_add_attrlist(icx->ni))) {
 			ntfs_attr_put_search_ctx(ctx);
 			ctx = (ntfs_attr_search_ctx*)NULL;
 			ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len,
