@@ -1102,6 +1102,14 @@ static const struct BUFFER *findprevious(CONTEXT *ctx, const struct BUFFER *buf)
 				rph = &buf->block.record;
 				prevblk = (le32_to_cpu(rph->copy.file_offset)
 							>> blockbits) - 1;
+				/*
+				 * If an initial block leads to block 4, it
+				 * can mean the last block or no previous
+				 * block at all. Using the last block is safer,
+				 * its lsn will indicate whether it is stale.
+				 */
+				if (prevblk < BASEBLKS)
+					prevblk = (logfilesz >> blockbits) - 1;
 			}
 		/* No previous block if the log only consists of block 2 or 3 */
 		if (prevblk < BASEBLKS) {
