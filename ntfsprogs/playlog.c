@@ -4234,6 +4234,219 @@ static int distribute_redos(ntfs_volume *vol,
 	return (err);
 }
 
+int play_one_redo(ntfs_volume *vol, const struct ACTION_RECORD *action)
+{
+	MFT_RECORD *entry;
+	INDEX_BLOCK *indx;
+	char *buffer;
+	s64 this_lsn;
+	s64 data_lsn;
+	u32 xsize;
+	int err;
+	BOOL warn;
+	BOOL executed;
+	enum ACTION_KIND kind;
+	u16 rop;
+	u16 uop;
+
+	err = 0;
+	rop = le16_to_cpu(action->record.redo_operation);
+	uop = le16_to_cpu(action->record.undo_operation);
+	this_lsn = le64_to_cpu(action->record.this_lsn);
+	if (optv)
+		printf("Redo action %d %s (%s) 0x%llx\n",
+			action->num,
+			actionname(rop), actionname(uop),
+			(long long)le64_to_cpu(
+				action->record.this_lsn));
+	buffer = (char*)NULL;
+	switch (rop) {
+			/* Actions always acting on MFT */
+	case AddIndexEntryRoot :
+	case CreateAttribute :
+	case DeallocateFileRecordSegment :
+	case DeleteAttribute :
+	case DeleteIndexEntryRoot :
+	case InitializeFileRecordSegment :
+	case SetIndexEntryVcnRoot :
+	case SetNewAttributeSizes :
+	case UpdateFileNameRoot :
+	case UpdateMappingPairs :
+	case UpdateResidentValue :
+	case Win10Action37 :
+	case WriteEndofFileRecordSegment :
+		kind = ON_MFT;
+		break;
+			/* Actions always acting on INDX */
+	case AddIndexEntryAllocation :
+	case DeleteIndexEntryAllocation :
+	case SetIndexEntryVcnAllocation :
+	case UpdateFileNameAllocation :
+	case WriteEndOfIndexBuffer :
+		kind = ON_INDX;
+		break;
+			/* Actions never acting on MFT or INDX */
+	case ClearBitsInNonResidentBitMap :
+	case SetBitsInNonResidentBitMap :
+		kind = ON_RAW;
+		break;
+			/* Actions which may act on MFT */
+	case Noop : /* on MFT if DeallocateFileRecordSegment */
+		kind = ON_NONE;
+		break;
+			/* Actions which may act on INDX */
+	case UpdateNonResidentValue :
+		/* Known cases : INDX, $SDS, ATTR_LIST */
+		kind = get_action_kind(action);
+		if (kind == ON_NONE)
+			err = 1;
+		break;
+	case CompensationlogRecord :
+	case OpenNonResidentAttribute :
+		/* probably not important */
+		kind = ON_NONE;
+		break;
+			/* Actions currently ignored */
+	case AttributeNamesDump :
+	case DirtyPageTableDump :
+	case ForgetTransaction :
+	case OpenAttributeTableDump :
+	case TransactionTableDump :
+		kind = ON_NONE;
+		break;
+			/* Actions with no known use case */
+	case CommitTransaction :
+	case DeleteDirtyClusters :
+	case EndTopLevelAction :
+	case HotFix :
+	case PrepareTransaction :
+	case UpdateRecordDataAllocation :
+	case UpdateRecordDataRoot :
+	case Win10Action35 :
+	case Win10Action36 :
+	default :
+		err = 1;
+		kind = ON_NONE;
+		break;
+	}
+	executed = FALSE;
+	switch (kind) {
+	case ON_MFT :
+/*
+ the check below cannot be used on WinXP
+if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
+printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
+*/
+		/* Check whether data is to be discarded */
+		warn = (rop != InitializeFileRecordSegment)
+			|| !check_full_mft(action,TRUE);
+		buffer = read_protected(vol, &action->record,
+					mftrecsz, warn);
+		entry = (MFT_RECORD*)buffer;
+		if (entry && (entry->magic == magic_FILE)) {
+			data_lsn = le64_to_cpu(entry->lsn);
+			/*
+			 * Beware of records not updated
+			 * during the last session which may
+			 * have a stale lsn (consequence
+			 * of ntfs-3g resetting the log)
+			 */
+			executed = ((s64)(data_lsn - this_lsn) >= 0)
+			    && (((s64)(data_lsn - latest_lsn)) <= 0)
+			    && !exception(action->num);
+		} else {
+			if (!warn) {
+				/* Old record not needed */
+				if (!buffer)
+					buffer = (char*)calloc(1, mftrecsz);
+				if (buffer)
+					executed = FALSE;
+				else
+					err = 1;
+			} else {
+				printf("** %s (action %d) not"
+					" acting on MFT\n",
+					actionname(rop),
+					(int)action->num);
+				err = 1;
+			}
+		}
+		break;
+	case ON_INDX :
+/*
+ the check below cannot be used on WinXP
+if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
+printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
+*/
+		xsize = vol->indx_record_size;
+		/* Check whether data is to be discarded */
+		warn = (rop != UpdateNonResidentValue)
+			|| !check_full_index(action,TRUE);
+		buffer = read_protected(vol, &action->record,
+						xsize, warn);
+		indx = (INDEX_BLOCK*)buffer;
+		if (indx && (indx->magic == magic_INDX)) {
+			data_lsn = le64_to_cpu(indx->lsn);
+			/*
+			 * Beware of records not updated
+			 * during the last session which may
+			 * have a stale lsn (consequence
+			 * of ntfs-3g resetting the log)
+			 */
+			executed = ((s64)(data_lsn - this_lsn) >= 0)
+			    && (((s64)(data_lsn - latest_lsn)) <= 0)
+			    && ! exception(action->num);
+		} else {
+			if (!warn) {
+				/* Old record not needed */
+				if (!buffer)
+					buffer = (char*)calloc(1, xsize);
+				if (buffer)
+					executed = FALSE;
+				else
+					err = 1;
+			} else {
+				printf("** %s (action %d) not"
+					" acting on INDX\n",
+					actionname(rop),
+					(int)action->num);
+				err = 1;
+			}
+		}
+		break;
+	case ON_RAW :
+		if (action->record.attribute_flags
+			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+			printf("** Error : action %s on MFT"
+				" or INDX\n",
+				actionname(rop));
+			err = 1;
+		} else {
+			buffer = read_raw(vol, &action->record);
+			if (!buffer)
+				err = 1;
+		}
+		break;
+	default :
+		buffer = (char*)NULL;
+		break;
+	}
+	if (!err && (!executed || !opts)) {
+		err = distribute_redos(vol, action, buffer);
+		redocount++;
+	} else {
+		if (optv)
+			printf("Action %d %s (%s) not redone\n",
+				action->num,
+				actionname(rop),
+				actionname(uop));
+	}
+	if (buffer)
+		free(buffer);
+	return (err);
+}
+
+
 /*
  *		Play the redo actions from earliest to latest
  *
@@ -4244,226 +4457,15 @@ static int distribute_redos(ntfs_volume *vol,
 int play_redos(ntfs_volume *vol, const struct ACTION_RECORD *firstaction)
 {
 	const struct ACTION_RECORD *action;
-	MFT_RECORD *entry;
-	INDEX_BLOCK *indx;
-	char *buffer;
-	s64 this_lsn;
-	s64 data_lsn;
-	u32 xsize;
-	u16 rop;
-	u16 uop;
 	int err;
-	BOOL warn;
-	BOOL executed;
-	enum ACTION_KIND kind;
 
 	err = 0;
 	action = firstaction;
 	while (action && !err) {
-		this_lsn = le64_to_cpu(action->record.this_lsn);
 			/* Only committed actions should be redone */
 		if ((!optc || within_lcn_range(&action->record))
-		    && (action->flags & ACTION_TO_REDO)) {
-			rop = le16_to_cpu(action->record.redo_operation);
-			uop = le16_to_cpu(action->record.undo_operation);
-			if (optv)
-				printf("Redo action %d %s (%s) 0x%llx\n",
-					action->num,
-					actionname(rop), actionname(uop),
-					(long long)le64_to_cpu(
-						action->record.this_lsn));
-			buffer = (char*)NULL;
-			switch (rop) {
-					/* Actions always acting on MFT */
-			case AddIndexEntryRoot :
-			case CreateAttribute :
-			case DeallocateFileRecordSegment :
-			case DeleteAttribute :
-			case DeleteIndexEntryRoot :
-			case InitializeFileRecordSegment :
-			case SetIndexEntryVcnRoot :
-			case SetNewAttributeSizes :
-			case UpdateFileNameRoot :
-			case UpdateMappingPairs :
-			case UpdateResidentValue :
-			case Win10Action37 :
-			case WriteEndofFileRecordSegment :
-				kind = ON_MFT;
-				break;
-					/* Actions always acting on INDX */
-			case AddIndexEntryAllocation :
-			case DeleteIndexEntryAllocation :
-			case SetIndexEntryVcnAllocation :
-			case UpdateFileNameAllocation :
-			case WriteEndOfIndexBuffer :
-				kind = ON_INDX;
-				break;
-					/* Actions never acting on MFT or INDX */
-			case ClearBitsInNonResidentBitMap :
-			case SetBitsInNonResidentBitMap :
-				kind = ON_RAW;
-				break;
-					/* Actions which may act on MFT */
-			case Noop : /* on MFT if DeallocateFileRecordSegment */
-				kind = ON_NONE;
-				break;
-					/* Actions which may act on INDX */
-			case UpdateNonResidentValue :
-				/* Known cases : INDX, $SDS, ATTR_LIST */
-				kind = get_action_kind(action);
-				if (kind == ON_NONE)
-					err = 1;
-				break;
-			case CompensationlogRecord :
-			case OpenNonResidentAttribute :
-				/* probably not important */
-				kind = ON_NONE;
-				break;
-					/* Actions currently ignored */
-			case AttributeNamesDump :
-			case DirtyPageTableDump :
-			case ForgetTransaction :
-			case OpenAttributeTableDump :
-			case TransactionTableDump :
-				kind = ON_NONE;
-				break;
-					/* Actions with no known use case */
-			case CommitTransaction :
-			case DeleteDirtyClusters :
-			case EndTopLevelAction :
-			case HotFix :
-			case PrepareTransaction :
-			case UpdateRecordDataAllocation :
-			case UpdateRecordDataRoot :
-			case Win10Action35 :
-			case Win10Action36 :
-			default :
-				err = 1;
-				kind = ON_NONE;
-				break;
-			}
-			executed = FALSE;
-			switch (kind) {
-			case ON_MFT :
-/*
- the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
-printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
-*/
-				/* Check whether data is to be discarded */
-				warn = (rop != InitializeFileRecordSegment)
-					|| !check_full_mft(action,TRUE);
-				buffer = read_protected(vol, &action->record,
-							mftrecsz, warn);
-				entry = (MFT_RECORD*)buffer;
-				if (entry && (entry->magic == magic_FILE)) {
-					data_lsn = le64_to_cpu(entry->lsn);
-					/*
-					 * Beware of records not updated
-					 * during the last session which may
-					 * have a stale lsn (consequence
-					 * of ntfs-3g resetting the log)
-					 */
-					executed = ((s64)(data_lsn
-							- this_lsn) >= 0)
-					    && (((s64)(data_lsn
-							- latest_lsn)) <= 0)
-					    && !exception(action->num);
-				} else {
-					if (!warn) {
-						/* Old record not needed */
-						if (!buffer)
-							buffer =
-							(char*)malloc(mftrecsz);
-						if (buffer)
-							executed = FALSE;
-						else
-							err = 1;
-					} else {
-						printf("** %s (action %d) not"
-							" acting on MFT\n",
-							actionname(rop),
-							(int)action->num);
-						err = 1;
-					}
-				}
-				break;
-			case ON_INDX :
-/*
- the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
-printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
-*/
-				xsize = vol->indx_record_size;
-				/* Check whether data is to be discarded */
-				warn = (rop != UpdateNonResidentValue)
-					|| !check_full_index(action,TRUE);
-				buffer = read_protected(vol, &action->record,
-								xsize, warn);
-				indx = (INDEX_BLOCK*)buffer;
-				if (indx && (indx->magic == magic_INDX)) {
-					data_lsn = le64_to_cpu(indx->lsn);
-					/*
-					 * Beware of records not updated
-					 * during the last session which may
-					 * have a stale lsn (consequence
-					 * of ntfs-3g resetting the log)
-					 */
-					executed = ((s64)(data_lsn
-							- this_lsn) >= 0)
-					    && (((s64)(data_lsn
-							- latest_lsn)) <= 0)
-					    && ! exception(action->num);
-				} else {
-					if (!warn) {
-						/* Old record not needed */
-						if (!buffer)
-							buffer = 
-							(char*)malloc(xsize);
-						if (buffer)
-							executed = FALSE;
-						else
-							err = 1;
-					} else {
-						printf("** %s (action %d) not"
-							" acting on INDX\n",
-							actionname(rop),
-							(int)action->num);
-						err = 1;
-					}
-				}
-				break;
-			case ON_RAW :
-				if (action->record.attribute_flags
-					& (const_cpu_to_le16(
-						ACTS_ON_INDX | ACTS_ON_MFT))) {
-					printf("** Error : action %s on MFT"
-						" or INDX\n",
-						actionname(rop));
-					err = 1;
-				} else {
-					buffer = read_raw(vol, &action->record);
-					if (!buffer)
-						err = 1;
-				}
-				break;
-			default :
-				buffer = (char*)NULL;
-				break;
-			}
-			if (!err && (!executed || !opts)) {
-				err = distribute_redos(vol, action, buffer);
-				redocount++;
-			} else {
-				if (optv)
-					printf("Action %d %s (%s) not redone\n",
-						action->num,
-						actionname(rop),
-						actionname(uop));
-			}
-			if (buffer)
-				free(buffer);
-		}
+		    && (action->flags & ACTION_TO_REDO))
+			err = play_one_redo(vol, action);
 		if (!err)
 			action = action->next;
 	}
@@ -4616,6 +4618,192 @@ static int distribute_undos(ntfs_volume *vol, const struct ACTION_RECORD *action
 	return (err);
 }
 
+int play_one_undo(ntfs_volume *vol, const struct ACTION_RECORD *action)
+{
+	MFT_RECORD *entry;
+	INDEX_BLOCK *indx;
+	char *buffer;
+	u32 xsize;
+	u16 rop;
+	u16 uop;
+	int err;
+	BOOL executed;
+	enum ACTION_KIND kind;
+
+	err = 0;
+	rop = le16_to_cpu(action->record.redo_operation);
+	uop = le16_to_cpu(action->record.undo_operation);
+	if (optv)
+		printf("Undo action %d %s (%s) lsn 0x%llx\n",
+			action->num,
+			actionname(rop), actionname(uop),
+			(long long)le64_to_cpu(
+				action->record.this_lsn));
+	buffer = (char*)NULL;
+	executed = FALSE;
+	kind = ON_NONE;
+	switch (rop) {
+			/* Actions always acting on MFT */
+	case AddIndexEntryRoot :
+	case CreateAttribute :
+	case DeallocateFileRecordSegment :
+	case DeleteAttribute :
+	case DeleteIndexEntryRoot :
+	case InitializeFileRecordSegment :
+	case SetIndexEntryVcnRoot :
+	case SetNewAttributeSizes :
+	case UpdateFileNameRoot :
+	case UpdateMappingPairs :
+	case UpdateResidentValue :
+	case Win10Action37 :
+	case WriteEndofFileRecordSegment :
+		kind = ON_MFT;
+		break;
+			/* Actions always acting on INDX */
+	case AddIndexEntryAllocation :
+	case DeleteIndexEntryAllocation :
+	case SetIndexEntryVcnAllocation :
+	case UpdateFileNameAllocation :
+	case WriteEndOfIndexBuffer :
+		kind = ON_INDX;
+		break;
+			/* Actions never acting on MFT or INDX */
+	case ClearBitsInNonResidentBitMap :
+	case SetBitsInNonResidentBitMap :
+		kind = ON_RAW;
+		break;
+			/* Actions which may act on MFT */
+	case Noop : /* on MFT if DeallocateFileRecordSegment */
+		break;
+			/* Actions which may act on INDX */
+	case UpdateNonResidentValue :
+		/* Known cases : INDX, $SDS, ATTR_LIST */
+		kind = get_action_kind(action);
+		if (kind == ON_NONE)
+			err = 1;
+		break;
+	case OpenNonResidentAttribute :
+		/* probably not important */
+		kind = ON_NONE;
+		break;
+			/* Actions currently ignored */
+	case AttributeNamesDump :
+	case CommitTransaction :
+	case CompensationlogRecord :
+	case DeleteDirtyClusters :
+	case DirtyPageTableDump :
+	case EndTopLevelAction :
+	case ForgetTransaction :
+	case HotFix :
+	case OpenAttributeTableDump :
+	case PrepareTransaction :
+	case TransactionTableDump :
+	case UpdateRecordDataAllocation :
+	case UpdateRecordDataRoot :
+	case Win10Action35 :
+	case Win10Action36 :
+		kind = ON_NONE;
+		break;
+	}
+	switch (kind) {
+	case ON_MFT :
+/*
+ the check below cannot be used on WinXP
+if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
+printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
+*/
+		buffer = read_protected(vol, &action->record, mftrecsz, TRUE);
+		entry = (MFT_RECORD*)buffer;
+		if (entry) {
+			if (entry->magic == magic_FILE) {
+				executed = !older_record(entry,
+					&action->record);
+				if (!executed
+				    && exception(action->num))
+					executed = TRUE;
+if (optv > 1)
+printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
+(long long)le64_to_cpu(entry->lsn),
+(executed ? "not older" : "older"),
+(int)action->num,
+(long long)le64_to_cpu(action->record.this_lsn));
+			} else {
+				printf("** %s (action %d) not acting on MFT\n",
+					actionname(rop), (int)action->num);
+				err = 1;
+			}
+		} else {
+			/* Undoing a record create which was not done ? */
+// TODO make sure this is about a newly allocated record (with bad fixup)
+// TODO check this is inputting a full record (record lth == data lth)
+			buffer = (char*)calloc(1, mftrecsz);
+		}
+		break;
+	case ON_INDX :
+/*
+ the check below cannot be used on WinXP
+if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
+printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
+*/
+		xsize = vol->indx_record_size;
+		buffer = read_protected(vol, &action->record, xsize, TRUE);
+		indx = (INDEX_BLOCK*)buffer;
+		if (indx) {
+			if (indx->magic == magic_INDX) {
+				executed = !older_record(indx,
+					&action->record);
+				if (!executed
+				    && exception(action->num))
+					executed = TRUE;
+if (optv > 1)
+printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
+(long long)le64_to_cpu(indx->lsn),
+(executed ? "not older" : "older"),
+(int)action->num,
+(long long)le64_to_cpu(action->record.this_lsn));
+			} else {
+				printf("** %s (action %d) not acting on INDX\n",
+					actionname(rop), (int)action->num);
+				err = 1;
+			}
+		} else {
+			/* Undoing a record create which was not done ? */
+// TODO make sure this is about a newly allocated record (with bad fixup)
+// TODO check this is inputting a full record (record lth == data lth)
+// recreate an INDX record if this is the first entry
+			buffer = (char*)calloc(1, xsize);
+			err = create_indx(vol, action, buffer);
+			executed = TRUE;
+		}
+		break;
+	case ON_RAW :
+		if (action->record.attribute_flags
+			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+			printf("** Error : action %s on MFT or INDX\n",
+				actionname(rop));
+			err = 1;
+		} else {
+			buffer = read_raw(vol, &action->record);
+			if (!buffer)
+				err = 1;
+		}
+		executed = TRUE;
+		break;
+	default :
+		executed = TRUE;
+		buffer = (char*)NULL;
+		break;
+	}
+	if (!err && executed) {
+		err = distribute_undos(vol, action, buffer);
+		undocount++;
+	}
+	if (buffer)
+		free(buffer);
+
+	return (err);
+}
+
 /*
  *		Play the undo actions from latest to earliest
  *
@@ -4629,196 +4817,13 @@ static int distribute_undos(ntfs_volume *vol, const struct ACTION_RECORD *action
 int play_undos(ntfs_volume *vol, const struct ACTION_RECORD *lastaction)
 {
 	const struct ACTION_RECORD *action;
-	MFT_RECORD *entry;
-	INDEX_BLOCK *indx;
-	char *buffer;
-	u32 xsize;
-	u16 rop;
-	u16 uop;
 	int err;
-	BOOL executed;
-	enum ACTION_KIND kind;
 
 	err = 0;
 	action = lastaction;
 	while (action && !err) {
-		if (!optc || within_lcn_range(&action->record)) {
-			rop = le16_to_cpu(action->record.redo_operation);
-			uop = le16_to_cpu(action->record.undo_operation);
-			if (optv)
-				printf("Undo action %d %s (%s) lsn 0x%llx\n",
-					action->num,
-					actionname(rop), actionname(uop),
-					(long long)le64_to_cpu(
-						action->record.this_lsn));
-			buffer = (char*)NULL;
-			executed = FALSE;
-			kind = ON_NONE;
-			switch (rop) {
-					/* Actions always acting on MFT */
-			case AddIndexEntryRoot :
-			case CreateAttribute :
-			case DeallocateFileRecordSegment :
-			case DeleteAttribute :
-			case DeleteIndexEntryRoot :
-			case InitializeFileRecordSegment :
-			case SetIndexEntryVcnRoot :
-			case SetNewAttributeSizes :
-			case UpdateFileNameRoot :
-			case UpdateMappingPairs :
-			case UpdateResidentValue :
-			case Win10Action37 :
-			case WriteEndofFileRecordSegment :
-				kind = ON_MFT;
-				break;
-					/* Actions always acting on INDX */
-			case AddIndexEntryAllocation :
-			case DeleteIndexEntryAllocation :
-			case SetIndexEntryVcnAllocation :
-			case UpdateFileNameAllocation :
-			case WriteEndOfIndexBuffer :
-				kind = ON_INDX;
-				break;
-					/* Actions never acting on MFT or INDX */
-			case ClearBitsInNonResidentBitMap :
-			case SetBitsInNonResidentBitMap :
-				kind = ON_RAW;
-				break;
-					/* Actions which may act on MFT */
-			case Noop : /* on MFT if DeallocateFileRecordSegment */
-				break;
-					/* Actions which may act on INDX */
-			case UpdateNonResidentValue :
-				/* Known cases : INDX, $SDS, ATTR_LIST */
-				kind = get_action_kind(action);
-				if (kind == ON_NONE)
-					err = 1;
-				break;
-			case OpenNonResidentAttribute :
-				/* probably not important */
-				kind = ON_NONE;
-				break;
-					/* Actions currently ignored */
-			case AttributeNamesDump :
-			case CommitTransaction :
-			case CompensationlogRecord :
-			case DeleteDirtyClusters :
-			case DirtyPageTableDump :
-			case EndTopLevelAction :
-			case ForgetTransaction :
-			case HotFix :
-			case OpenAttributeTableDump :
-			case PrepareTransaction :
-			case TransactionTableDump :
-			case UpdateRecordDataAllocation :
-			case UpdateRecordDataRoot :
-			case Win10Action35 :
-			case Win10Action36 :
-				kind = ON_NONE;
-				break;
-			}
-			switch (kind) {
-			case ON_MFT :
-/*
- the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
-printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
-*/
-				buffer = read_protected(vol, &action->record,
-							mftrecsz, TRUE);
-				entry = (MFT_RECORD*)buffer;
-				if (entry) {
-					if (entry->magic == magic_FILE) {
-						executed = !older_record(entry,
-							&action->record);
-						if (!executed
-						    && exception(action->num))
-							executed = TRUE;
-if (optv > 1)
-printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
-(long long)le64_to_cpu(entry->lsn),
-(executed ? "not older" : "older"),
-(int)action->num,
-(long long)le64_to_cpu(action->record.this_lsn));
-					} else {
-						printf("** %s (action %d) not"
-							" acting on MFT\n",
-							actionname(rop),
-							(int)action->num);
-						err = 1;
-					}
-				} else {
-// TODO make sure this is about a newly allocated record (with bad fixup)
-// TODO check this is inputting a full record (record lth == data lth)
-					buffer = (char*)malloc(mftrecsz);
-				}
-				break;
-			case ON_INDX :
-/*
- the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
-printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
-*/
-				xsize = vol->indx_record_size;
-				buffer = read_protected(vol, &action->record,
-								xsize, TRUE);
-				indx = (INDEX_BLOCK*)buffer;
-				if (indx) {
-					if (indx->magic == magic_INDX) {
-						executed = !older_record(indx,
-							&action->record);
-						if (!executed
-						    && exception(action->num))
-							executed = TRUE;
-if (optv > 1)
-printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
-(long long)le64_to_cpu(indx->lsn),
-(executed ? "not older" : "older"),
-(int)action->num,
-(long long)le64_to_cpu(action->record.this_lsn));
-					} else {
-						printf("** %s (action %d) not"
-							" acting on INDX\n",
-							actionname(rop),
-							(int)action->num);
-						err = 1;
-					}
-				} else {
-// TODO make sure this is about a newly allocated record (with bad fixup)
-// TODO check this is inputting a full record (record lth == data lth)
-// recreate an INDX record if this is the first entry
-					buffer = (char*)malloc(xsize);
-					err = create_indx(vol, action, buffer);
-					executed = TRUE;
-				}
-				break;
-			case ON_RAW :
-				if (action->record.attribute_flags
-					& (const_cpu_to_le16(
-						ACTS_ON_INDX | ACTS_ON_MFT))) {
-					printf("** Error : action %s on MFT"
-						" or INDX\n",
-						actionname(rop));
-					err = 1;
-				} else {
-					buffer = read_raw(vol, &action->record);
-					if (!buffer)
-						err = 1;
-				}
-				executed = TRUE;
-				break;
-			default :
-				executed = TRUE;
-				buffer = (char*)NULL;
-				break;
-			}
-			if (!err && executed) {
-				err = distribute_undos(vol, action, buffer);
-				undocount++;
-			}
-			if (buffer)
-				free(buffer);
-		}
+		if (!optc || within_lcn_range(&action->record))
+			err = play_one_undo(vol, action);
 		if (!err)
 			action = action->prev;
 	}
