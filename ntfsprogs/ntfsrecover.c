@@ -2988,6 +2988,7 @@ static int reset_logfile(CONTEXT *ctx __attribute__((unused)))
 		    && (ntfs_attr_pwrite(log_na, (u64)1 << blockbits,
                 		blocksz, buffer) == blocksz))
 			err = 0;
+		free(buffer);
 	}
 	return (err);
 }
