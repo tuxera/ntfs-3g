@@ -1841,7 +1841,8 @@ err_out:
 	goto out;
 }
 
-int ntfs_index_remove(ntfs_inode *dir_ni, ntfs_inode *ni,
+int ntfs_index_remove(ntfs_inode *dir_ni,
+		ntfs_inode *ni __attribute__((unused)),
 		const void *key, const int keylen)
 {
 	int ret = STATUS_ERROR;
