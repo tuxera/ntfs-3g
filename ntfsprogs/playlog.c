@@ -1991,7 +1991,6 @@ static int redo_create_file(ntfs_volume *vol,
 	LCN lcn;
 	const char *data;
 	MFT_RECORD *record;
-	const MFT_RECORD *fullrec;
 	u32 target;
 	u32 length;
 	int err;
@@ -2034,27 +2033,7 @@ static int redo_create_file(ntfs_volume *vol,
 				(changed ? "updated" : "unchanged"));
 		}
 	} else {
-// TODO make sure this was caused by bad fixups
-		/*
-		 * Could not read protected, assume newly allocated record.
-		 * Check we are creating a full MFT record, and so
-		 * existing data is meaningless.
-		 */
-		fullrec = (const MFT_RECORD*)data;
-		if ((length > offsetof(MFT_RECORD, bytes_in_use))
-		    && (le32_to_cpu(fullrec->bytes_in_use) <= length)
-		    && (fullrec->magic == magic_FILE)
-		    && !target
-		    && (length <= mftrecsz)) {
-			buffer = (char*)malloc(mftrecsz);
-			memcpy(buffer, data, length);
-			if (optv > 1) {
-				printf("-> created MFT record :\n");
-				dump(buffer, length);
-			}
-			err = write_protected(vol, &action->record,
-							buffer, mftrecsz);
-		}
+		err = 1; /* record overflows */
 	}
 	return (err);
 }
