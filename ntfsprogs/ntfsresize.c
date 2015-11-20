@@ -2112,10 +2112,17 @@ static int handle_mftdata(ntfs_resize_t *resize, int do_mftdata)
 static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 {
 	int ret;
+	leMFT_REF lemref;
+	MFT_REF base_mref;
 
 	if (!(resize->ctx = attr_get_search_ctx(NULL, resize->mrec)))
 		exit(1);
 
+	lemref = resize->mrec->base_mft_record;
+	if (lemref)
+		base_mref = MREF(le64_to_cpu(lemref));
+	else
+		base_mref = resize->mref;
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
 			break;
@@ -2131,6 +2138,11 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 
 		if (resize->mref == FILE_Bitmap &&
 		    resize->ctx->attr->type == AT_DATA)
+			continue;
+
+		/* Do not relocate bad clusters */
+		if ((base_mref == FILE_BadClus)
+		    && (resize->ctx->attr->type == AT_DATA))
 			continue;
 
 		relocate_attribute(resize);
@@ -2310,60 +2322,6 @@ static void advise_on_resize(ntfs_resize_t *resize)
 	print_advise(vol, resize->last_unsupp);
 }
 
-static void rl_expand(runlist **rl, const VCN last_vcn)
-{
-	int len;
-	runlist *p = *rl;
-
-	len = rl_items(p) - 1;
-	if (len <= 0)
-		err_exit("rl_expand: bad runlist length: %d\n", len);
-
-	if (p[len].vcn > last_vcn)
-		err_exit("rl_expand: length is already more than requested "
-			 "(%lld > %lld)\n",
-			 (long long)p[len].vcn, (long long)last_vcn);
-
-	if (p[len - 1].lcn == LCN_HOLE) {
-
-		p[len - 1].length += last_vcn - p[len].vcn;
-		p[len].vcn = last_vcn;
-
-	} else if (p[len - 1].lcn >= 0) {
-
-		p = realloc(*rl, (++len + 1) * sizeof(runlist_element));
-		if (!p)
-			perr_exit("rl_expand: realloc");
-
-		p[len - 1].lcn = LCN_HOLE;
-		p[len - 1].length = last_vcn - p[len - 1].vcn;
-		rl_set(p + len, last_vcn, LCN_ENOENT, 0LL);
-		*rl = p;
-
-	} else
-		err_exit("rl_expand: bad LCN: %lld\n",
-				(long long)p[len - 1].lcn);
-}
-
-static void rl_truncate(runlist **rl, const VCN last_vcn)
-{
-	int len;
-	VCN vcn;
-
-	len = rl_items(*rl) - 1;
-	if (len <= 0)
-		err_exit("rl_truncate: bad runlist length: %d\n", len);
-
-	vcn = (*rl)[len].vcn;
-
-	if (vcn < last_vcn)
-		rl_expand(rl, last_vcn);
-
-	else if (vcn > last_vcn)
-		if (ntfs_rl_truncate(rl, last_vcn) == -1)
-			perr_exit("ntfs_rl_truncate");
-}
-
 /**
  * bitmap_file_data_fixup
  *
@@ -2376,6 +2334,37 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 		ntfs_bit_set(bm->bm, (u64)cluster, 1);
 }
 
+/*
+ *		Open the attribute $BadClust:$Bad and get its runlist
+ */
+
+static ntfs_attr *open_badclust_bad_attr(ntfs_attr_search_ctx *ctx)
+{
+	ntfs_inode *base_ni;
+	ntfs_attr *na;
+	static ntfschar Bad[4] = {
+		const_cpu_to_le16('$'), const_cpu_to_le16('B'),
+		const_cpu_to_le16('a'), const_cpu_to_le16('d')
+	} ;
+
+	base_ni = ctx->base_ntfs_ino;
+	if (!base_ni)
+		base_ni = ctx->ntfs_ino;
+
+	na = ntfs_attr_open(base_ni, AT_DATA, Bad, 4);
+	if (!na) {
+		err_printf("Could not access the bad sector list\n");
+	} else {
+		if (ntfs_attr_map_whole_runlist(na) || !na->rl) {
+			err_printf("Could not decode the bad sector list\n");
+			ntfs_attr_close(na);
+			ntfs_inode_close(base_ni);
+			na = (ntfs_attr*)NULL;
+		}
+	}
+	return (na);
+}
+
 /**
  * truncate_badclust_bad_attr
  *
@@ -2386,27 +2375,26 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  */
 static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 {
-	ATTR_RECORD *a;
-	runlist *rl_bad;
+	ntfs_inode *base_ni;
+	ntfs_attr *na;
 	s64 nr_clusters = resize->new_volume_size;
 	ntfs_volume *vol = resize->vol;
 
-	a = resize->ctx->attr;
-	if (!a->non_resident)
-		/* FIXME: handle resident attribute value */
-		err_exit("Resident attribute in $BadClust isn't supported!\n");
+	na = open_badclust_bad_attr(resize->ctx);
+	if (!na) {
+		err_printf("Could not access the bad sector list\n");
+		exit(1);
+	}
+	base_ni = na->ni;
+	if (ntfs_attr_truncate(na,nr_clusters << vol->cluster_size_bits)) {
+		err_printf("Could not adjust the bad sector list\n");
+		exit(1);
+	}
+	na->ni->flags |= FILE_ATTR_SPARSE_FILE;
+	NInoFileNameSetDirty(na->ni);
 
-	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, a, NULL)))
-		perr_exit("ntfs_mapping_pairs_decompress");
-
-	rl_truncate(&rl_bad, nr_clusters);
-
-	a->highest_vcn = cpu_to_sle64(nr_clusters - 1LL);
-	a->allocated_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
-	a->data_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
-
-	if (!replace_attribute_runlist(resize, rl_bad))
-		free(rl_bad);
+	ntfs_attr_close(na);
+	ntfs_inode_mark_dirty(base_ni);
 }
 
 /**
@@ -2568,30 +2556,17 @@ static void close_inode_and_context(ntfs_attr_search_ctx *ctx)
 static int check_bad_sectors(ntfs_volume *vol)
 {
 	ntfs_attr_search_ctx *ctx;
-	ntfs_inode *base_ni;
 	ntfs_attr *na;
 	runlist *rl;
 	s64 i, badclusters = 0;
-	static le16 Bad[4] = {
-		const_cpu_to_le16('$'), const_cpu_to_le16('B'),
-		const_cpu_to_le16('a'), const_cpu_to_le16('d')
-	} ;
 
 	ntfs_log_verbose("Checking for bad sectors ...\n");
 
 	lookup_data_attr(vol, FILE_BadClus, "$Bad", &ctx);
 
-	base_ni = ctx->base_ntfs_ino;
-	if (!base_ni)
-		base_ni = ctx->ntfs_ino;
-
-	na = ntfs_attr_open(base_ni, AT_DATA, Bad, 4);
+	na = open_badclust_bad_attr(ctx);
 	if (!na) {
 		err_printf("Could not access the bad sector list\n");
-		exit(1);
-	}
-	if (ntfs_attr_map_whole_runlist(na) || !na->rl) {
-		err_printf("Could not decode the bad sector list\n");
 		exit(1);
 	}
 	rl = na->rl;
@@ -2643,10 +2618,6 @@ static void truncate_badclust_file(ntfs_resize_t *resize)
 	/* FIXME: sanity_check_attr(ctx->attr); */
 	resize->mref = FILE_BadClus;
 	truncate_badclust_bad_attr(resize);
-
-	if (write_mft_record(resize->vol, resize->ctx->ntfs_ino->mft_no,
-			     resize->ctx->mrec))
-		perr_exit("Couldn't update $BadClust");
 
 #if CLEAN_EXIT
 	close_inode_and_context(resize->ctx);
