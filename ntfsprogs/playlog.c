@@ -4214,7 +4214,18 @@ static int distribute_redos(ntfs_volume *vol,
 	return (err);
 }
 
-int play_one_redo(ntfs_volume *vol, const struct ACTION_RECORD *action)
+/*
+ *		Redo a single action
+ *
+ *	The record the action acts on is read and, when it is an MFT or
+ *	INDX one, the need for redoing is checked.
+ *
+ *	When this is an action which creates a new MFT or INDX record
+ *	and the old one cannot be read (usually because it was not
+ *	initialized), a zeroed buffer is allocated.
+ */
+
+static int play_one_redo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 {
 	MFT_RECORD *entry;
 	INDEX_BLOCK *indx;
@@ -4598,7 +4609,14 @@ static int distribute_undos(ntfs_volume *vol, const struct ACTION_RECORD *action
 	return (err);
 }
 
-int play_one_undo(ntfs_volume *vol, const struct ACTION_RECORD *action)
+/*
+ *		Undo a single action
+ *
+ *	The record the action acts on is read and, when it is an MFT or
+ *	INDX one, the need for undoing is checked.
+ */
+
+static int play_one_undo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 {
 	MFT_RECORD *entry;
 	INDEX_BLOCK *indx;
