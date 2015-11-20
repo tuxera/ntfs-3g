@@ -691,7 +691,8 @@ static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
 						err = write_mirr(vol, logr,
 								full);
 					free(full);
-				}
+				} else
+					err = 1;
 			} else {
 					/* write full clusters */
 				err = write_raw(vol, logr, buffer);
