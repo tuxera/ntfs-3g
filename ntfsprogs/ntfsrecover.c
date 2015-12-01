@@ -3381,7 +3381,6 @@ static TRISTATE backward_rcrd(CONTEXT *ctx, u32 blk, int skipped,
 	if (prevbuf)
 		prevrph = &prevbuf->block.record;
 	data = buf->block.data;
-	nextdata = nextbuf->block.data;
 	if (rph && (rph->head.magic == magic_RCRD)
 	    && (!prevrph || (prevrph->head.magic == magic_RCRD))) {
 		if (optv) {
@@ -3465,6 +3464,7 @@ static TRISTATE backward_rcrd(CONTEXT *ctx, u32 blk, int skipped,
 		    && ((k == endoff) || !endoff)
 		    && ((u32)(k + LOG_RECORD_HEAD_SZ) <= blocksz)) {
 			if (nextbuf && (blk >= BASEBLKS)) {
+				nextdata = nextbuf->block.data;
 				state = backoverlap(ctx, blk,
 						data, nextdata, k);
 			}
