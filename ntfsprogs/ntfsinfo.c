@@ -411,7 +411,6 @@ static char *ntfs_attr_get_name_mbs(ATTR_RECORD *attr)
 static const char *reparse_type_name(le32 tag)
 {
 	const char *name;
-	le32 IO_REPARSE_TAG_WOF = const_cpu_to_le32(0x80000017); /* temporary */
 
 	if (tag == IO_REPARSE_TAG_MOUNT_POINT)
 		name = " (mount point)";

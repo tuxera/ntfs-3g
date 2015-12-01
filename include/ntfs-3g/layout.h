@@ -2409,6 +2409,7 @@ typedef enum {
 	IO_REPARSE_TAG_SIS		= const_cpu_to_le32(0x80000007),
 	IO_REPARSE_TAG_SYMLINK		= const_cpu_to_le32(0xA000000C),
 	IO_REPARSE_TAG_WIM		= const_cpu_to_le32(0x80000008),
+	IO_REPARSE_TAG_WOF		= const_cpu_to_le32(0x80000017),
 
 	IO_REPARSE_TAG_VALID_VALUES	= const_cpu_to_le32(0xf000ffff),
 } PREDEFINED_REPARSE_TAGS;
