@@ -442,6 +442,7 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 
 	ok = ni && reparse_attr
 		&& (size >= sizeof(REPARSE_POINT))
+		&& (reparse_attr->reparse_tag != IO_REPARSE_TAG_RESERVED_ZERO)
 		&& (((size_t)le16_to_cpu(reparse_attr->reparse_data_length)
 			 + sizeof(REPARSE_POINT)
 			 + ((reparse_attr->reparse_tag &
