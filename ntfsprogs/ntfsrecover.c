@@ -3720,6 +3720,20 @@ static int walk(CONTEXT *ctx)
 				}
 		if (!done) {
 			buf = nextbuf;
+			if (blk >= RSTBLKS && blk < BASEBLKS) {
+				/* The latest buf may be more recent
+				   than restart */
+				rph = &buf->block.record;
+				if ((s64)(le64_to_cpu(rph->last_end_lsn)
+					  - committed_lsn) > 0) {
+					committed_lsn =
+						le64_to_cpu(rph->last_end_lsn);
+					if (optv)
+						printf("* Restart page was "
+						       "obsolete, updated "
+						       "committed lsn\n");
+				}
+			}
 			if (optv)
 				printf("\n* block %d at 0x%llx\n",(int)blk,
 					(long long)loclogblk(ctx, blk));
