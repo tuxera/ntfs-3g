@@ -3,8 +3,8 @@
  *
  *      This module is part of ntfs-3g library
  *
- * Copyright (c) 2014 Jean-Pierre Andre
- * Copyright (c) 2014 Red Hat, Inc.
+ * Copyright (c) 2014-2015 Jean-Pierre Andre
+ * Copyright (c) 2014      Red Hat, Inc.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -232,7 +232,7 @@ not_found:
  * are found and TRIM requests are sent to the block device.  'minlen'
  * is the minimum continguous free range to discard.
  */
-static int fstrim(ntfs_volume *vol, void *data)
+static int fstrim(ntfs_volume *vol, void *data, u64 *trimmed)
 {
 	struct fstrim_range *range = data;
 	u64 start = range->start;
@@ -247,6 +247,8 @@ static int fstrim(ntfs_volume *vol, void *data)
 		(unsigned long long) start,
 		(unsigned long long) len,
 		(unsigned long long) minlen);
+
+	*trimmed = 0;
 
 	/* Fail if user tries to use the fstrim -o/-l/-m options.
 	 * XXX We could fix these limitations in future.
@@ -341,6 +343,8 @@ static int fstrim(ntfs_volume *vol, void *data)
 				if (ret)
 					goto free_out;
 
+				*trimmed += (end_lcn - start_lcn)
+						<< vol->cluster_size_bits;
 				start_lcn = end_lcn-1;
 			}
 		}
@@ -364,8 +368,13 @@ int ntfs_ioctl(ntfs_inode *ni, int cmd, void *arg __attribute__((unused)),
 	case FITRIM:
 		if (!ni || !data)
 			ret = -EINVAL;
-		else
-			ret = fstrim(ni->vol, data);
+		else {
+			u64 trimmed;
+			struct fstrim_range *range = (struct fstrim_range*)data;
+
+			ret = fstrim(ni->vol, data, &trimmed);
+			range->len = trimmed;
+		}
 		break;
 #else
 #warning Trimming not supported : FITRIM or BLKDISCARD not defined
