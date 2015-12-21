@@ -358,7 +358,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 				VOL_INF(val)->minor_ver);
 		i = VOL_INF(val)->flags;
 #undef VOL_INF
-		printf("Volume flags = 0x%x: ", i);
+		printf("Volume flags = 0x%x: ", le16_to_cpu(i));
 		if (!i) {
 			printf("NONE\n");
 			return;
@@ -776,7 +776,7 @@ int main(int argc, char **argv)
 	err = ntfs_attr_truncate(na, new_len);
 	if (err)
 		err_exit("Failed to truncate attribute 0x%x: %s\n",
-				(unsigned int)attr_type, strerror(errno));
+				(unsigned int)le32_to_cpu(attr_type), strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		ntfs_log_verbose("Dumping mft record after calling "

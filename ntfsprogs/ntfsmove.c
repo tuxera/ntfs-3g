@@ -830,7 +830,7 @@ static s64 move_file(ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
 
 	while ((rec = find_attribute(AT_UNUSED, ctx))) {
 		utils_attr_get_name(vol, rec, buffer, MAX_PATH);
-		ntfs_log_info("\tAttribute 0x%02x %s is ", rec->type, buffer);
+		ntfs_log_info("\tAttribute 0x%02x %s is ", le32_to_cpu(rec->type), buffer);
 
 		if (rec->non_resident) {
 			ntfs_log_info("non-resident.   Moving it.\n");

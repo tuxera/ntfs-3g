@@ -458,11 +458,11 @@ ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 	}
 
 	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
-		ntfs_log_debug("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
+		ntfs_log_debug("find_attribute didn't find an attribute of type: 0x%02x.\n", le32_to_cpu(type));
 		return NULL;	/* None / no more of that type */
 	}
 
-	ntfs_log_debug("find_attribute found an attribute of type: 0x%02x.\n", type);
+	ntfs_log_debug("find_attribute found an attribute of type: 0x%02x.\n", le32_to_cpu(type));
 	return ctx->attr;
 }
 
@@ -499,9 +499,9 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
 	rec = find_attribute(type, ctx);
 	ntfs_attr_put_search_ctx(ctx);
 	if (rec)
-		ntfs_log_debug("find_first_attribute: found attr of type 0x%02x.\n", type);
+		ntfs_log_debug("find_first_attribute: found attr of type 0x%02x.\n", le32_to_cpu(type));
 	else
-		ntfs_log_debug("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
+		ntfs_log_debug("find_first_attribute: didn't find attr of type 0x%02x.\n", le32_to_cpu(type));
 	return rec;
 }
 
@@ -659,7 +659,7 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 		}
 		len = snprintf(buffer, bufsize, "%s", name);
 	} else {
-		ntfs_log_error("Unknown attribute type 0x%02x\n", attr->type);
+		ntfs_log_error("Unknown attribute type 0x%02x\n", le32_to_cpu(attr->type));
 		len = snprintf(buffer, bufsize, "<UNKNOWN>");
 	}
 

@@ -394,7 +394,7 @@ static void print_inode_ni(ntfs_inode *ni)
 
 static void print_attribute_type(ATTR_TYPES atype)
 {
-	printf("attribute 0x%x", atype);
+	printf("attribute 0x%x", le32_to_cpu(atype));
 }
 
 static void print_attribute_name(char *name)
@@ -781,7 +781,7 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 		print_attribute_ctx(ctx);
 		printf("record %llu lowest_vcn %lld:    SKIPPED\n",
 			(unsigned long long)ctx->ntfs_ino->mft_no,
-			(long long)ctx->attr->lowest_vcn);
+			(long long)sle64_to_cpu(ctx->attr->lowest_vcn));
 	}
 
 	return 0;

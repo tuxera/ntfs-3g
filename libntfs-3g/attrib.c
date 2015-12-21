@@ -96,7 +96,7 @@ static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 		na->ni->flags |= flag;
 	else
 		ntfs_log_trace("Denied setting flag %d for not unnamed data "
-			       "attribute\n", flag);
+			       "attribute\n", le32_to_cpu(flag));
 }
 
 static void NAttrClearFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
@@ -405,7 +405,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	le16 cs;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x.\n",
-		       (unsigned long long)ni->mft_no, type);
+		       (unsigned long long)ni->mft_no, le32_to_cpu(type));
 	
 	if (!ni || !ni->vol || !ni->mrec) {
 		errno = EINVAL;
@@ -484,7 +484,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		errno = EIO;
 		ntfs_log_perror("Inode %lld has corrupt attribute flags "
 				"(0x%x <> 0x%x)",(unsigned long long)ni->mft_no,
-				a->flags, na->ni->flags);
+				le16_to_cpu(a->flags), le32_to_cpu(na->ni->flags));
 		goto put_err_out;
 	}
 
@@ -494,7 +494,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 			errno = EIO;
 			ntfs_log_perror("Compressed inode %lld attr 0x%x has "
 					"no compression unit",
-					(unsigned long long)ni->mft_no, type);
+					(unsigned long long)ni->mft_no, le32_to_cpu(type));
 			goto put_err_out;
 		}
 		ntfs_attr_init(na, TRUE, a->flags,
@@ -561,7 +561,7 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 	ntfs_attr_search_ctx *ctx;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, vcn 0x%llx.\n",
-		(unsigned long long)na->ni->mft_no, na->type, (long long)vcn);
+		(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type), (long long)vcn);
 
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
 	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
@@ -704,7 +704,7 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 	int not_mapped;
 
 	ntfs_log_enter("Entering for inode %llu, attr 0x%x.\n",
-		       (unsigned long long)na->ni->mft_no, na->type);
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type));
 
 		/* avoid multiple full runlist mappings */
 	if (NAttrFullyMapped(na)) {
@@ -831,7 +831,7 @@ LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn)
 		return (LCN)LCN_EINVAL;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+			long)na->ni->mft_no, le32_to_cpu(na->type));
 retry:
 	/* Convert vcn to lcn. If that fails map the runlist and retry once. */
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
@@ -883,7 +883,7 @@ runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn)
 	}
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, vcn %llx\n",
-		       (unsigned long long)na->ni->mft_no, na->type,
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 		       (long long)vcn);
 retry:
 	rl = na->rl;
@@ -1176,7 +1176,7 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	
 	ntfs_log_enter("Entering for inode %lld attr 0x%x pos %lld count "
 		       "%lld\n", (unsigned long long)na->ni->mft_no,
-		       na->type, (long long)pos, (long long)count);
+		       le32_to_cpu(na->type), (long long)pos, (long long)count);
 
 	ret = ntfs_attr_pread_i(na, pos, count, b);
 	
@@ -1800,7 +1800,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	BOOL compressed;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
-		       "0x%llx.\n", (long long)na->ni->mft_no, na->type,
+		       "0x%llx.\n", (long long)na->ni->mft_no, le32_to_cpu(na->type),
 		       (long long)pos, (long long)count);
 	
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
@@ -2349,7 +2349,7 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	BOOL compressed;
 
 	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x.\n",
-			na->ni->mft_no, na->type);
+			na->ni->mft_no, le32_to_cpu(na->type));
 	
 	if (!na || !na->ni || !na->ni->vol) {
 		errno = EINVAL;
@@ -2568,7 +2568,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	BOOL warn;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
-			(unsigned long long)na->ni->mft_no, na->type,
+			(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 			(long long)pos);
 	if (bk_cnt < 0 || bk_size % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
@@ -2624,7 +2624,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	s64 written, i;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
-			(unsigned long long)na->ni->mft_no, na->type,
+			(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 			(long long)pos);
 	if (bk_cnt < 0 || bk_size % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
@@ -2742,7 +2742,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	ntfschar *upcase;
 	u32 upcase_len;
 
-	ntfs_log_trace("attribute type 0x%x.\n", type);
+	ntfs_log_trace("attribute type 0x%x.\n", le32_to_cpu(type));
 
 	if (ctx->ntfs_ino) {
 		vol = ctx->ntfs_ino->vol;
@@ -2967,7 +2967,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
 	ntfs_log_trace("Entering for inode %lld, attribute type 0x%x.\n",
-			(unsigned long long)ni->mft_no, type);
+			(unsigned long long)ni->mft_no, le32_to_cpu(type));
 	if (!base_ni) {
 		/* First call happens with the base mft record. */
 		base_ni = ctx->base_ntfs_ino = ctx->ntfs_ino;
@@ -3350,7 +3350,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 	ntfs_inode *base_ni;
 	int ret = -1;
 
-	ntfs_log_enter("Entering for attribute type 0x%x\n", type);
+	ntfs_log_enter("Entering for attribute type 0x%x\n", le32_to_cpu(type));
 	
 	if (!ctx || !ctx->mrec || !ctx->attr || (name && name != AT_UNNAMED &&
 			(!ctx->ntfs_ino || !(vol = ctx->ntfs_ino->vol) ||
@@ -3518,7 +3518,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 
 	if (!vol || !vol->attrdef || !type) {
 		errno = EINVAL;
-		ntfs_log_perror("%s: type=%d", __FUNCTION__, type);
+		ntfs_log_perror("%s: type=%d", __FUNCTION__, le32_to_cpu(type));
 		return NULL;
 	}
 	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
@@ -3533,7 +3533,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		break;
 	}
 	errno = ENOENT;
-	ntfs_log_perror("%s: type=%d", __FUNCTION__, type);
+	ntfs_log_perror("%s: type=%d", __FUNCTION__, le32_to_cpu(type));
 	return NULL;
 }
 
@@ -3594,7 +3594,7 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	    ((max_size > 0) && (size > max_size))) {
 		errno = ERANGE;
 		ntfs_log_perror("Attr type %d size check failed (min,size,max="
-			"%lld,%lld,%lld)", type, (long long)min_size,
+			"%lld,%lld,%lld)", le32_to_cpu(type), (long long)min_size,
 			(long long)size, (long long)max_size);
 		return -1;
 	}
@@ -3774,7 +3774,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_inode *base_ni;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, flags 0x%x.\n",
-		(long long) ni->mft_no, (unsigned) type, (unsigned) data_flags);
+		(long long) ni->mft_no, (unsigned) le32_to_cpu(type), (unsigned) le16_to_cpu(data_flags));
 
 	if (!ni || (!name && name_len)) {
 		errno = EINVAL;
@@ -3907,8 +3907,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
 			"dataruns_size %d, flags 0x%x.\n",
-			(long long) ni->mft_no, (unsigned) type,
-			(long long) lowest_vcn, dataruns_size, (unsigned) flags);
+			(long long) ni->mft_no, (unsigned) le32_to_cpu(type),
+			(long long) lowest_vcn, dataruns_size, (unsigned) le16_to_cpu(flags));
 
 	if (!ni || dataruns_size <= 0 || (!name && name_len)) {
 		errno = EINVAL;
@@ -3935,7 +3935,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (!ntfs_attr_find(type, name, name_len, CASE_SENSITIVE, NULL, 0,
 			ctx)) {
 		err = EEXIST;
-		ntfs_log_perror("Attribute 0x%x already present", type);
+		ntfs_log_perror("Attribute 0x%x already present", le32_to_cpu(type));
 		goto put_err_out;
 	}
 	if (errno != ENOENT) {
@@ -4196,7 +4196,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	ntfs_log_trace("Entering for inode %lld, attr %x, size %lld.\n",
-			(long long)ni->mft_no, type, (long long)size);
+			(long long)ni->mft_no, le32_to_cpu(type), (long long)size);
 
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
@@ -4418,7 +4418,7 @@ int ntfs_attr_rm(ntfs_attr *na)
 	}
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n",
-		(long long) na->ni->mft_no, na->type);
+		(long long) na->ni->mft_no, le32_to_cpu(na->type));
 
 	/* Free cluster allocation. */
 	if (NAttrNonResident(na)) {
@@ -4766,7 +4766,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	int mp_size, mp_ofs, name_ofs, arec_size, err;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+			long)na->ni->mft_no, le32_to_cpu(na->type));
 
 	/* Some preliminary sanity checking. */
 	if (NAttrNonResident(na)) {
@@ -4960,7 +4960,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 	int err, ret = STATUS_ERROR;
 
 	ntfs_log_trace("Inode 0x%llx attr 0x%x new size %lld\n", 
-		       (unsigned long long)na->ni->mft_no, na->type, 
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 		       (long long)newsize);
 
 	/* Get the attribute record that needs modification. */
@@ -5263,7 +5263,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	s64 arec_size, bytes_read;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+			long)na->ni->mft_no, le32_to_cpu(na->type));
 
 	/* Should be called for the first extent of the attribute. */
 	if (sle64_to_cpu(a->lowest_vcn)) {
@@ -5425,7 +5425,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	int sparse, ret = 0;
 	
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x\n", 
-		       (unsigned long long)na->ni->mft_no, na->type);
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type));
 	
 	if (a->lowest_vcn)
 		goto out;
@@ -5568,7 +5568,7 @@ retry:
 	}
 
 	ntfs_log_trace("Entering for inode %llu, attr 0x%x\n", 
-		       (unsigned long long)na->ni->mft_no, na->type);
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type));
 
 	if (!NAttrNonResident(na)) {
 		errno = EINVAL;
@@ -5997,7 +5997,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	int err;
 
 	ntfs_log_trace("Inode 0x%llx attr 0x%x new size %lld\n", (unsigned long long)
-		       na->ni->mft_no, na->type, (long long)newsize);
+		       na->ni->mft_no, le32_to_cpu(na->type), (long long)newsize);
 
 	vol = na->ni->vol;
 
@@ -6155,7 +6155,7 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 	int err;
 
 	ntfs_log_trace("Inode %lld, attr 0x%x, new size %lld old size %lld\n",
-			(unsigned long long)na->ni->mft_no, na->type,
+			(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 			(long long)newsize, (long long)na->data_size);
 
 	vol = na->ni->vol;
@@ -6426,7 +6426,7 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
 	}
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x, size %lld\n",
-		       (unsigned long long)na->ni->mft_no, na->type, 
+		       (unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 		       (long long)newsize);
 
 	if (na->data_size == newsize) {
@@ -6811,7 +6811,7 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 			/* do not log removal of non-existent stream */
 		if (type != AT_DATA) {
 			ntfs_log_perror("Failed to open attribute 0x%02x of inode "
-				"0x%llx", type, (unsigned long long)ni->mft_no);
+				"0x%llx", le32_to_cpu(type), (unsigned long long)ni->mft_no);
 		}
 		return -1;
 	}
@@ -6819,7 +6819,7 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	ret = ntfs_attr_rm(na);
 	if (ret)
 		ntfs_log_perror("Failed to remove attribute 0x%02x of inode "
-				"0x%llx", type, (unsigned long long)ni->mft_no);
+				"0x%llx", le32_to_cpu(type), (unsigned long long)ni->mft_no);
 	ntfs_attr_close(na);
 	
 	return ret;
