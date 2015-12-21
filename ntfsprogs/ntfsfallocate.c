@@ -704,14 +704,14 @@ static int ntfs_full_allocation(ntfs_attr *na, ntfs_attr_search_ctx *ctx,
 		} else {
 				/* Feed the sizes into the attribute */
 			attr = ctx->attr;
-			attr->data_size = cpu_to_le64(na->data_size);
+			attr->data_size = cpu_to_sle64(na->data_size);
 			attr->initialized_size
-				= cpu_to_le64(na->initialized_size);
+				= cpu_to_sle64(na->initialized_size);
 			attr->allocated_size
-				= cpu_to_le64(na->allocated_size);
+				= cpu_to_sle64(na->allocated_size);
 			if (na->data_flags & ATTR_IS_SPARSE)
 				attr->compressed_size
-					= cpu_to_le64(na->compressed_size);
+					= cpu_to_sle64(na->compressed_size);
 			/* Copy the unnamed data attribute sizes to inode */
 			if ((attr_type == AT_DATA) && !attr_name_len) {
 				ni = na->ni;

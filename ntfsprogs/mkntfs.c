@@ -1552,7 +1552,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
-	a->lowest_vcn = const_cpu_to_le64(0);
+	a->lowest_vcn = const_cpu_to_sle64(0);
 	a->highest_vcn = cpu_to_sle64(highest_vcn - 1LL);
 	a->mapping_pairs_offset = cpu_to_le16(hdr_size + ((name_len + 7) & ~7));
 	memset(a->reserved1, 0, sizeof(a->reserved1));
@@ -1571,7 +1571,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		a->compression_unit = 4;
 		inited_size = val_len;
 		/* FIXME: Set the compressed size. */
-		a->compressed_size = const_cpu_to_le64(0);
+		a->compressed_size = const_cpu_to_sle64(0);
 		/* FIXME: Write out the compressed data. */
 		/* FIXME: err = build_mapping_pairs_compressed(); */
 		err = -EOPNOTSUPP;
@@ -1745,7 +1745,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
-	a->lowest_vcn = const_cpu_to_le64(0);
+	a->lowest_vcn = const_cpu_to_sle64(0);
 	for (i = 0; rl[i].length; i++)
 		;
 	a->highest_vcn = cpu_to_sle64(rl[i].vcn - 1);
@@ -1767,7 +1767,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		}
 		a->compression_unit = 4;
 		/* FIXME: Set the compressed size. */
-		a->compressed_size = const_cpu_to_le64(0);
+		a->compressed_size = const_cpu_to_sle64(0);
 		/* FIXME: Write out the compressed data. */
 		/* FIXME: err = build_mapping_pairs_compressed(); */
 		err = -EOPNOTSUPP;
@@ -2497,8 +2497,8 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	/* Set USN to 1. */
 	*(le16*)((char*)ia_val + le16_to_cpu(ia_val->usa_ofs)) =
 			const_cpu_to_le16(1);
-	ia_val->lsn = const_cpu_to_le64(0);
-	ia_val->index_block_vcn = const_cpu_to_le64(0);
+	ia_val->lsn = const_cpu_to_sle64(0);
+	ia_val->index_block_vcn = const_cpu_to_sle64(0);
 	ia_val->index.ih_flags = LEAF_NODE;
 	/* Align to 8-byte boundary. */
 	ia_val->index.entries_offset = cpu_to_le32((sizeof(INDEX_HEADER) +
@@ -2541,7 +2541,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	}
 	/* Set VCN pointer to 0LL. */
 	*(leVCN*)((char*)re + cpu_to_le16(re->length) - sizeof(VCN)) =
-			const_cpu_to_le64(0);
+			const_cpu_to_sle64(0);
 	err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)ia_val, index_block_size);
 	if (err) {
 		err = -errno;
@@ -2932,7 +2932,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q1_data->change_time = mkntfs_time();
 	idx_entry_q1_data->threshold = const_cpu_to_sle64(-1);
 	idx_entry_q1_data->limit = const_cpu_to_sle64(-1);
-	idx_entry_q1_data->exceeded_time = const_cpu_to_le64(0);
+	idx_entry_q1_data->exceeded_time = const_cpu_to_sle64(0);
 	err = insert_index_entry_in_res_dir_index(idx_entry_q1, q1_size, m,
 			NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q1);
@@ -2959,7 +2959,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2_data->change_time = mkntfs_time();
 	idx_entry_q2_data->threshold = const_cpu_to_sle64(-1);
 	idx_entry_q2_data->limit = const_cpu_to_sle64(-1);
-	idx_entry_q2_data->exceeded_time = const_cpu_to_le64(0);
+	idx_entry_q2_data->exceeded_time = const_cpu_to_sle64(0);
 	idx_entry_q2_data->sid.revision = 1;
 	idx_entry_q2_data->sid.sub_authority_count = 2;
 	for (i = 0; i < 5; i++)
@@ -4965,7 +4965,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		goto done;
 	}
 	/* Initialize the random number generator with the current time. */
-	srandom(le64_to_cpu(mkntfs_time())/10000000);
+	srandom(sle64_to_cpu(mkntfs_time())/10000000);
 	/* Allocate and initialize ntfs_volume structure g_vol. */
 	g_vol = ntfs_volume_alloc();
 	if (!g_vol) {

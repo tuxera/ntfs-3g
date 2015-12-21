@@ -638,7 +638,7 @@ static void dump_mft_record(MFT_RECORD *m)
 	printf("Update sequence array offset = %u (0x%x)\n", u, u);
 	printf("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
 	printf("$LogFile sequence number (lsn) = %llu\n",
-			(unsigned long long)le64_to_cpu(m->lsn));
+			(unsigned long long)sle64_to_cpu(m->lsn));
 	printf("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
 	printf("Reference (hard link) count = %u\n",
 						le16_to_cpu(m->link_count));

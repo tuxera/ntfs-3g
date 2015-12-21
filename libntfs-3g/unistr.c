@@ -244,7 +244,7 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
  */
 int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 {
-	ntfschar c1, c2;
+	u16 c1, c2;
 	size_t i;
 
 #ifdef DEBUG

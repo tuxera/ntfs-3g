@@ -372,8 +372,8 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 				"Thank you.\n", NTFS_DEV_LIST);
 	}
 	/* Set the update sequence number to 1. */
-	*(u16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = const_cpu_to_le16(1);
-	mrec->lsn = const_cpu_to_le64(0ull);
+	*(le16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = const_cpu_to_le16(1);
+	mrec->lsn = const_cpu_to_sle64(0ll);
 	mrec->sequence_number = const_cpu_to_le16(1);
 	mrec->link_count = const_cpu_to_le16(0);
 	/* Aligned to 8-byte boundary. */
@@ -1510,7 +1510,7 @@ found_free_rec:
 	ntfs_inode_mark_dirty(ni);
 	/* Initialize time, allocated and data size in ntfs_inode struct. */
 	ni->data_size = ni->allocated_size = 0;
-	ni->flags = 0;
+	ni->flags = const_cpu_to_le32(0);
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
 			ni->last_access_time = ntfs_current_time();
@@ -1814,7 +1814,7 @@ found_free_rec:
 	ntfs_inode_mark_dirty(ni);
 	/* Initialize time, allocated and data size in ntfs_inode struct. */
 	ni->data_size = ni->allocated_size = 0;
-	ni->flags = 0;
+	ni->flags = const_cpu_to_le32(0);
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
 			ni->last_access_time = ntfs_current_time();

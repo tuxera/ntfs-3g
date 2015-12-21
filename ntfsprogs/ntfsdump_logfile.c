@@ -542,11 +542,11 @@ static void dump_log_record(LOG_RECORD *lr)
 {
 	unsigned int i;
 	ntfs_log_info("this lsn = 0x%llx\n",
-			(unsigned long long)le64_to_cpu(lr->this_lsn));
+			(unsigned long long)sle64_to_cpu(lr->this_lsn));
 	ntfs_log_info("client previous lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(lr->client_previous_lsn));
+			sle64_to_cpu(lr->client_previous_lsn));
 	ntfs_log_info("client undo next lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(lr->client_undo_next_lsn));
+			sle64_to_cpu(lr->client_undo_next_lsn));
 	ntfs_log_info("client data length = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->client_data_length));
 	ntfs_log_info("client_id.seq_number = 0x%x\n",
@@ -628,14 +628,14 @@ rcrd_pass_loc:
 			"CHKD");
 // TODO: I am here... (AIA)
 	ntfs_log_info("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->copy.last_lsn));
+			sle64_to_cpu(rcrd->copy.last_lsn));
 	ntfs_log_info("flags = 0x%x\n", (unsigned int)le32_to_cpu(rcrd->flags));
 	ntfs_log_info("page count = %i\n", le16_to_cpu(rcrd->page_count));
 	ntfs_log_info("page position = %i\n", le16_to_cpu(rcrd->page_position));
 	ntfs_log_info("header.next_record_offset = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->header.packed.next_record_offset));
 	ntfs_log_info("header.last_end_lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->header.packed.last_end_lsn));
+			sle64_to_cpu(rcrd->header.packed.last_end_lsn));
 	/*
 	 * Where does the 0x40 come from? Is it just usa_offset +
 	 * usa_client * 2 + 7 & ~7 or is it derived from somewhere?

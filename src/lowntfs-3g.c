@@ -270,10 +270,10 @@ static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
 	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
-			(le64_to_cpu(ni->last_access_time)
-				>= le64_to_cpu(ni->last_data_change_time)) &&
-			(le64_to_cpu(ni->last_access_time)
-				>= le64_to_cpu(ni->last_mft_change_time)))
+			(sle64_to_cpu(ni->last_access_time)
+				>= sle64_to_cpu(ni->last_data_change_time)) &&
+			(sle64_to_cpu(ni->last_access_time)
+				>= sle64_to_cpu(ni->last_mft_change_time)))
 		return;
 	ntfs_inode_update_times(ni, mask);
 }
@@ -1416,8 +1416,8 @@ static void ntfs_fuse_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	res = total;
 	if ((res > 0)
 	    && (!ctx->dmtime
-		|| (le64_to_cpu(ntfs_current_time())
-		     - le64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
+		|| (sle64_to_cpu(ntfs_current_time())
+		     - sle64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)

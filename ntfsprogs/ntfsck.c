@@ -247,7 +247,7 @@ static BOOL verify_boot_sector(struct ntfs_device *dev, ntfs_volume *rawvol)
  *
  * Assumes dev is open.
  */
-static runlist *load_runlist(ntfs_volume *rawvol, s64 offset_to_file_record, u32 attr_type, u32 size_of_file_record)
+static runlist *load_runlist(ntfs_volume *rawvol, s64 offset_to_file_record, ATTR_TYPES attr_type, u32 size_of_file_record)
 {
 	u8 *buf;
 	u16 attrs_offset;
@@ -789,7 +789,7 @@ static void check_volume(ntfs_volume *vol)
 
 static int reset_dirty(ntfs_volume *vol)
 {
-	u16 flags;
+	le16 flags;
 
 	if (!(vol->flags | VOLUME_IS_DIRTY))
 		return 0;

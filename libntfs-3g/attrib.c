@@ -452,7 +452,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	 * does not detect or fix them so we need to cope with it, too.
 	 */
 	if (type == AT_ATTRIBUTE_LIST)
-		a->flags = 0;
+		a->flags = const_cpu_to_le16(0);
 
 	if ((type == AT_DATA)
 	   && (a->non_resident ? !a->initialized_size : !a->value_length)) {
@@ -643,7 +643,7 @@ static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
 				rl = na->rl;
 			if (rl) {
 				na->rl = rl;
-				highest_vcn = le64_to_cpu(a->highest_vcn);
+				highest_vcn = sle64_to_cpu(a->highest_vcn);
 				if (highest_vcn < needed) {
 				/* corruption detection on unchanged runlists */
 					if (newrunlist
@@ -1040,7 +1040,7 @@ res_err_out:
 				count--;
 				total2++;
 			} else {
-				*(u16*)((u8*)b+count-2) = cpu_to_le16(efs_padding_length);
+				*(le16*)((u8*)b+count-2) = cpu_to_le16(efs_padding_length);
 				count -= 2;
 				total2 +=2;
 			}
@@ -3975,9 +3975,9 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	/* If @lowest_vcn == 0, than setup empty attribute. */
 	if (!lowest_vcn) {
 		a->highest_vcn = const_cpu_to_sle64(-1);
-		a->allocated_size = 0;
-		a->data_size = 0;
-		a->initialized_size = 0;
+		a->allocated_size = const_cpu_to_sle64(0);
+		a->data_size = const_cpu_to_sle64(0);
+		a->initialized_size = const_cpu_to_sle64(0);
 		/* Set empty mapping pairs. */
 		*((u8*)a + le16_to_cpu(a->mapping_pairs_offset)) = 0;
 	}
@@ -4891,7 +4891,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	if ((a->flags & ATTR_COMPRESSION_MASK) == ATTR_IS_COMPRESSED) {
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
-		a->compressed_size = const_cpu_to_le64(0);
+		a->compressed_size = const_cpu_to_sle64(0);
 	} else {
 		a->compression_unit = 0;
 		a->flags &= ~ATTR_COMPRESSION_MASK;
@@ -5337,7 +5337,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/* Convert the attribute record to describe a resident attribute. */
 	a->non_resident = 0;
-	a->flags = 0;
+	a->flags = const_cpu_to_le16(0);
 	a->value_length = cpu_to_le32(na->data_size);
 	a->value_offset = cpu_to_le16(val_ofs);
 	/*
@@ -6762,7 +6762,7 @@ int ntfs_attr_shrink_size(ntfs_inode *ni, ntfschar *stream_name,
 
 			if (a->non_resident
 			    && (sle64_to_cpu(a->initialized_size) > offset)) {
-				a->initialized_size = cpu_to_le64(offset);
+				a->initialized_size = cpu_to_sle64(offset);
 				a->data_size = a->initialized_size;
 			}
 			res = 0;

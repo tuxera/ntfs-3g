@@ -1953,12 +1953,12 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 					}
 				}
 			}
-			ctx->attr->lowest_vcn = const_cpu_to_le64(0);
-			ctx->attr->highest_vcn = const_cpu_to_le64(0);
-			ctx->attr->allocated_size = const_cpu_to_le64(0);
-			ctx->attr->data_size = const_cpu_to_le64(0);
-			ctx->attr->initialized_size = const_cpu_to_le64(0);
-			ctx->attr->compressed_size = const_cpu_to_le64(0);
+			ctx->attr->lowest_vcn = const_cpu_to_sle64(0);
+			ctx->attr->highest_vcn = const_cpu_to_sle64(0);
+			ctx->attr->allocated_size = const_cpu_to_sle64(0);
+			ctx->attr->data_size = const_cpu_to_sle64(0);
+			ctx->attr->initialized_size = const_cpu_to_sle64(0);
+			ctx->attr->compressed_size = const_cpu_to_sle64(0);
 			if (!opts.noaction) {
 				if (ntfs_mft_records_write(nv,
 					MK_MREF (record, 0),

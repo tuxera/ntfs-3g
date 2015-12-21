@@ -191,9 +191,9 @@ void ntfs_index_ctx_reinit(ntfs_index_context *icx)
 	};
 }
 
-static VCN *ntfs_ie_get_vcn_addr(INDEX_ENTRY *ie)
+static leVCN *ntfs_ie_get_vcn_addr(INDEX_ENTRY *ie)
 {
-	return (VCN *)((u8 *)ie + le16_to_cpu(ie->length) - sizeof(VCN));
+	return (leVCN *)((u8 *)ie + le16_to_cpu(ie->length) - sizeof(leVCN));
 }
 
 /**
@@ -338,7 +338,7 @@ static void ntfs_ie_delete(INDEX_HEADER *ih, INDEX_ENTRY *ie)
 
 static void ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn)
 {
-	*ntfs_ie_get_vcn_addr(ie) = cpu_to_le64(vcn);
+	*ntfs_ie_get_vcn_addr(ie) = cpu_to_sle64(vcn);
 }
 
 /**
@@ -814,14 +814,14 @@ static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, u32 ib_size,
 	ib->usa_ofs = const_cpu_to_le16(sizeof(INDEX_BLOCK));
 	ib->usa_count = cpu_to_le16(ib_size / NTFS_BLOCK_SIZE + 1);
 	/* Set USN to 1 */
-	*(u16 *)((char *)ib + le16_to_cpu(ib->usa_ofs)) = const_cpu_to_le16(1);
-	ib->lsn = const_cpu_to_le64(0);
+	*(le16 *)((char *)ib + le16_to_cpu(ib->usa_ofs)) = const_cpu_to_le16(1);
+	ib->lsn = const_cpu_to_sle64(0);
 	
 	ib->index_block_vcn = cpu_to_sle64(ib_vcn);
 	
 	ib->index.entries_offset = cpu_to_le32((ih_size +
 			le16_to_cpu(ib->usa_count) * 2 + 7) & ~7);
-	ib->index.index_length = 0;
+	ib->index.index_length = const_cpu_to_le32(0);
 	ib->index.allocated_size = cpu_to_le32(ib_size - 
 					       (sizeof(INDEX_BLOCK) - ih_size));
 	ib->index.ih_flags = node_type;
@@ -2042,7 +2042,7 @@ static INDEX_ENTRY *ntfs_index_walk_up(INDEX_ENTRY *ie,
 INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
 {
 	INDEX_ENTRY *next;
-	int flags;
+	le16 flags;
 
 			/*
                          * lookup() may have returned an invalid node

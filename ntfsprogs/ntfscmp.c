@@ -830,7 +830,7 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 	int old_ret1, ret1 = 0, ret2 = 0;
 	int errno1 = 0, errno2 = 0;
 	char  *prev_name = NULL, *name1 = NULL, *name2 = NULL;
-	ATTR_TYPES old_atype1, prev_atype = 0, atype1, atype2;
+	ATTR_TYPES old_atype1, prev_atype = const_cpu_to_le32(0), atype1, atype2;
 	ntfs_attr_search_ctx *ctx1, *ctx2;
 
 	if (!(ctx1 = attr_get_search_ctx(ni1)))

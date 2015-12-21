@@ -1412,7 +1412,7 @@ static void replace_later(ntfs_resize_t *resize, runlist *rl, runlist *head_rl)
 		delayed->type = a->type;
 		delayed->attr_name = attr_name;
 		delayed->name_len = name_len;
-		delayed->lowest_vcn = le64_to_cpu(a->lowest_vcn);
+		delayed->lowest_vcn = sle64_to_cpu(a->lowest_vcn);
 		delayed->rl = rl;
 		delayed->head_rl = head_rl;
 		delayed->next = resize->delayed_runlists;
@@ -2058,7 +2058,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	s64 nr_mft_records;
 	MFT_REF mref;
 	VCN highest_vcn;
-	u64 length;
+	s64 length;
 
 	printf("Relocating needed data ...\n");
 
@@ -2103,11 +2103,11 @@ static void relocate_inodes(ntfs_resize_t *resize)
 		while (!ntfs_attrs_walk(resize->ctx)
 		   && (resize->ctx->attr->type != AT_DATA)) { }
 		if (resize->ctx->attr->type == AT_DATA) {
-			le64 high_le;
+			sle64 high_le;
 
 			high_le = resize->ctx->attr->highest_vcn;
-			if (le64_to_cpu(high_le) < length)
-				length = le64_to_cpu(high_le) + 1;
+			if (sle64_to_cpu(high_le) < length)
+				length = sle64_to_cpu(high_le) + 1;
 		} else {
 			err_exit("Could not find the DATA of MFT\n");
 		}
@@ -3064,7 +3064,7 @@ static s64 get_data_size(expand_t *expand, s64 inum)
 			/* get the size of unnamed $DATA */
 	a = get_unnamed_attr(expand, AT_DATA, inum);
 	if (a && a->non_resident)
-		size = le64_to_cpu(a->allocated_size);
+		size = sle64_to_cpu(a->allocated_size);
 	if (!size) {
 		err_printf("Bad record %lld, could not get its size\n",
 					(long long)inum);
@@ -3092,7 +3092,7 @@ static u8 *get_mft_bitmap(expand_t *expand)
 			/* get the runlist of unnamed bitmap */
 	a = get_unnamed_attr(expand, AT_BITMAP, FILE_MFT);
 	ok = TRUE;
-	bitmap_size = le64_to_cpu(a->allocated_size);
+	bitmap_size = sle64_to_cpu(a->allocated_size);
 	if (a
 	    && a->non_resident
 	    && ((bitmap_size << (vol->mft_record_size_bits + 3))
@@ -3615,10 +3615,10 @@ static int copy_boot(expand_t *expand)
 	if (buf) {
 			/* set the new volume parameters in the bootsector */
 		bs = (NTFS_BOOT_SECTOR*)expand->bootsector;
-		bs->number_of_sectors = cpu_to_le64(expand->new_sectors);
-		bs->mft_lcn = cpu_to_le64(expand->mft_lcn);
+		bs->number_of_sectors = cpu_to_sle64(expand->new_sectors);
+		bs->mft_lcn = cpu_to_sle64(expand->mft_lcn);
 		mftmirr_lcn = vol->mftmirr_lcn + expand->cluster_increment;
-		bs->mftmirr_lcn = cpu_to_le64(mftmirr_lcn);
+		bs->mftmirr_lcn = cpu_to_sle64(mftmirr_lcn);
 			/* the hidden sectors are needed to boot into windows */
 		memcpy(&hidden_sectors_le,&bs->bpb.hidden_sectors,4);
 				/* alignment messed up on the Sparc */
@@ -3984,11 +3984,11 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 					rl[1].length = 0;
 					if (set_bitmap(expand,rl))
 						res = -1;
-					a->data_size = cpu_to_le64(data_size);
+					a->data_size = cpu_to_sle64(data_size);
 					a->initialized_size = a->data_size;
 					a->allocated_size
-						= cpu_to_le64(allocated_size);
-					a->highest_vcn = cpu_to_le64(lth - 1);
+						= cpu_to_sle64(allocated_size);
+					a->highest_vcn = cpu_to_sle64(lth - 1);
 				}
 				/* expand the named data for $BadClus */
 				if ((a->type == AT_DATA)
@@ -4004,11 +4004,11 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 						prl[1].vcn = lth;
 					} else
 						prl->vcn = lth;
-					a->data_size = cpu_to_le64(data_size);
+					a->data_size = cpu_to_sle64(data_size);
 					/* do not change the initialized size */
 					a->allocated_size
-						= cpu_to_le64(allocated_size);
-					a->highest_vcn = cpu_to_le64(lth - 1);
+						= cpu_to_sle64(allocated_size);
+					a->highest_vcn = cpu_to_sle64(lth - 1);
 				}
 				if (!res && update_runlist(expand,inum,a,rl))
 					res = -1;
@@ -4212,7 +4212,7 @@ static ntfs_volume *get_volume_data(expand_t *expand, struct ntfs_device *dev,
 			    && ntfs_boot_sector_is_ntfs(bs)
 			    && !ntfs_boot_sector_parse(vol, bs)) {
 				expand->original_sectors
-				    = le64_to_cpu(bs->number_of_sectors);
+				    = sle64_to_cpu(bs->number_of_sectors);
 				expand->mrec = (MFT_RECORD*)
 					ntfs_malloc(vol->mft_record_size);
 				if (expand->mrec

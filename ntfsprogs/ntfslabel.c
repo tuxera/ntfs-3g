@@ -299,7 +299,7 @@ static int set_new_serial(ntfs_volume *vol)
 			serial_number = cpu_to_le64(sn);
 		}
 		if (!change_serial(vol, 0, serial_number, bs, oldbs)) {
-			number_of_sectors = le64_to_cpu(bs->number_of_sectors);
+			number_of_sectors = sle64_to_cpu(bs->number_of_sectors);
 			if (!change_serial(vol, number_of_sectors,
 						serial_number, bs, oldbs)) {
 				ntfs_log_info("New serial number : %016llx\n",
@@ -389,7 +389,7 @@ static int change_label(ntfs_volume *vol, char *label)
 				(unsigned)(label_len -
 				(0x100 / sizeof(ntfschar))));
 		label_len = 0x100 / sizeof(ntfschar);
-		label[label_len] = const_cpu_to_le16(0);
+		label[label_len] = 0;
 	}
 
 	if(!opts.noaction)
