@@ -506,10 +506,10 @@ enum {
 				   FILE_EXECUTE 	    |\
 				   SYNCHRONIZE)
 
-#define GENERIC_READ			 cpu_to_le32(0x80000000L)
-#define GENERIC_WRITE			 cpu_to_le32(0x40000000L)
-#define GENERIC_EXECUTE 		 cpu_to_le32(0x20000000L)
-#define GENERIC_ALL	 		 cpu_to_le32(0x10000000L)
+#define GENERIC_READ			 const_cpu_to_le32(0x80000000L)
+#define GENERIC_WRITE			 const_cpu_to_le32(0x40000000L)
+#define GENERIC_EXECUTE 		 const_cpu_to_le32(0x20000000L)
+#define GENERIC_ALL	 		 const_cpu_to_le32(0x10000000L)
 
 
 #define OBJECT_INHERIT_ACE		  (0x1)
