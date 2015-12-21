@@ -3828,7 +3828,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->non_resident = 0;
 	a->name_length = name_len;
 	a->name_offset = (name_len
-		? cpu_to_le16(offsetof(ATTR_RECORD, resident_end))
+		? const_cpu_to_le16(offsetof(ATTR_RECORD, resident_end))
 		: const_cpu_to_le16(0));
 	a->flags = data_flags;
 	a->instance = m->next_attr_instance;
@@ -3974,7 +3974,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 			? STANDARD_COMPRESSION_UNIT : 0;
 	/* If @lowest_vcn == 0, than setup empty attribute. */
 	if (!lowest_vcn) {
-		a->highest_vcn = cpu_to_sle64(-1);
+		a->highest_vcn = const_cpu_to_sle64(-1);
 		a->allocated_size = 0;
 		a->data_size = 0;
 		a->initialized_size = 0;
@@ -4874,7 +4874,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	a->name_offset = cpu_to_le16(name_ofs);
 
 	/* Setup the fields specific to non-resident attributes. */
-	a->lowest_vcn = cpu_to_sle64(0);
+	a->lowest_vcn = const_cpu_to_sle64(0);
 	a->highest_vcn = cpu_to_sle64((new_allocated_size - 1) >>
 						vol->cluster_size_bits);
 

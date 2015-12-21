@@ -806,7 +806,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 		goto err_out;
 	}
 	/* Collect the reparse tag, if any */
-	reparse_tag = cpu_to_le32(0);
+	reparse_tag = const_cpu_to_le32(0);
 	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
 		if (!ntfs_attr_lookup(AT_REPARSE_POINT, NULL,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {

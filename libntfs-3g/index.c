@@ -811,11 +811,11 @@ static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, u32 ib_size,
 		return NULL;
 	
 	ib->magic = magic_INDX;
-	ib->usa_ofs = cpu_to_le16(sizeof(INDEX_BLOCK));
+	ib->usa_ofs = const_cpu_to_le16(sizeof(INDEX_BLOCK));
 	ib->usa_count = cpu_to_le16(ib_size / NTFS_BLOCK_SIZE + 1);
 	/* Set USN to 1 */
-	*(u16 *)((char *)ib + le16_to_cpu(ib->usa_ofs)) = cpu_to_le16(1);
-	ib->lsn = cpu_to_le64(0);
+	*(u16 *)((char *)ib + le16_to_cpu(ib->usa_ofs)) = const_cpu_to_le16(1);
+	ib->lsn = const_cpu_to_le64(0);
 	
 	ib->index_block_vcn = cpu_to_sle64(ib_vcn);
 	
@@ -1160,7 +1160,7 @@ retry :
 	
 	ie = ntfs_ie_get_first(&ir->index);
 	ie->ie_flags |= INDEX_ENTRY_NODE;
-	ie->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN));
+	ie->length = const_cpu_to_le16(sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN));
 	
 	ir->index.ih_flags = LARGE_INDEX;
 	ir->index.index_length = cpu_to_le32(le32_to_cpu(ir->index.entries_offset)

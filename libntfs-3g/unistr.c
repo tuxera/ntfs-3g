@@ -360,7 +360,7 @@ ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
 	dst = ntfs_malloc((len + 1) * sizeof(ntfschar));
 	if (dst) {
 		memcpy(dst, s, len * sizeof(ntfschar));
-		dst[len] = cpu_to_le16(L'\0');
+		dst[len] = const_cpu_to_le16(L'\0');
 	}
 	return dst;
 }
@@ -1050,7 +1050,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 	}
 #endif
 	/* Now write the NULL character. */
-	ucs[o] = cpu_to_le16(L'\0');
+	ucs[o] = const_cpu_to_le16(L'\0');
 	*outs = ucs;
 	return o;
 err_out:

@@ -3072,15 +3072,17 @@ void tryposix(struct POSIX_SECURITY *pxdesc)
 {
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(513)
 		} ;
 
 	char *attr;
@@ -3228,9 +3230,9 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 		pacl = (ACL*)&attr[pos];
 		pacl->revision = ACL_REVISION;
 		pacl->alignment1 = 0;
-		pacl->size = cpu_to_le16(0); /* fixed later */
+		pacl->size = const_cpu_to_le16(0); /* fixed later */
 		pacl->ace_count = cpu_to_le16(cnt);
-		pacl->alignment2 = cpu_to_le16(0);
+		pacl->alignment2 = const_cpu_to_le16(0);
 
 		/* enter the ACEs */
 
@@ -3257,8 +3259,8 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 
 		/* append usid and gsid if defined */
 		/* positions of ACL, USID and GSID into header */
-		pnhead->owner = cpu_to_le32(0);
-		pnhead->group = cpu_to_le32(0);
+		pnhead->owner = const_cpu_to_le32(0);
+		pnhead->group = const_cpu_to_le32(0);
 		if (usid) {
 			memcpy(&attr[pos], usid, usidsz);
 			pnhead->owner = cpu_to_le32(pos);
@@ -3268,13 +3270,14 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 			pnhead->group = cpu_to_le32(pos + usidsz);
 		}
 		/* positions of DACL and SACL into header */
-		pnhead->sacl = cpu_to_le32(0);
+		pnhead->sacl = const_cpu_to_le32(0);
 		if (cnt) {
 			pacl->size = cpu_to_le16(aclsz);
 			pnhead->dacl =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
+				const_cpu_to_le32(sizeof(
+				SECURITY_DESCRIPTOR_RELATIVE));
 		} else
-			pnhead->dacl = cpu_to_le32(0);
+			pnhead->dacl = const_cpu_to_le32(0);
 		if (!ntfs_valid_descr(attr,pos+usidsz+gsidsz)) {
 			printf("** Bad sample descriptor\n");
 			free(attr);
@@ -3309,33 +3312,38 @@ void check_samples()
 #endif
 	le32 owner1[] = /* S-1-5-21-1833069642-4243175381-1340018762-1003 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(1833069642), cpu_to_le32(4243175381),
-		cpu_to_le32(1340018762), cpu_to_le32(1003)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(1833069642),
+		const_cpu_to_le32(4243175381), const_cpu_to_le32(1340018762),
+		const_cpu_to_le32(1003)
 		} ;
 	le32 group1[] = /* S-1-5-21-1833069642-4243175381-1340018762-513 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(1833069642), cpu_to_le32(4243175381),
-		cpu_to_le32(1340018762), cpu_to_le32(513)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(1833069642),
+		const_cpu_to_le32(4243175381), const_cpu_to_le32(1340018762),
+		const_cpu_to_le32(513)
 		} ;
 	le32 group2[] = /* S-1-5-21-1607551490-981732888-1819828000-513 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(1607551490), cpu_to_le32(981732888),
-		cpu_to_le32(1819828000), cpu_to_le32(513)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(1607551490),
+		const_cpu_to_le32(981732888), const_cpu_to_le32(1819828000),
+		const_cpu_to_le32(513)
 		} ;
 	le32 owner3[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(1016)
 		} ;
 	le32 group3[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(513)
 		} ;
 
 #if POSIXACLS
@@ -4169,15 +4177,17 @@ void selftests(void)
 {
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
-		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
+		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
+		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
+		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
+		const_cpu_to_le32(513)
 		} ;
 #if POSIXACLS
 #ifdef STSC

@@ -1011,14 +1011,14 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			rec->magic = magic_FILE;
 			rec->usa_ofs = cpu_to_le16(usa_offset);
 			rec->usa_count = cpu_to_le16((u16) usa_size);
-			rec->sequence_number = cpu_to_le16(0x0001);
+			rec->sequence_number = const_cpu_to_le16(0x0001);
 			rec->attrs_offset = cpu_to_le16(attrs_offset);
 			rec->bytes_in_use = cpu_to_le32(bytes_in_use);
 			rec->bytes_allocated = cpu_to_le32(vol->mft_record_size);
-			rec->next_attr_instance = cpu_to_le16(0x0001);
+			rec->next_attr_instance = const_cpu_to_le16(0x0001);
 
 			// End marker.
-			*((le32*) (((u8*) rec) + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);
+			*((le32*) (((u8*) rec) + attrs_offset)) = const_cpu_to_le32(0xFFFFFFFF);
 		}
 
 		result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
@@ -1795,7 +1795,7 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 				}
 			}
 		}
-		ctx->attr->value_length = cpu_to_le32(0);
+		ctx->attr->value_length = const_cpu_to_le32(0);
 		if (!opts.noaction) {
 			if (ntfs_mft_records_write(nv, MK_MREF(record, 0),
 					1LL, ctx->mrec) != 0) {
@@ -1863,7 +1863,7 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 					}
 				}
 			}
-			ctx->attr->value_length = cpu_to_le32(0);
+			ctx->attr->value_length = const_cpu_to_le32(0);
 			if ( !opts.noaction ) {
 				if (ntfs_mft_records_write(nv,
 					MK_MREF(record, 0),
@@ -1953,12 +1953,12 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 					}
 				}
 			}
-			ctx->attr->lowest_vcn = cpu_to_le64(0);
-			ctx->attr->highest_vcn = cpu_to_le64(0);
-			ctx->attr->allocated_size = cpu_to_le64(0);
-			ctx->attr->data_size = cpu_to_le64(0);
-			ctx->attr->initialized_size = cpu_to_le64(0);
-			ctx->attr->compressed_size = cpu_to_le64(0);
+			ctx->attr->lowest_vcn = const_cpu_to_le64(0);
+			ctx->attr->highest_vcn = const_cpu_to_le64(0);
+			ctx->attr->allocated_size = const_cpu_to_le64(0);
+			ctx->attr->data_size = const_cpu_to_le64(0);
+			ctx->attr->initialized_size = const_cpu_to_le64(0);
+			ctx->attr->compressed_size = const_cpu_to_le64(0);
 			if (!opts.noaction) {
 				if (ntfs_mft_records_write(nv,
 					MK_MREF (record, 0),

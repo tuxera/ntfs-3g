@@ -1599,11 +1599,11 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 			ir->clusters_per_index_block = 
 					ni->vol->indx_record_size >>
 					NTFS_BLOCK_SIZE_BITS;
-		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
+		ir->index.entries_offset = const_cpu_to_le32(sizeof(INDEX_HEADER));
 		ir->index.index_length = cpu_to_le32(index_len);
 		ir->index.allocated_size = cpu_to_le32(index_len);
 		ie = (INDEX_ENTRY*)((u8*)ir + sizeof(INDEX_ROOT));
-		ie->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
+		ie->length = const_cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
 		ie->key_length = 0;
 		ie->ie_flags = INDEX_ENTRY_END;
 		/* Add INDEX_ROOT attribute to inode. */
@@ -1711,7 +1711,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		goto err_out;
 	}
 	/* Set hard links count and directory flag. */
-	ni->mrec->link_count = cpu_to_le16(1);
+	ni->mrec->link_count = const_cpu_to_le16(1);
 	if (S_ISDIR(type))
 		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
 	ntfs_inode_mark_dirty(ni);
@@ -1970,7 +1970,7 @@ search:
 	 * (Windows also does so), however delete the name if it were
 	 * in an extent, to avoid leaving an attribute list.
 	 */
-	if ((ni->mrec->link_count == cpu_to_le16(1)) && !actx->base_ntfs_ino) {
+	if ((ni->mrec->link_count == const_cpu_to_le16(1)) && !actx->base_ntfs_ino) {
 			/* make sure to not loop to another search */
 		looking_for_dos_name = FALSE;
 	} else {
