@@ -2540,7 +2540,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		goto err_out;
 	}
 	/* Set VCN pointer to 0LL. */
-	*(leVCN*)((char*)re + cpu_to_le16(re->length) - sizeof(VCN)) =
+	*(leVCN*)((char*)re + le16_to_cpu(re->length) - sizeof(VCN)) =
 			const_cpu_to_sle64(0);
 	err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)ia_val, index_block_size);
 	if (err) {

@@ -563,12 +563,12 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	printf("Length of resident part = %u (0x%x)\n", u, u);
 	printf("Attribute is %sresident\n", a->non_resident ? "non-" : "");
 	printf("Name length = %u unicode characters\n", a->name_length);
-	printf("Name offset = %u (0x%x)\n", cpu_to_le16(a->name_offset),
-			cpu_to_le16(a->name_offset));
+	printf("Name offset = %u (0x%x)\n", le16_to_cpu(a->name_offset),
+			le16_to_cpu(a->name_offset));
 	u = a->flags;
 	if (a->name_length) {
 		if (ucstos(s, (ntfschar*)((char*)a +
-				cpu_to_le16(a->name_offset)),
+				le16_to_cpu(a->name_offset)),
 				min((int)sizeof(s),
 						a->name_length + 1)) == -1) {
 			ntfs_log_error("Could not convert Unicode string to single "
