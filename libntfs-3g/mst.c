@@ -157,6 +157,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 {
 	u16 usa_ofs, usa_count, usn;
+	le16 le_usn;
 	le16 *usa_pos, *data_pos;
 
 	ntfs_log_trace("Entering\n");
@@ -189,8 +190,8 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 	usn = le16_to_cpup(usa_pos) + 1;
 	if (usn == 0xffff || !usn)
 		usn = 1;
-	usn = cpu_to_le16(usn);
-	*usa_pos = usn;
+	le_usn = cpu_to_le16(usn);
+	*usa_pos = le_usn;
 	/* Position in data of first le16 that needs fixing up. */
 	data_pos = (le16*)b + NTFS_BLOCK_SIZE/sizeof(le16) - 1;
 	/* Fixup all sectors. */
@@ -201,7 +202,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 		 */
 		*(++usa_pos) = *data_pos;
 		/* Apply fixup to data. */
-		*data_pos = usn;
+		*data_pos = le_usn;
 		/* Increment position in data as well. */
 		data_pos += NTFS_BLOCK_SIZE/sizeof(le16);
 	}
