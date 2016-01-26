@@ -286,7 +286,7 @@ static void parse_options(int argc, char *argv[])
  */
 static int ucstos(char *dest, const ntfschar *src, int maxlen)
 {
-	ntfschar u;
+	u16 u;
 	int i;
 
 	/* Need one byte for null terminator. */
