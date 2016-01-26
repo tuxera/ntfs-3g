@@ -75,7 +75,7 @@ BOOL success = FALSE;
 
 char *dev_name;
 s64 inode;
-u32 attr_type;
+ATTR_TYPES attr_type;
 ntfschar *attr_name = NULL;
 u32 attr_name_len;
 s64 new_len;
@@ -236,7 +236,7 @@ static void parse_options(int argc, char *argv[])
 		if (*s2 || !ul || (ul >= ULONG_MAX && errno == ERANGE))
 			err_exit("Invalid attribute type %s: %s\n", s,
 					strerror(errno));
-		attr_type = ul;
+		attr_type = cpu_to_le32(ul);
 
 		/* Get the attribute name, if specified. */
 		s = argv[optind++];
@@ -258,7 +258,7 @@ static void parse_options(int argc, char *argv[])
 			attr_name_len = 0;
 		}
 	}
-	ntfs_log_verbose("attribute type = 0x%x\n", (unsigned int)attr_type);
+	ntfs_log_verbose("attribute type = 0x%x\n", (unsigned int)le32_to_cpu(attr_type));
 	if (attr_name == AT_UNNAMED)
 		ntfs_log_verbose("attribute name = \"\" (UNNAMED)\n");
 	else
@@ -666,7 +666,7 @@ static void dump_mft_record(MFT_RECORD *m)
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	printf("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
-		if (a->type == cpu_to_le32(attr_type))
+		if (a->type == attr_type)
 			dump_attr_record(m, a);
 		if (a->type == AT_END)
 			break;
@@ -765,7 +765,7 @@ int main(int argc, char **argv)
 	na = ntfs_attr_open(ni, attr_type, attr_name, attr_name_len);
 	if (!na)
 		err_exit("Failed to open attribute 0x%x: %s\n",
-				(unsigned int)attr_type, strerror(errno));
+				(unsigned int)le32_to_cpu(attr_type), strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		ntfs_log_verbose("Dumping mft record before calling "
