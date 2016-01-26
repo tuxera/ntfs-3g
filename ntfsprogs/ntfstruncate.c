@@ -314,6 +314,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	const char *todo = "This is still work in progress.";
 	char *buf;
 	int i, j;
+	VOLUME_FLAGS flags;
 	u32 u;
 
 	switch (type) {
@@ -356,54 +357,54 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 #define VOL_INF(x) ((VOLUME_INFORMATION *)(x))
 		printf("NTFS version %i.%i\n", VOL_INF(val)->major_ver,
 				VOL_INF(val)->minor_ver);
-		i = VOL_INF(val)->flags;
+		flags = VOL_INF(val)->flags;
 #undef VOL_INF
-		printf("Volume flags = 0x%x: ", le16_to_cpu(i));
-		if (!i) {
+		printf("Volume flags = 0x%x: ", le16_to_cpu(flags));
+		if (!flags) {
 			printf("NONE\n");
 			return;
 		}
 		j = 0;
-		if (i & VOLUME_MODIFIED_BY_CHKDSK) {
+		if (flags & VOLUME_MODIFIED_BY_CHKDSK) {
 			j = 1;
 			printf("VOLUME_MODIFIED_BY_CHKDSK");
 		}
-		if (i & VOLUME_REPAIR_OBJECT_ID) {
+		if (flags & VOLUME_REPAIR_OBJECT_ID) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_REPAIR_OBJECT_ID");
 		}
-		if (i & VOLUME_DELETE_USN_UNDERWAY) {
+		if (flags & VOLUME_DELETE_USN_UNDERWAY) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_DELETE_USN_UNDERWAY");
 		}
-		if (i & VOLUME_MOUNTED_ON_NT4) {
+		if (flags & VOLUME_MOUNTED_ON_NT4) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_MOUNTED_ON_NT4");
 		}
-		if (i & VOLUME_UPGRADE_ON_MOUNT) {
+		if (flags & VOLUME_UPGRADE_ON_MOUNT) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_UPGRADE_ON_MOUNT");
 		}
-		if (i & VOLUME_RESIZE_LOG_FILE) {
+		if (flags & VOLUME_RESIZE_LOG_FILE) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_RESIZE_LOG_FILE");
 		}
-		if (i & VOLUME_IS_DIRTY) {
+		if (flags & VOLUME_IS_DIRTY) {
 			if (j)
 				printf(" | ");
 			else
