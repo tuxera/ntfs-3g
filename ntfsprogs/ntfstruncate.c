@@ -531,6 +531,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	unsigned int u;
 	char s[0x200];
 	int i;
+	ATTR_FLAGS flags;
 
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
 			(unsigned)((u8*)a - (u8*)m));
@@ -565,7 +566,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	printf("Name length = %u unicode characters\n", a->name_length);
 	printf("Name offset = %u (0x%x)\n", le16_to_cpu(a->name_offset),
 			le16_to_cpu(a->name_offset));
-	u = a->flags;
+	flags = a->flags;
 	if (a->name_length) {
 		if (ucstos(s, (ntfschar*)((char*)a +
 				le16_to_cpu(a->name_offset)),
@@ -579,17 +580,17 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 		}
 		printf("Name = %s\n", s);
 	}
-	printf("Attribute flags = 0x%x: ", le16_to_cpu(u));
-	if (!u)
+	printf("Attribute flags = 0x%x: ", le16_to_cpu(flags));
+	if (!flags)
 		printf("NONE");
 	else {
 		int first = TRUE;
-		if (u & ATTR_COMPRESSION_MASK) {
-			if (u & ATTR_IS_COMPRESSED) {
+		if (flags & ATTR_COMPRESSION_MASK) {
+			if (flags & ATTR_IS_COMPRESSED) {
 				printf("ATTR_IS_COMPRESSED");
 				first = FALSE;
 			}
-			if ((u & ATTR_COMPRESSION_MASK) & ~ATTR_IS_COMPRESSED) {
+			if ((flags & ATTR_COMPRESSION_MASK) & ~ATTR_IS_COMPRESSED) {
 				if (!first)
 					printf(" | ");
 				else
@@ -597,14 +598,14 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 				printf("ATTR_UNKNOWN_COMPRESSION");
 			}
 		}
-		if (u & ATTR_IS_ENCRYPTED) {
+		if (flags & ATTR_IS_ENCRYPTED) {
 			if (!first)
 				printf(" | ");
 			else
 				first = FALSE;
 			printf("ATTR_IS_ENCRYPTED");
 		}
-		if (u & ATTR_IS_SPARSE) {
+		if (flags & ATTR_IS_SPARSE) {
 			if (!first)
 				printf(" | ");
 			else
