@@ -584,7 +584,7 @@ static BOOL check_file_record(u8 *buffer, u16 buflen)
 	ATTR_REC *attr_rec;
 
 	// check record magic
-	assert_u32_equal(mft_rec->magic, magic_FILE, "FILE record magic");
+	assert_u32_equal(le32_to_cpu(mft_rec->magic), le32_to_cpu(magic_FILE), "FILE record magic");
 	// todo: records 16-23 must be filled in order.
 	// todo: what to do with magic_BAAD?
 
