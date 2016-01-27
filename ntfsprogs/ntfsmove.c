@@ -319,10 +319,10 @@ static int resize_nonres_attr(MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
 	int old_size;
 	u8 *ptr;
 
-	old_size  = a->length;
-	file_size = m->bytes_in_use;
+	old_size  = le32_to_cpu(a->length);
+	file_size = le32_to_cpu(m->bytes_in_use);
 	this_attr = p2n(a)-p2n(m);
-	next_attr = this_attr + a->length;
+	next_attr = this_attr + le32_to_cpu(a->length);
 	tail_size = file_size - next_attr;
 	ptr = (u8*) m;
 
@@ -337,8 +337,8 @@ static int resize_nonres_attr(MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
 
 	memmove(ptr + this_attr + new_size, ptr + next_attr, tail_size);
 
-	a->length = new_size;
-	m->bytes_in_use += new_size - old_size;
+	a->length = cpu_to_le32(new_size);
+	m->bytes_in_use = cpu_to_le32(le32_to_cpu(m->bytes_in_use) + (new_size - old_size));
 
 	return 0;
 }
@@ -355,7 +355,7 @@ static int calc_attr_length(ATTR_RECORD *rec, int runlength)
 	if (!rec->non_resident)
 		return -1;
 
-	size = rec->mapping_pairs_offset + runlength + 7;
+	size = le16_to_cpu(rec->mapping_pairs_offset) + runlength + 7;
 	size &= 0xFFF8;
 	return size;
 }
@@ -492,7 +492,7 @@ static int dont_move(ntfs_inode *ino)
 		return 1;
 	}
 
-	name = (FILE_NAME_ATTR*) ((u8*)rec + rec->value_offset);
+	name = (FILE_NAME_ATTR*) ((u8*)rec + le16_to_cpu(rec->value_offset));
 	if (ntfs_names_are_equal(ntldr, 5, name->file_name, name->file_name_length,
 		IGNORE_CASE, ino->vol->upcase, ino->vol->upcase_len)) {
 		ntfs_log_error("ntldr\n");
@@ -727,10 +727,10 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	}
 
 	// wipe orig runs
-	memset(((u8*)rec) +rec->mapping_pairs_offset, 0, need_to - rec->mapping_pairs_offset);
+	memset(((u8*)rec) + le16_to_cpu(rec->mapping_pairs_offset), 0, need_to - le16_to_cpu(rec->mapping_pairs_offset));
 
 	// update data runs
-	ntfs_mapping_pairs_build(vol, ((u8*)rec) + rec->mapping_pairs_offset,
+	ntfs_mapping_pairs_build(vol, ((u8*)rec) + le16_to_cpu(rec->mapping_pairs_offset),
 			need_to, from, 0, NULL);
 
 	// commit
