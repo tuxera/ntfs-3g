@@ -306,8 +306,8 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 					"size.  Cannot handle this yet.\n");
 	}
 	/* Abort if the version number is not 1.1. */
-	if (sle16_to_cpu(rstr->major_ver != 1) ||
-			sle16_to_cpu(rstr->minor_ver != 1))
+	if (sle16_to_cpu(rstr->major_ver) != 1 ||
+			sle16_to_cpu(rstr->minor_ver) != 1)
 		log_err_exit(buf, "Unknown $LogFile version %i.%i.  Only know "
 				"how to handle version 1.1.\n",
 				sle16_to_cpu(rstr->major_ver),
