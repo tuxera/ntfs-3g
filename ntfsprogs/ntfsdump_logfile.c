@@ -633,7 +633,7 @@ rcrd_pass_loc:
 	ntfs_log_info("page count = %i\n", le16_to_cpu(rcrd->page_count));
 	ntfs_log_info("page position = %i\n", le16_to_cpu(rcrd->page_position));
 	ntfs_log_info("header.next_record_offset = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->header.packed.next_record_offset));
+			le16_to_cpu(rcrd->header.packed.next_record_offset));
 	ntfs_log_info("header.last_end_lsn = 0x%llx\n", (unsigned long long)
 			sle64_to_cpu(rcrd->header.packed.last_end_lsn));
 	/*
@@ -648,7 +648,7 @@ rcrd_pass_loc:
 		client++;
 		lr = (LOG_RECORD*)((u8*)lr + 0x70);
 	} while (((u8*)lr + 0x70 <= (u8*)rcrd +
-			le64_to_cpu(rcrd->header.packed.next_record_offset)));
+			le16_to_cpu(rcrd->header.packed.next_record_offset)));
 
 	pass++;
 	goto rcrd_pass_loc;
