@@ -608,7 +608,7 @@ static BOOL check_file_record(u8 *buffer, u16 buflen)
 
 
 	// We should know all the flags.
-	if (mft_rec->flags>0xf) {
+	if (le16_to_cpu(mft_rec->flags) > 0xf) {
 		check_failed("Unknown MFT record flags (0x%x).\n",
 			(unsigned int)le16_to_cpu(mft_rec->flags));
 	}
