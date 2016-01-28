@@ -775,7 +775,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			memcpy(pnewace,poldace,acesz);
 				/* reencode GENERIC_ALL */
 			if (!le32_andz(pnewace->mask, GENERIC_ALL)) {
-				pnewace->mask &= ~GENERIC_ALL;
+				pnewace->mask = le32_and(pnewace->mask, ~GENERIC_ALL);
 				if (fordir)
 					pnewace->mask |= OWNER_RIGHTS
 							| DIR_READ
@@ -802,12 +802,12 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					pnewace->mask |= OWNER_RIGHTS
 							| FILE_READ
 							| FILE_EXEC;
-				pnewace->mask &= ~(GENERIC_READ
+				pnewace->mask = le32_and(pnewace->mask, ~(GENERIC_READ
 						| GENERIC_EXECUTE
 						| WRITE_DAC
 						| WRITE_OWNER
 						| DELETE | FILE_WRITE_EA
-						| FILE_WRITE_ATTRIBUTES);
+						| FILE_WRITE_ATTRIBUTES));
 			}
 				/* reencode GENERIC_WRITE */
 			if (!le32_andz(pnewace->mask, GENERIC_WRITE)) {
@@ -817,10 +817,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				else
 					pnewace->mask |= OWNER_RIGHTS
 							| FILE_WRITE;
-				pnewace->mask &= ~(GENERIC_WRITE
+				pnewace->mask = le32_and(pnewace->mask, ~(GENERIC_WRITE
 							| WRITE_DAC
 							| WRITE_OWNER
-							| FILE_DELETE_CHILD);
+							| FILE_DELETE_CHILD));
 			}
 				/* remove inheritance flags */
 			pnewace->flags &= ~(OBJECT_INHERIT_ACE
@@ -2531,7 +2531,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 					denials |= FILE_READ;
 			}
 		}
-		denials &= ~grants;
+		denials = le32_and(denials, ~grants);
 		if (!le32_cmpz(denials)) {
 			pdace->type = ACCESS_DENIED_ACE_TYPE;
 			pdace->size = cpu_to_le16(usidsz + 8);
@@ -2618,7 +2618,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				if (mode & S_IROTH)
 					denials |= FILE_READ;
 			}
-			denials &= ~(grants | OWNER_RIGHTS);
+			denials = le32_and(denials, ~(grants | OWNER_RIGHTS));
 			if (!le32_cmpz(denials)) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
@@ -3258,9 +3258,9 @@ static int build_std_permissions(const char *securattr,
 	allowown |= (allowgrp | allowall);
 	allowgrp |= allowall;
 	return (merge_permissions(isdir,
-				allowown & ~(denyown | denyall),
-				allowgrp & ~(denygrp | denyall),
-				allowall & ~denyall,
+				le32_and(allowown, ~(denyown | denyall)),
+				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowall, ~denyall),
 				special));
 }
 
@@ -3337,9 +3337,9 @@ static int build_owngrp_permissions(const char *securattr,
 	if (!grppresent)
 		allowgrp = allowall;
 	return (merge_permissions(isdir,
-				allowown & ~(denyown | denyall),
-				allowgrp & ~(denygrp | denyall),
-				allowall & ~denyall,
+				le32_and(allowown, ~(denyown | denyall)),
+				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowall, ~denyall),
 				special));
 }
 
@@ -3533,9 +3533,9 @@ static int build_ownadmin_permissions(const char *securattr,
 		allowgrp |= allowall;
 	}
 	return (merge_permissions(isdir,
-				allowown & ~(denyown | denyall),
-				allowgrp & ~(denygrp | denyall),
-				allowall & ~denyall,
+				le32_and(allowown, ~(denyown | denyall)),
+				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowall, ~denyall),
 				special));
 }
 

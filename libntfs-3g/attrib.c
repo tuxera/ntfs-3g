@@ -102,7 +102,7 @@ static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 static void NAttrClearFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
-		na->ni->flags &= ~flag;
+		na->ni->flags = le32_and(na->ni->flags, ~flag);
 }
 
 #define GenNAttrIno(func_name, flag)					\

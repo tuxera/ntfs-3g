@@ -722,7 +722,7 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 			(unsigned long long)na->ni->mft_no, na->type,
 			(long long)pos, (long long)count);
 	data_flags = na->data_flags;
-	compression = na->ni->flags & FILE_ATTR_COMPRESSED;
+	compression = le32_and(na->ni->flags, FILE_ATTR_COMPRESSED);
 	if (!na || !na->ni || !na->ni->vol || !b
 			|| !le16_eq(le16_and(data_flags, ATTR_COMPRESSION_MASK),
 				ATTR_IS_COMPRESSED)

@@ -1209,8 +1209,8 @@ int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 					/* now remove attribute */
 					res = ntfs_attr_rm(na);
 					if (!res) {
-						ni->flags &=
-						    ~FILE_ATTR_REPARSE_POINT;
+						ni->flags = le32_and(ni->flags,
+						    ~FILE_ATTR_REPARSE_POINT);
 						NInoFileNameSetDirty(ni);
 					} else {
 					/*

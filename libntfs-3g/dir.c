@@ -1683,9 +1683,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	if (!S_ISREG(type) && !S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	else
-		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
+		fn->file_attributes |= le32_and(ni->flags, FILE_ATTR_COMPRESSED);
 	fn->file_attributes |= FILE_ATTR_ARCHIVE;
-	fn->file_attributes |= ni->flags & FILE_ATTR_HIDDEN;
+	fn->file_attributes |= le32_and(ni->flags, FILE_ATTR_HIDDEN);
 	fn->creation_time = ni->creation_time;
 	fn->last_data_change_time = ni->last_data_change_time;
 	fn->last_mft_change_time = ni->last_mft_change_time;
@@ -2169,7 +2169,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
 			ni->flags |= FILE_ATTR_HIDDEN;
 		else
-			ni->flags &= ~FILE_ATTR_HIDDEN;
+			ni->flags = le32_and(ni->flags, ~FILE_ATTR_HIDDEN);
 	}
 	
 	/* Create FILE_NAME attribute. */
