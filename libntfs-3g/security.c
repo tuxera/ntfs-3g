@@ -243,7 +243,7 @@ int ntfs_sid_to_mbs_size(const SID *sid)
 	 * maximum is 2^32-1 = 4294967295 = 10 characters.  If it needs to be
 	 * in hexadecimal, then maximum is 0x665544332211 = 14 characters.
 	 */
-	if (!sid->identifier_authority.high_part)
+	if (be16_cmpz(sid->identifier_authority.high_part))
 		size += 10;
 	else
 		size += 14;
@@ -326,7 +326,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	/* Add the identifier authority. */
 	for (u = i = 0, j = 40; i < 6; i++, j -= 8)
 		u += (u64)sid->identifier_authority.value[i] << j;
-	if (!sid->identifier_authority.high_part)
+	if (be16_cmpz(sid->identifier_authority.high_part))
 		i = snprintf(s, cnt, "%lu", (unsigned long)u);
 	else
 		i = snprintf(s, cnt, "0x%llx", (unsigned long long)u);

@@ -318,4 +318,6 @@
 
 #define sle64_cmpz(a) (!(a))
 
+#define be16_cmpz(a) (!(a))
+
 #endif /* defined _NTFS_ENDIANS_H */
