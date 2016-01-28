@@ -760,7 +760,7 @@ static int ntfs_mft_bitmap_extend_allocation_i(ntfs_volume *vol)
 	 * We now have extended the mft bitmap allocated_size by one cluster.
 	 * Reflect this in the ntfs_attr structure and the attribute record.
 	 */
-	if (a->lowest_vcn) {
+	if (!sle64_cmpz(a->lowest_vcn)) {
 		/*
 		 * We are not in the first attribute extent, switch to it, but
 		 * first ensure the changes will make it to disk later.
@@ -1112,7 +1112,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	 * @rl is the last (non-terminator) runlist element of mft data
 	 * attribute.
 	 */
-	if (a->lowest_vcn) {
+	if (!sle64_cmpz(a->lowest_vcn)) {
 		/*
 		 * We are not in the first attribute extent, switch to it, but
 		 * first ensure the changes will make it to disk later.

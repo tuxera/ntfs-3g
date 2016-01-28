@@ -742,7 +742,7 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
-			 if (a->lowest_vcn) {
+			 if (!sle64_cmpz(a->lowest_vcn)) {
 				 errno = EIO;
 				 ntfs_log_perror("First extent of inode %llu "
 					"attribute has non-zero lowest_vcn",
@@ -5427,7 +5427,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x\n", 
 		       (unsigned long long)na->ni->mft_no, na->type);
 	
-	if (a->lowest_vcn)
+	if (!sle64_cmpz(a->lowest_vcn))
 		goto out;
 
 	a->allocated_size = cpu_to_sle64(na->allocated_size);
