@@ -334,4 +334,6 @@
 
 #define le32_or(a, b) ((a) | (b))
 
+#define le64_or(a, b) ((a) | (b))
+
 #endif /* defined _NTFS_ENDIANS_H */
