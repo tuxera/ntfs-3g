@@ -2949,7 +2949,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 				/* adjust Windows read-only flag */
 				if (!isdir) {
 					if (mode & S_IWUSR)
-						ni->flags = le32_and(ni->flags, ~FILE_ATTR_READONLY);
+						ni->flags = le32_and(ni->flags, le32_not(FILE_ATTR_READONLY));
 					else
 						ni->flags = le32_or(ni->flags, FILE_ATTR_READONLY);
 					NInoFileNameSetDirty(ni);
@@ -4449,7 +4449,7 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 				}
 			}
 			if (!res) {
-				ni->flags = le32_or(le32_and(ni->flags, ~settable),
+				ni->flags = le32_or(le32_and(ni->flags, le32_not(settable)),
 					 le32_and(cpu_to_le32(attrib), settable));
 				NInoFileNameSetDirty(ni);
 				NInoSetDirty(ni);
@@ -5054,7 +5054,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				}
 			}
 			if (!res) {
-				ni->flags = le32_or(le32_and(ni->flags, ~settable),
+				ni->flags = le32_or(le32_and(ni->flags, le32_not(settable)),
 					 le32_and(cpu_to_le32(attrib), settable));
 				NInoSetDirty(ni);
 				NInoFileNameSetDirty(ni);

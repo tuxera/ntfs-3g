@@ -775,7 +775,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			memcpy(pnewace,poldace,acesz);
 				/* reencode GENERIC_ALL */
 			if (!le32_andz(pnewace->mask, GENERIC_ALL)) {
-				pnewace->mask = le32_and(pnewace->mask, ~GENERIC_ALL);
+				pnewace->mask = le32_and(pnewace->mask, le32_not(GENERIC_ALL));
 				if (fordir)
 					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
 							le32_or(DIR_READ,
@@ -802,7 +802,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
 							le32_or(FILE_READ,
 							FILE_EXEC)));
-				pnewace->mask = le32_and(pnewace->mask, ~(le32_or(GENERIC_READ,
+				pnewace->mask = le32_and(pnewace->mask, le32_not(le32_or(GENERIC_READ,
 						le32_or(GENERIC_EXECUTE,
 						le32_or(WRITE_DAC,
 						le32_or(WRITE_OWNER,
@@ -817,7 +817,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				else
 					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
 							FILE_WRITE));
-				pnewace->mask = le32_and(pnewace->mask, ~(le32_or(GENERIC_WRITE,
+				pnewace->mask = le32_and(pnewace->mask, le32_not(le32_or(GENERIC_WRITE,
 							le32_or(WRITE_DAC,
 							le32_or(WRITE_OWNER,
 							FILE_DELETE_CHILD)))));
@@ -2531,7 +2531,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 					denials = le32_or(denials, FILE_READ);
 			}
 		}
-		denials = le32_and(denials, ~grants);
+		denials = le32_and(denials, le32_not(grants));
 		if (!le32_cmpz(denials)) {
 			pdace->type = ACCESS_DENIED_ACE_TYPE;
 			pdace->size = cpu_to_le16(usidsz + 8);
@@ -2618,7 +2618,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				if (mode & S_IROTH)
 					denials = le32_or(denials, FILE_READ);
 			}
-			denials = le32_and(denials, ~(le32_or(grants, OWNER_RIGHTS)));
+			denials = le32_and(denials, le32_not(le32_or(grants, OWNER_RIGHTS)));
 			if (!le32_cmpz(denials)) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
@@ -3258,9 +3258,9 @@ static int build_std_permissions(const char *securattr,
 	allowown = le32_or(allowown, le32_or(allowgrp, allowall));
 	allowgrp = le32_or(allowgrp, allowall);
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(le32_or(denyown, denyall))),
-				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
-				le32_and(allowall, ~denyall),
+				le32_and(allowown, le32_not(le32_or(denyown, denyall))),
+				le32_and(allowgrp, le32_not(le32_or(denygrp, denyall))),
+				le32_and(allowall, le32_not(denyall)),
 				special));
 }
 
@@ -3337,9 +3337,9 @@ static int build_owngrp_permissions(const char *securattr,
 	if (!grppresent)
 		allowgrp = allowall;
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(le32_or(denyown, denyall))),
-				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
-				le32_and(allowall, ~denyall),
+				le32_and(allowown, le32_not(le32_or(denyown, denyall))),
+				le32_and(allowgrp, le32_not(le32_or(denygrp, denyall))),
+				le32_and(allowall, le32_not(denyall)),
 				special));
 }
 
@@ -3494,7 +3494,7 @@ static int build_ownadmin_permissions(const char *securattr,
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)
-		   && le32_andz(~pace->mask, le32_or(ROOT_OWNER_UNMARK, ROOT_GROUP_UNMARK))) {
+		   && le32_andz(le32_not(pace->mask), le32_or(ROOT_OWNER_UNMARK, ROOT_GROUP_UNMARK))) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			     && ((!le32_andz(pace->mask, WRITE_OWNER) && firstapply))) {
@@ -3533,9 +3533,9 @@ static int build_ownadmin_permissions(const char *securattr,
 		allowgrp = le32_or(allowgrp, allowall);
 	}
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(le32_or(denyown, denyall))),
-				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
-				le32_and(allowall, ~denyall),
+				le32_and(allowown, le32_not(le32_or(denyown, denyall))),
+				le32_and(allowgrp, le32_not(le32_or(denygrp, denyall))),
+				le32_and(allowall, le32_not(denyall)),
 				special));
 }
 

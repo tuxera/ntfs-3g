@@ -2169,7 +2169,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
 			ni->flags = le32_or(ni->flags, FILE_ATTR_HIDDEN);
 		else
-			ni->flags = le32_and(ni->flags, ~FILE_ATTR_HIDDEN);
+			ni->flags = le32_and(ni->flags, le32_not(FILE_ATTR_HIDDEN));
 	}
 	
 	/* Create FILE_NAME attribute. */
