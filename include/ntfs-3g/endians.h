@@ -308,4 +308,6 @@
 
 #define be16_eq(a, b) ((a) == (b))
 
+#define be32_eq(a, b) ((a) == (b))
+
 #endif /* defined _NTFS_ENDIANS_H */
