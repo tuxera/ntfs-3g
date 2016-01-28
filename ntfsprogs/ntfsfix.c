@@ -236,7 +236,7 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const le16 flags)
 		return -1;
 	}
 	/* Sanity check */
-	if (!(m->flags & MFT_RECORD_IN_USE)) {
+	if (le16_andz(m->flags, MFT_RECORD_IN_USE)) {
 		ntfs_log_error("$Volume has been deleted. Cannot handle this "
 				"yet. Run chkdsk to fix this.\n");
 		errno = EIO;
@@ -516,7 +516,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 				goto error_exit;
 			}
 			/* $MFT is corrupt but $MFTMirr is ok, use $MFTMirr. */
-			if (!(mrec->flags & MFT_RECORD_IN_USE) &&
+			if (le16_andz(mrec->flags, MFT_RECORD_IN_USE) &&
 					!ntfs_is_mft_record(mrec->magic))
 				use_mirr = TRUE;
 		}

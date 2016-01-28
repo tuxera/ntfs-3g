@@ -1271,7 +1271,7 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 				if (ctx->efs_raw
-				    && !(na->data_flags & ATTR_IS_ENCRYPTED)
+				    && le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					state |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */

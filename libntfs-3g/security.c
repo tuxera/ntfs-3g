@@ -725,7 +725,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 					psii = (struct SII*)entry;
 				}
 				if (psii
-				    && !(psii->flags & INDEX_ENTRY_END)) {
+				    && le16_andz(psii->flags, INDEX_ENTRY_END)) {
 						/* save first key and */
 						/* available position */
 					keyid = psii->keysecurid;
@@ -4927,10 +4927,10 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 		/* if selected, owner and group must be present or defaulted */
 		missing = ((selection & OWNER_SECURITY_INFORMATION)
 				&& le32_cmpz(phead->owner)
-				&& !(phead->control & SE_OWNER_DEFAULTED))
+				&& le16_andz(phead->control, SE_OWNER_DEFAULTED))
 			|| ((selection & GROUP_SECURITY_INFORMATION)
 				&& le32_cmpz(phead->group)
-				&& !(phead->control & SE_GROUP_DEFAULTED));
+				&& le16_andz(phead->control, SE_GROUP_DEFAULTED));
 		if (!missing
 		    && !le16_andz(phead->control, SE_SELF_RELATIVE)
 		    && ntfs_valid_descr(attr, attrsz)) {

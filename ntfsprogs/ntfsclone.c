@@ -1086,7 +1086,7 @@ static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 	le64 timestamp = timespec2ntfs(zero_time);
 
 	/* FIXME: can fall into infinite loop if corrupted */
-	while (!(e->ie_flags & INDEX_ENTRY_END)) {
+	while (le16_andz(e->ie_flags, INDEX_ENTRY_END)) {
 
 		e->key.file_name.creation_time = timestamp;
 		e->key.file_name.last_data_change_time = timestamp;
@@ -1202,7 +1202,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, le64 timestamp)
 	entry = (INDEX_ENTRY *)((u8 *)iroot +
 			le32_to_cpu(iroot->index.entries_offset) + 0x10);
 
-	while (!(entry->ie_flags & INDEX_ENTRY_END)) {
+	while (le16_andz(entry->ie_flags, INDEX_ENTRY_END)) {
 
 		if (le32_eq(iroot->type, AT_FILE_NAME)) {
 
@@ -1385,7 +1385,7 @@ static void wipe_mft(char *mrec, u32 mrecsz, u64 mft_no)
 	image.ni = &ni;
 	ntfs_mst_post_read_fixup_warn((NTFS_RECORD*)mrec,mrecsz,FALSE);
 	wipe_unused_mft_data(&ni);
-	if (!(((MFT_RECORD*)mrec)->flags & MFT_RECORD_IN_USE)) {
+	if (le16_andz(((MFT_RECORD*)mrec)->flags, MFT_RECORD_IN_USE)) {
 		wipe_unused_mft(&ni);
 	} else {
 			/* ctx with no ntfs_inode prevents from searching external attrs */
@@ -1955,7 +1955,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			continue;
 		}
 
-		deleted_inode = !(ni->mrec->flags & MFT_RECORD_IN_USE);
+		deleted_inode = le16_andz(ni->mrec->flags, MFT_RECORD_IN_USE);
 
 		if (deleted_inode && !opt.metadata_image) {
 

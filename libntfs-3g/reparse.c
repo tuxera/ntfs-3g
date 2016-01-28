@@ -450,7 +450,7 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
 			lth = le16_to_cpu(mount_point_data->subst_name_length);
 				/* consistency checks */
-			if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			if (le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 			    || ((size_t)((sizeof(REPARSE_POINT)
 				 + sizeof(struct MOUNT_POINT_REPARSE_DATA)
 				 + offs + lth)) > size))

@@ -480,7 +480,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	/* a file may be sparse though its unnamed data is not (cf $UsnJrnl) */
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED &&
 	    ((!le16_andz(a->flags, ATTR_IS_SPARSE)    && !NAttrSparse(na)) ||
-	     (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
+	     (le16_andz(a->flags, ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
 		errno = EIO;
 		ntfs_log_perror("Inode %lld has corrupt attribute flags "
 				"(0x%x <> 0x%x)",(unsigned long long)ni->mft_no,
@@ -5446,7 +5446,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	/* Check whether attribute becomes sparse, unless check is delayed. */
 	if ((holes != HOLES_DELAY)
 	    && sparse
-	    && !(a->flags & (ATTR_IS_SPARSE | ATTR_IS_COMPRESSED))) {
+	    && le16_andz(a->flags, ATTR_IS_SPARSE | ATTR_IS_COMPRESSED)) {
 		/*
 		 * Move attribute to another mft record, if attribute is too 
 		 * small to add compressed_size field to it and we have no 
@@ -5495,7 +5495,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 
 	/* Attribute no longer sparse. */
 	if (!sparse && !le16_andz(a->flags, ATTR_IS_SPARSE) &&
-	    !(a->flags & ATTR_IS_COMPRESSED)) {
+	    le16_andz(a->flags, ATTR_IS_COMPRESSED)) {
 		
 		NAttrClearSparse(na);
 		a->flags &= ~ATTR_IS_SPARSE;
@@ -5586,10 +5586,10 @@ retry:
 		 */
 	if ((holes != HOLES_DELAY)
 	   && (!NAttrFullyMapped(na) || from_vcn)
-	   && !(na->data_flags & ATTR_IS_COMPRESSED)) {
+	   && le16_andz(na->data_flags, ATTR_IS_COMPRESSED)) {
 		BOOL changed;
 
-		if (!(na->data_flags & ATTR_IS_SPARSE)) {
+		if (le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 			int sparse = 0;
 			runlist_element *xrl;
 
@@ -6109,7 +6109,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 
 	/* If the attribute now has zero size, make it resident. */
 	if (!newsize) {
-		if (!(na->data_flags & ATTR_IS_ENCRYPTED)
+		if (le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 		    && ntfs_attr_make_resident(na, ctx)) {
 			/* If couldn't make resident, just continue. */
 			if (errno != EPERM)

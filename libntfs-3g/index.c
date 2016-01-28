@@ -552,7 +552,7 @@ static int ntfs_ie_lookup(const void *key, const int key_len,
 	 * presence of a child node and if not present return with errno ENOENT,
 	 * otherwise we will keep searching in another index block.
 	 */
-	if (!(ie->ie_flags & INDEX_ENTRY_NODE)) {
+	if (le16_andz(ie->ie_flags, INDEX_ENTRY_NODE)) {
 		ntfs_log_debug("Index entry wasn't found.\n");
 		*ie_out = ie;
 		errno = ENOENT;
@@ -1302,7 +1302,7 @@ static int ntfs_ih_insert(INDEX_HEADER *ih, INDEX_ENTRY *orig_ie, VCN new_vcn,
 	if (!ie)
 		return STATUS_ERROR;
 	
-	if (!(ie->ie_flags & INDEX_ENTRY_NODE))
+	if (le16_andz(ie->ie_flags, INDEX_ENTRY_NODE))
 		if (ntfs_ie_add_vcn(&ie))
 			goto out;
 
@@ -1344,7 +1344,7 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 
 	new_size = le32_to_cpu(icx->ir->index.index_length) + 
 			le16_to_cpu(median->length);
-	if (!(median->ie_flags & INDEX_ENTRY_NODE))
+	if (le16_andz(median->ie_flags, INDEX_ENTRY_NODE))
 		new_size += sizeof(VCN);
 
 	ret = ntfs_ir_make_space(icx, new_size);

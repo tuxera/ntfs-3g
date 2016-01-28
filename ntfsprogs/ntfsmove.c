@@ -901,7 +901,7 @@ int main(int argc, char *argv[])
 		 * This means that the dirty flag is possibly not set, but
 		 * should be set. So we explicitly set it with a call to
 		 * ntfs_volume_write_flags. */
-		if(!(vol->flags & VOLUME_IS_DIRTY) && ntfs_volume_write_flags(
+		if(le16_andz(vol->flags, VOLUME_IS_DIRTY) && ntfs_volume_write_flags(
 			vol, vol->flags | VOLUME_IS_DIRTY)) {
 			ntfs_log_error("Error: Failed to set volume dirty "
 				"flag (%d (%s))!\n", errno, strerror(errno));

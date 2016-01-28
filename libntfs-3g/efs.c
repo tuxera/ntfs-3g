@@ -164,7 +164,7 @@ static int fixup_loop(ntfs_inode *ni)
 				ntfs_log_error("can't open DATA Attribute\n");
 				res = -1;
 			}
-			if (na && !(ctx->attr->flags & ATTR_IS_ENCRYPTED)) {
+			if (na && le16_andz(ctx->attr->flags, ATTR_IS_ENCRYPTED)) {
 				if (!NAttrNonResident(na)
 				   && ntfs_attr_make_non_resident(na, ctx)) {
 				/*
@@ -290,7 +290,7 @@ int ntfs_set_efs_info(ntfs_inode *ni, const char *value, size_t size,
 		}
 		if (!res) {
 			/* Don't handle AT_DATA Attribute(s) if inode is a directory */
-			if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+			if (le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 				/* iterate over AT_DATA attributes */
                         	/* set encrypted flag, truncate attribute to match padding bytes */
 			

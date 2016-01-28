@@ -1448,7 +1448,7 @@ static int ntfs_feed_encrypt(ntfs_inode *inode, ntfs_fek *fek)
 	}
 	total = 0;
 
-	if (!(attr->data_flags & ATTR_IS_ENCRYPTED)) {
+	if (le16_andz(attr->data_flags, ATTR_IS_ENCRYPTED)) {
 		ntfs_log_error("The data stream was not encrypted\n");
 		goto rejected;
 	}

@@ -352,7 +352,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 	 * ENOENT, unless we have got the mft reference of a matching name
 	 * cached in mref in which case return mref.
 	 */
-	if (!(ie->ie_flags & INDEX_ENTRY_NODE)) {
+	if (le16_andz(ie->ie_flags, INDEX_ENTRY_NODE)) {
 		ntfs_attr_put_search_ctx(ctx);
 		if (mref)
 			return mref;
@@ -1132,7 +1132,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		return -1;
 	}
 
-	if (!(dir_ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+	if (le16_andz(dir_ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 		errno = ENOTDIR;
 		return -1;
 	}
@@ -1791,7 +1791,7 @@ int ntfs_check_empty_dir(ntfs_inode *ni)
 	ntfs_attr *na;
 	int ret = 0;
 	
-	if (!(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))
+	if (le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 		return 0;
 
 	na = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);

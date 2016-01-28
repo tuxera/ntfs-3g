@@ -175,7 +175,7 @@ static ntfs_inode *ntfs_inode_real_open(ntfs_volume *vol, const MFT_REF mref)
 		goto out;
 	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
 		goto err_out;
-	if (!(ni->mrec->flags & MFT_RECORD_IN_USE)) {
+	if (le16_andz(ni->mrec->flags, MFT_RECORD_IN_USE)) {
 		errno = ENOENT;
 		goto err_out;
 	}
@@ -512,7 +512,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 		if (ni->vol && ni->vol->nidata_cache
 			&& ((ni->mft_no == FILE_root)
 			    || ((ni->mft_no >= FILE_first_user)
-				&& !(ni->mrec->flags & MFT_RECORD_IS_4)))) {
+				&& le16_andz(ni->mrec->flags, MFT_RECORD_IS_4)))) {
 			/* If we have dirty metadata, write it out. */
 			dirty = NInoDirty(ni) || NInoAttrListDirty(ni);
 			if (dirty) {

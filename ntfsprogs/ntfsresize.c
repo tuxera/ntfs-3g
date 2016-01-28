@@ -2022,7 +2022,7 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 		perr_exit("ntfs_file_record_record");
 	}
 
-	if (!(resize->mrec->flags & MFT_RECORD_IN_USE))
+	if (le16_andz(resize->mrec->flags, MFT_RECORD_IN_USE))
 		return;
 
 	resize->mref = mref;

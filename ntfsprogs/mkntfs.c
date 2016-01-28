@@ -2506,7 +2506,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	ia_val->index.allocated_size = cpu_to_le32(index_block_size -
 			(sizeof(INDEX_ALLOCATION) - sizeof(INDEX_HEADER)));
 	/* Find the last entry in the index root and save it in re. */
-	while ((char*)re < re_end && !(re->ie_flags & INDEX_ENTRY_END)) {
+	while ((char*)re < re_end && le16_andz(re->ie_flags, INDEX_ENTRY_END)) {
 		/* Next entry in index root. */
 		re = (INDEX_ENTRY*)((char*)re + le16_to_cpu(re->length));
 	}
@@ -2742,7 +2742,7 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx, u32 idx_size,
 	 */
 	if (le32_eq(type, AT_FILE_NAME)) {
 		while (((u8*)idx_entry < (u8*)idx_end) &&
-				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
+				le16_andz(idx_entry->ie_flags, INDEX_ENTRY_END)) {
 			/*
 			i = ntfs_file_values_compare(&idx->key.file_name,
 					&idx_entry->key.file_name, 1,
@@ -2787,7 +2787,7 @@ do_next:
 		}
 	} else if (le32_eq(type, AT_UNUSED)) {  /* case view */
 		while (((u8*)idx_entry < (u8*)idx_end) &&
-				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
+				le16_andz(idx_entry->ie_flags, INDEX_ENTRY_END)) {
 			i = ntfs_index_keys_compare((u8*)idx + 0x10,
 					(u8*)idx_entry + 0x10,
 					le16_to_cpu(idx->key_length),
@@ -3036,7 +3036,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, leMFT_REF file_ref,
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	while ((char*)ie < index_end && !(ie->ie_flags & INDEX_ENTRY_END)) {
+	while ((char*)ie < index_end && le16_andz(ie->ie_flags, INDEX_ENTRY_END)) {
 #if 0
 #ifdef DEBUG
 		ntfs_log_debug("file_name_attr1->file_name_length = %i\n",

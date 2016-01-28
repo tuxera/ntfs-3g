@@ -955,7 +955,7 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec)
 	if (!name || !rec)
 		return NULL;
 
-	if (!(rec->flags & MFT_RECORD_IS_DIRECTORY)) {
+	if (le16_andz(rec->flags, MFT_RECORD_IS_DIRECTORY)) {
 		return NULL;
 	}
 

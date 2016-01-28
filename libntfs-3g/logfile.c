@@ -682,7 +682,7 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 	 * we assume there was an unclean shutdown.
 	 */
 	if (!le16_eq(ra->client_in_use_list, LOGFILE_NO_CLIENT) &&
-			!(ra->flags & RESTART_VOLUME_IS_CLEAN)) {
+			le16_andz(ra->flags, RESTART_VOLUME_IS_CLEAN)) {
 		ntfs_log_error("The disk contains an unclean file system (%d, "
 			       "%d).\n", le16_to_cpu(ra->client_in_use_list),
 			       le16_to_cpu(ra->flags));

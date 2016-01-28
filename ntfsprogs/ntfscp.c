@@ -930,7 +930,7 @@ int main(int argc, char *argv[])
 			dir_ni = ntfs_inode_open(vol, FILE_root);
 		}
 		if (dir_ni) {
-			if (!(dir_ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+			if (le16_andz(dir_ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 				/* Remove the last '/' for estetic reasons. */
 				dirname_last_whack[0] = 0;
 				ntfs_log_error("The file '%s' already exists "
