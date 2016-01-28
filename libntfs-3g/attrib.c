@@ -467,7 +467,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * Also prevent compression on NTFS version < 3.0
 		 * or cluster size > 4K or compression is disabled
 		 */
-		a->flags &= ~ATTR_COMPRESSION_MASK;
+		a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
 		if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED)
 		    && (ni->vol->major_ver >= 3)
 		    && NVolCompression(ni->vol)
@@ -475,7 +475,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 			a->flags |= ATTR_IS_COMPRESSED;
 	}
 	
-	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+	cs = le16_and(a->flags, ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 
 	/* a file may be sparse though its unnamed data is not (cf $UsnJrnl) */
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED &&
@@ -943,7 +943,7 @@ static s64 ntfs_attr_pread_i(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	/* Sanity checking arguments is done in ntfs_attr_pread(). */
 	
 	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK) && NAttrNonResident(na)) {
-		if (le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+		if (le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			ATTR_IS_COMPRESSED))
 			return ntfs_compressed_attr_pread(na, pos, count, b);
 		else {
@@ -1809,7 +1809,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		goto errno_set;
 	}
 	vol = na->ni->vol;
-	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+	compressed = !le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			 const_cpu_to_le16(0));
 	na->unused_runs = 0; /* prepare overflow checks */
 	/*
@@ -1839,7 +1839,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
                  */
 	if (compressed
 	    && (!le32_eq(na->type, AT_DATA)
-		|| (!le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+		|| (!le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			 ATTR_IS_COMPRESSED)))) {
 		errno = EOPNOTSUPP;
 		goto errno_set;
@@ -1885,7 +1885,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		}
 #endif
 			/* resizing may change the compression mode */
-		compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+		compressed = !le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 				const_cpu_to_le16(0));
 		need_to.undo_data_size = 1;
 	}
@@ -2358,7 +2358,7 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	}
 	vol = na->ni->vol;
 	na->unused_runs = 0;
-	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+	compressed = !le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			 const_cpu_to_le16(0));
 	/*
 	 * Encrypted non-resident attributes are not supported.  We return
@@ -4386,8 +4386,8 @@ int ntfs_attr_set_flags(ntfs_inode *ni, ATTR_TYPES type, const ntfschar *name,
 		if (!ntfs_attr_lookup(type, name, name_len,
 					CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			/* do the requested change (all small endian le16) */
-			ctx->attr->flags = (ctx->attr->flags & ~mask)
-						| (flags & mask);
+			ctx->attr->flags = le16_and(ctx->attr->flags, ~mask)
+						| le16_and(flags, mask);
 			NInoSetDirty(ni);
 			res = 0;
 		}
@@ -4784,7 +4784,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 			- 1) & ~(vol->cluster_size - 1);
 
 	if (new_allocated_size > 0) {
-			if (le16_eq(a->flags & ATTR_COMPRESSION_MASK,
+			if (le16_eq(le16_and(a->flags, ATTR_COMPRESSION_MASK),
 					ATTR_IS_COMPRESSED)) {
 				/* must allocate full compression blocks */
 				new_allocated_size = ((new_allocated_size - 1)
@@ -4813,7 +4813,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 */
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
-	if (le16_eq(a->flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED)) {
+	if (le16_eq(le16_and(a->flags, ATTR_COMPRESSION_MASK), ATTR_IS_COMPRESSED)) {
 			/* set compression writing parameters */
 		na->compression_block_size
 			= 1 << (STANDARD_COMPRESSION_UNIT + vol->cluster_size_bits);
@@ -4887,14 +4887,14 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 * The decisions about compression can only be made when
 	 * creating/recreating the stream, not when making non resident.
 	 */
-	a->flags &= ~(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED);
-	if (le16_eq(a->flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED)) {
+	a->flags = le16_and(a->flags, ~(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED));
+	if (le16_eq(le16_and(a->flags, ATTR_COMPRESSION_MASK), ATTR_IS_COMPRESSED)) {
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
 		a->compressed_size = const_cpu_to_le64(0);
 	} else {
 		a->compression_unit = 0;
-		a->flags &= ~ATTR_COMPRESSION_MASK;
+		a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
 		na->data_flags = a->flags;
 	}
 
@@ -5092,7 +5092,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			tna->ni->allocated_size = tna->allocated_size;
 			NInoFileNameSetDirty(tna->ni);
 		}
-		if (le16_eq(tna->data_flags & ATTR_COMPRESSION_MASK,
+		if (le16_eq(le16_and(tna->data_flags, ATTR_COMPRESSION_MASK),
 						ATTR_IS_COMPRESSED)
 		   && ntfs_attr_pclose(tna)) {
 			err = errno;
@@ -5434,7 +5434,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 
 	/* Update sparse bit, unless this is an intermediate state */
 	if (holes == HOLES_DELAY)
-		sparse = !le16_eq(a->flags & ATTR_IS_SPARSE, const_cpu_to_le16(0));
+		sparse = !le16_eq(le16_and(a->flags, ATTR_IS_SPARSE), const_cpu_to_le16(0));
 	else {
 		sparse = ntfs_rl_sparse(na->rl);
 		if (sparse == -1) {
@@ -5498,7 +5498,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	    le16_andz(a->flags, ATTR_IS_COMPRESSED)) {
 		
 		NAttrClearSparse(na);
-		a->flags &= ~ATTR_IS_SPARSE;
+		a->flags = le16_and(a->flags, ~ATTR_IS_SPARSE);
 		na->data_flags = a->flags;
 		a->compression_unit = 0;
 		
@@ -5817,8 +5817,8 @@ retry:
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			a = ctx->attr;
 			a->allocated_size = cpu_to_sle64(na->allocated_size);
-			spcomp = na->data_flags
-				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+			spcomp = le16_and(na->data_flags,
+				ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 			if (!le16_cmpz(spcomp))
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
 			if (le32_eq(na->type, AT_DATA) && (na->name == AT_UNNAMED)) {
@@ -6450,11 +6450,11 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
 	 * for resident attributes when there is no open fuse context
 	 * (important case : $INDEX_ROOT:$I30)
 	 */
-	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+	compressed = !le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			 const_cpu_to_le16(0));
 	if (compressed
 	   && NAttrNonResident(na)
-	   && (!le16_eq(na->data_flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED))) {
+	   && (!le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK), ATTR_IS_COMPRESSED))) {
 		errno = EOPNOTSUPP;
 		ntfs_log_perror("Failed to truncate compressed attribute");
 		goto out;

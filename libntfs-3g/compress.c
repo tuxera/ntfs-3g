@@ -724,7 +724,7 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	data_flags = na->data_flags;
 	compression = na->ni->flags & FILE_ATTR_COMPRESSED;
 	if (!na || !na->ni || !na->ni->vol || !b
-			|| !le16_eq(data_flags & ATTR_COMPRESSION_MASK,
+			|| !le16_eq(le16_and(data_flags, ATTR_COMPRESSION_MASK),
 				ATTR_IS_COMPRESSED)
 			|| pos < 0 || count < 0) {
 		errno = EINVAL;
@@ -838,7 +838,7 @@ do_next_cb:
 		to_read = min(count, cb_size - ofs);
 		ofs += vcn << vol->cluster_size_bits;
 		NAttrClearCompressed(na);
-		na->data_flags &= ~ATTR_COMPRESSION_MASK;
+		na->data_flags = le16_and(na->data_flags, ~ATTR_COMPRESSION_MASK);
 		tdata_size = na->data_size;
 		tinitialized_size = na->initialized_size;
 		na->data_size = na->initialized_size = na->allocated_size;
@@ -896,7 +896,7 @@ do_next_cb:
 		 */
 		to_read = cb_size;
 		NAttrClearCompressed(na);
-		na->data_flags &= ~ATTR_COMPRESSION_MASK;
+		na->data_flags = le16_and(na->data_flags, ~ATTR_COMPRESSION_MASK);
 		tdata_size = na->data_size;
 		tinitialized_size = na->initialized_size;
 		na->data_size = na->initialized_size = na->allocated_size;

@@ -731,7 +731,7 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 
 	target = (char*)NULL;
 	bad = TRUE;
-	isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+	isdir = !le16_eq(le16_and(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY),
 			const_cpu_to_le16(0));
 	vol = ni->vol;
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,

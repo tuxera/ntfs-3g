@@ -796,7 +796,7 @@ static int reset_dirty(ntfs_volume *vol)
 
 	ntfs_log_verbose("Resetting dirty flag.\n");
 
-	flags = vol->flags & ~VOLUME_IS_DIRTY;
+	flags = le16_and(vol->flags, ~VOLUME_IS_DIRTY);
 
 	if (ntfs_volume_write_flags(vol, flags)) {
 		ntfs_log_error("Error setting volume flags.\n");

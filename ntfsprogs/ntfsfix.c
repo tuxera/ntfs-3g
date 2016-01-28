@@ -1612,7 +1612,7 @@ int main(int argc, char **argv)
 	 * mounting was successful.
 	 */
 	if (opt.clear_dirty)
-		vol->flags &= ~VOLUME_IS_DIRTY;
+		vol->flags = le16_and(vol->flags, ~VOLUME_IS_DIRTY);
 	else
 		vol->flags |= VOLUME_IS_DIRTY;
 	if (!opt.no_action && ntfs_volume_write_flags(vol, vol->flags)) {

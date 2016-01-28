@@ -1562,10 +1562,10 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
 	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
-		if (!le16_andz(flags, ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED)) {
+		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, ~ATTR_IS_COMPRESSED))) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
-			a->flags &= ~ATTR_COMPRESSION_MASK;
+			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
 			a->flags |= ATTR_IS_COMPRESSED;
 		}
 		a->compression_unit = 4;
@@ -1759,10 +1759,10 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
 	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
-		if (!le16_andz(flags, ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED)) {
+		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, ~ATTR_IS_COMPRESSED))) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
-			a->flags &= ~ATTR_COMPRESSION_MASK;
+			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
 			a->flags |= ATTR_IS_COMPRESSED;
 		}
 		a->compression_unit = 4;
@@ -2248,7 +2248,7 @@ static int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
 	memset(&vi, 0, sizeof(vi));
 	vi.major_ver = major_ver;
 	vi.minor_ver = minor_ver;
-	vi.flags = flags & VOLUME_FLAGS_MASK;
+	vi.flags = le16_and(flags, VOLUME_FLAGS_MASK);
 	err = insert_resident_attr_in_mft_record(m, AT_VOLUME_INFORMATION, NULL,
 			0, CASE_SENSITIVE, const_cpu_to_le16(0),
 			0, (u8*)&vi, sizeof(vi));

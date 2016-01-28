@@ -324,4 +324,6 @@
 
 #define le32_andz(a, b) (!((a) & (b)))
 
+#define le16_and(a, b) ((a) & (b))
+
 #endif /* defined _NTFS_ENDIANS_H */

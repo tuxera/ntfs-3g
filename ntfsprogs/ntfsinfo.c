@@ -1154,8 +1154,8 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 		printf("none set (0x0000)\n");
 	if (!le16_andz(vol_information->flags, ~VOLUME_FLAGS_MASK))
 		printf("\t\t\t\t Unknown Flags: 0x%04x\n",
-				le16_to_cpu(vol_information->flags &
-					(~VOLUME_FLAGS_MASK)));
+				le16_to_cpu(le16_and(vol_information->flags,
+					(~VOLUME_FLAGS_MASK))));
 }
 
 static ntfschar NTFS_DATA_SDS[5] = { const_cpu_to_le16('$'),
@@ -2191,20 +2191,20 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	if (!le16_cmpz(inode_flags)) {
 		if (!le16_andz(MFT_RECORD_IN_USE, inode_flags)) {
 			printf("IN_USE ");
-			inode_flags &= ~MFT_RECORD_IN_USE;
+			inode_flags = le16_and(inode_flags, ~MFT_RECORD_IN_USE);
 		}
 		if (!le16_andz(MFT_RECORD_IS_DIRECTORY, inode_flags)) {
 			printf("DIRECTORY ");
-			inode_flags &= ~MFT_RECORD_IS_DIRECTORY;
+			inode_flags = le16_and(inode_flags, ~MFT_RECORD_IS_DIRECTORY);
 		}
 		/* The meaning of IS_4 is illusive but not its existence. */
 		if (!le16_andz(MFT_RECORD_IS_4, inode_flags)) {
 			printf("IS_4 ");
-			inode_flags &= ~MFT_RECORD_IS_4;
+			inode_flags = le16_and(inode_flags, ~MFT_RECORD_IS_4);
 		}
 		if (!le16_andz(MFT_RECORD_IS_VIEW_INDEX, inode_flags)) {
 			printf("VIEW_INDEX ");
-			inode_flags &= ~MFT_RECORD_IS_VIEW_INDEX;
+			inode_flags = le16_and(inode_flags, ~MFT_RECORD_IS_VIEW_INDEX);
 		}
 		if (!le16_cmpz(inode_flags))
 			printf("UNKNOWN: 0x%04x", (unsigned)le16_to_cpu(

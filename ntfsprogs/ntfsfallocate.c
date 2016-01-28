@@ -548,7 +548,7 @@ static int ntfs_merge_allocation(ntfs_attr *na, runlist_element *rl,
 		if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 			na->compressed_size += size;
 			if (na->compressed_size >= na->allocated_size) {
-				na->data_flags &= ~ATTR_IS_SPARSE;
+				na->data_flags = le16_and(na->data_flags, ~ATTR_IS_SPARSE);
 				if (na->compressed_size > na->allocated_size) {
 					ntfs_log_error("File size error : "
 						"apparent %lld, "

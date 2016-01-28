@@ -2325,7 +2325,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			gid = cached->gid;
 		} else {
 			perm = 0;	/* default to no permission */
-			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+			isdir = !le16_eq(le16_and(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY),
 				const_cpu_to_le16(0));
 			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
@@ -2470,7 +2470,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			stbuf->st_mode = (stbuf->st_mode & ~07777) + perm;
 		} else {
 			perm = -1;	/* default to error */
-			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+			isdir = !le16_eq(le16_and(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY),
 				const_cpu_to_le16(0));
 			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
@@ -2892,7 +2892,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 
 		/* check whether target securid is known in cache */
 
-	isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY, const_cpu_to_le16(0));
+	isdir = !le16_eq(le16_and(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY), const_cpu_to_le16(0));
 	wanted.uid = uid;
 	wanted.gid = gid;
 	wanted.dmode = mode & 07777;
@@ -3660,7 +3660,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		mode = 0;
 		oldattr = getsecurityattr(scx->vol, ni);
 		if (oldattr) {
-			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+			isdir = !le16_eq(le16_and(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY),
 				const_cpu_to_le16(0));
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 				oldattr;
@@ -3948,8 +3948,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
 		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		pnhead->alignment = 0;
-		pnhead->control = (pphead->control
-			& (SE_DACL_AUTO_INHERITED | SE_SACL_AUTO_INHERITED))
+		pnhead->control = le16_and(pphead->control,
+			(SE_DACL_AUTO_INHERITED | SE_SACL_AUTO_INHERITED))
 				| SE_SELF_RELATIVE;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 			/*
@@ -3962,8 +3962,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
 			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid,
-				fordir, pphead->control
-					& SE_DACL_AUTO_INHERITED);
+				fordir, le16_and(pphead->control,
+					SE_DACL_AUTO_INHERITED));
 			if (aclsz) {
 				pnhead->dacl = cpu_to_le32(pos);
 				pos += aclsz;
@@ -3979,8 +3979,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
 			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid,
-				fordir, pphead->control
-					& SE_SACL_AUTO_INHERITED);
+				fordir, le16_and(pphead->control,
+					SE_SACL_AUTO_INHERITED));
 			if (aclsz) {
 				pnhead->sacl = cpu_to_le32(pos);
 				pos += aclsz;
@@ -4611,18 +4611,18 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		ok = FALSE;
 	} else {
 		if (selection & OWNER_SECURITY_INFORMATION)
-			control |= phead->control & SE_OWNER_DEFAULTED;
+			control |= le16_and(phead->control, SE_OWNER_DEFAULTED);
 		if (selection & GROUP_SECURITY_INFORMATION)
-			control |= phead->control & SE_GROUP_DEFAULTED;
+			control |= le16_and(phead->control, SE_GROUP_DEFAULTED);
 		if (selection & DACL_SECURITY_INFORMATION)
-			control |= phead->control
-					& (SE_DACL_PRESENT
+			control |= le16_and(phead->control,
+					SE_DACL_PRESENT
 					   | SE_DACL_DEFAULTED
 					   | SE_DACL_AUTO_INHERITED
 					   | SE_DACL_PROTECTED);
 		if (selection & SACL_SECURITY_INFORMATION)
-			control |= phead->control
-					& (SE_SACL_PRESENT
+			control |= le16_and(phead->control,
+					SE_SACL_PRESENT
 					   | SE_SACL_DEFAULTED
 					   | SE_SACL_AUTO_INHERITED
 					   | SE_SACL_PROTECTED);
@@ -4733,15 +4733,15 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 		} else
 			targhead->dacl = const_cpu_to_le32(0);
 		if (selection & DACL_SECURITY_INFORMATION) {
-			control |= newhead->control
-					& (SE_DACL_PRESENT
+			control |= le16_and(newhead->control,
+					SE_DACL_PRESENT
 					   | SE_DACL_DEFAULTED
 					   | SE_DACL_PROTECTED);
 			if (!le16_andz(newhead->control, SE_DACL_AUTO_INHERIT_REQ))
 				control |= SE_DACL_AUTO_INHERITED;
 		} else
-			control |= oldhead->control
-					& (SE_DACL_PRESENT
+			control |= le16_and(oldhead->control,
+					SE_DACL_PRESENT
 					   | SE_DACL_DEFAULTED
 					   | SE_DACL_AUTO_INHERITED
 					   | SE_DACL_PROTECTED);
@@ -4765,15 +4765,15 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 		} else
 			targhead->sacl = const_cpu_to_le32(0);
 		if (selection & SACL_SECURITY_INFORMATION) {
-			control |= newhead->control
-					& (SE_SACL_PRESENT
+			control |= le16_and(newhead->control,
+					SE_SACL_PRESENT
 					   | SE_SACL_DEFAULTED
 					   | SE_SACL_PROTECTED);
 			if (!le16_andz(newhead->control, SE_SACL_AUTO_INHERIT_REQ))
 				control |= SE_SACL_AUTO_INHERITED;
 		} else
-			control |= oldhead->control
-					& (SE_SACL_PRESENT
+			control |= le16_and(oldhead->control,
+					SE_SACL_PRESENT
 					   | SE_SACL_DEFAULTED
 					   | SE_SACL_AUTO_INHERITED
 					   | SE_SACL_PROTECTED);
@@ -4797,9 +4797,9 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 		} else
 			targhead->owner = const_cpu_to_le32(0);
 		if (selection & OWNER_SECURITY_INFORMATION)
-			control |= newhead->control & SE_OWNER_DEFAULTED;
+			control |= le16_and(newhead->control, SE_OWNER_DEFAULTED);
 		else
-			control |= oldhead->control & SE_OWNER_DEFAULTED;
+			control |= le16_and(oldhead->control, SE_OWNER_DEFAULTED);
 			/*
 			 * copy new GROUP if selected
 			 * or keep old GROUP if any
@@ -4809,13 +4809,13 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			if (selection & GROUP_SECURITY_INFORMATION) {
 				offgroup = le32_to_cpu(newhead->group);
 				pgroup = (const SID*)&newattr[offgroup];
-				control |= newhead->control
-						 & SE_GROUP_DEFAULTED;
+				control |= le16_and(newhead->control,
+						SE_GROUP_DEFAULTED);
 			} else {
 				offgroup = le32_to_cpu(oldhead->group);
 				pgroup = (const SID*)&oldattr[offgroup];
-				control |= oldhead->control
-						 & SE_GROUP_DEFAULTED;
+				control |= le16_and(oldhead->control,
+						SE_GROUP_DEFAULTED);
 			}
 			size = ntfs_sid_size(pgroup);
 			memcpy(&target[pos], pgroup, size);
@@ -4824,9 +4824,9 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 		} else
 			targhead->group = const_cpu_to_le32(0);
 		if (selection & GROUP_SECURITY_INFORMATION)
-			control |= newhead->control & SE_GROUP_DEFAULTED;
+			control |= le16_and(newhead->control, SE_GROUP_DEFAULTED);
 		else
-			control |= oldhead->control & SE_GROUP_DEFAULTED;
+			control |= le16_and(oldhead->control, SE_GROUP_DEFAULTED);
 		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		targhead->alignment = 0;
 		targhead->control = control;

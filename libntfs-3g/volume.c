@@ -1703,7 +1703,7 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const le16 flags)
 		goto err_out;
 	}
 	/* Set the volume flags. */
-	vol->flags = c->flags = flags & VOLUME_FLAGS_MASK;
+	vol->flags = c->flags = le16_and(flags, VOLUME_FLAGS_MASK);
 	/* Write them to disk. */
 	ntfs_inode_mark_dirty(vol->vol_ni);
 	if (ntfs_inode_sync(vol->vol_ni))
