@@ -163,7 +163,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	 * attribute.  Windows does not complain about invalid flags and chkdsk
 	 * does not detect or fix them so we need to cope with it, too.
 	 */
-	if (!le32_eq(a->type, AT_ATTRIBUTE_LIST) && a->flags) {
+	if (!le32_eq(a->type, AT_ATTRIBUTE_LIST) && !le16_cmpz(a->flags)) {
 		ntfs_log_error("Non-zero (%04x) attribute flags. Cannot handle "
 			       "this yet.\n", le16_to_cpu(a->flags));
 		errno = EOPNOTSUPP;
@@ -503,14 +503,14 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				sle64_to_cpu(a->allocated_size),
 				sle64_to_cpu(a->data_size),
 				sle64_to_cpu(a->initialized_size),
-				cs ? sle64_to_cpu(a->compressed_size) : 0,
-				cs ? a->compression_unit : 0);
+				!le16_cmpz(cs) ? sle64_to_cpu(a->compressed_size) : 0,
+				!le16_cmpz(cs) ? a->compression_unit : 0);
 	} else {
 		s64 l = le32_to_cpu(a->value_length);
 		ntfs_attr_init(na, FALSE, a->flags,
 				a->flags & ATTR_IS_ENCRYPTED,
 				a->flags & ATTR_IS_SPARSE, (l + 7) & ~7, l, l,
-				cs ? (l + 7) & ~7 : 0, 0);
+				!le16_cmpz(cs) ? (l + 7) & ~7 : 0, 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
 out:
@@ -5819,11 +5819,11 @@ retry:
 			a->allocated_size = cpu_to_sle64(na->allocated_size);
 			spcomp = na->data_flags
 				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
-			if (spcomp)
+			if (!le16_cmpz(spcomp))
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
 			if (le32_eq(na->type, AT_DATA) && (na->name == AT_UNNAMED)) {
 				na->ni->allocated_size
-					= (spcomp
+					= (!le16_cmpz(spcomp)
 						? na->compressed_size
 						: na->allocated_size);
 				NInoFileNameSetDirty(na->ni);

@@ -837,13 +837,13 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					pauthace->mask |= pnewace->mask;
 				} else {
 					pauthace = pnewace;
-					if (inherited)
+					if (!le16_cmpz(inherited))
 						pnewace->flags |= INHERITED_ACE;
 					dst += acesz;
 					newcnt++;
 				}
 			} else {
-				if (inherited)
+				if (!le16_cmpz(inherited))
 					pnewace->flags |= INHERITED_ACE;
 				dst += acesz;
 				newcnt++;
@@ -871,7 +871,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				pnewace->flags &= ~(OBJECT_INHERIT_ACE
 						| CONTAINER_INHERIT_ACE
 						| INHERIT_ONLY_ACE);
-				if (inherited)
+				if (!le16_cmpz(inherited))
 					pnewace->flags |= INHERITED_ACE;
 				if ((pnewace->type == ACCESS_ALLOWED_ACE_TYPE)
 				    && pownerace
@@ -889,7 +889,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				pnewace->flags &= ~(OBJECT_INHERIT_ACE
 						| CONTAINER_INHERIT_ACE
 						| INHERIT_ONLY_ACE);
-				if (inherited)
+				if (!le16_cmpz(inherited))
 					pnewace->flags |= INHERITED_ACE;
 				dst += gsidsz + 8;
 				newcnt++;
@@ -922,7 +922,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				else
 					pnewace->flags &= ~INHERIT_ONLY_ACE;
 			}
-			if (inherited)
+			if (!le16_cmpz(inherited))
 				pnewace->flags |= INHERITED_ACE;
 			/*
 			 * Prepare grouping similar ACE for authenticated users

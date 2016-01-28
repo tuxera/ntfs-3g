@@ -2026,7 +2026,7 @@ search:
 		ntfs_log_error("Could not delete inode cache entry for %s\n",
 			pathname);
 #endif
-	if (ni->mrec->link_count) {
+	if (!le16_cmpz(ni->mrec->link_count)) {
 		ntfs_inode_update_times(ni, NTFS_UPDATE_CTIME);
 		goto ok;
 	}

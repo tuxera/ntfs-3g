@@ -821,7 +821,7 @@ static void ntfs_dump_filename(const char *indent,
 				le16_to_cpu(file_name_attr->packed_ea_size),
 				(unsigned)
 				le16_to_cpu(file_name_attr->packed_ea_size));
-		if (file_name_attr->reserved)
+		if (!le16_cmpz(file_name_attr->reserved))
 			printf("%sReserved:\t\t %d (0x%x)\n", indent,
 					(unsigned)
 					le16_to_cpu(file_name_attr->reserved),
@@ -2188,7 +2188,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 			(unsigned)le16_to_cpu(mrec->attrs_offset));
 
 	printf("MFT Record Flags:\t ");
-	if (inode_flags) {
+	if (!le16_cmpz(inode_flags)) {
 		if (MFT_RECORD_IN_USE & inode_flags) {
 			printf("IN_USE ");
 			inode_flags &= ~MFT_RECORD_IN_USE;
@@ -2206,7 +2206,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 			printf("VIEW_INDEX ");
 			inode_flags &= ~MFT_RECORD_IS_VIEW_INDEX;
 		}
-		if (inode_flags)
+		if (!le16_cmpz(inode_flags))
 			printf("UNKNOWN: 0x%04x", (unsigned)le16_to_cpu(
 						inode_flags));
 	} else {

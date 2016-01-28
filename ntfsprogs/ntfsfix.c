@@ -860,7 +860,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 					>> vol->cluster_size_bits;
 			levcn = cpu_to_le64(vcn);
 			while ((length > 0)
-			    && al->length
+			    && !le16_cmpz(al->length)
 			    && (!le32_eq(al->type, AT_DATA)
 				|| !sle64_eq(al->lowest_vcn, levcn))) {
 				length -= le16_to_cpu(al->length);
@@ -868,7 +868,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 					((char*)al + le16_to_cpu(al->length));
 			}
 			if ((length > 0)
-			    && al->length
+			    && !le16_cmpz(al->length)
 			    && le32_eq(al->type, AT_DATA)
 			    && !al->name_length
 			    && sle64_eq(al->lowest_vcn, levcn)

@@ -2459,7 +2459,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		goto err_out;
 	}
 	a = ctx->attr;
-	if (a->non_resident || a->flags) {
+	if (a->non_resident || !le16_cmpz(a->flags)) {
 		err = -EINVAL;
 		goto err_out;
 	}

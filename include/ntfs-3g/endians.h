@@ -310,4 +310,6 @@
 
 #define be32_eq(a, b) ((a) == (b))
 
+#define le16_cmpz(a) (!(a))
+
 #endif /* defined _NTFS_ENDIANS_H */

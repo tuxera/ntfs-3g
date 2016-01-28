@@ -507,7 +507,7 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 			 */
 	if ((count >= 7)
 	    && !memcmp(junction,dir_junction_head,8)
-	    && junction[4]
+	    && !le16_cmpz(junction[4])
 	    && le16_eq(junction[5], const_cpu_to_le16(':'))
 	    && le16_eq(junction[6], const_cpu_to_le16('\\')))
 		kind = DIR_JUNCTION;
@@ -529,7 +529,7 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 			 */
 	if ((kind == DIR_JUNCTION)
 	    && (count >= 7)
-	    && junction[7]
+	    && !le16_cmpz(junction[7])
 	    && !ntfs_drive_letter(vol, junction[4])) {
 		target = search_absolute(vol,&junction[7],count - 7, isdir);
 		if (target) {
@@ -609,7 +609,7 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			 * where \ is an individual char and x a non-null char
 			 */
 	if ((count >= 3)
-	    && junction[0]
+	    && !le16_cmpz(junction[0])
 	    && le16_eq(junction[1], const_cpu_to_le16(':'))
 	    && le16_eq(junction[2], const_cpu_to_le16('\\')))
 		kind = FULL_PATH;
@@ -630,7 +630,7 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			 */
 	if (((kind == FULL_PATH)
 	    && (count >= 3)
-	    && junction[3]
+	    && !le16_cmpz(junction[3])
 	    && !ntfs_drive_letter(vol, junction[0]))
 	    || (kind == ABS_PATH)) {
 		if (kind == ABS_PATH)

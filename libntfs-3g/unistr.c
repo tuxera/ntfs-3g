@@ -456,7 +456,7 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 	BOOL surrog;
 
 	surrog = FALSE;
-	for (i = 0; i < ins_len && ins[i]; i++) {
+	for (i = 0; i < ins_len && !le16_cmpz(ins[i]); i++) {
 		unsigned short c = le16_to_cpu(ins[i]);
 		if (surrog) {
 			if ((c >= 0xdc00) && (c < 0xe000)) {
@@ -538,7 +538,7 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 
 	t = *outs;
 
-	for (i = 0; i < ins_len && ins[i]; i++) {
+	for (i = 0; i < ins_len && !le16_cmpz(ins[i]); i++) {
 	    unsigned short c = le16_to_cpu(ins[i]);
 			/* size not double-checked */
 		if (halfpair) {
