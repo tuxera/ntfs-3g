@@ -4435,7 +4435,7 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 				 * and set index root accordingly
 				 */
 				settable = le32_or(settable, FILE_ATTR_COMPRESSED);
-				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
+				if (!le32_andz(le32_xor(ni->flags, cpu_to_le32(attrib)),
 				             FILE_ATTR_COMPRESSED)) {
 					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
 						dirflags = const_cpu_to_le16(0);
@@ -5040,7 +5040,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				 * and set index root accordingly
 				 */
 				settable = le32_or(settable, FILE_ATTR_COMPRESSED);
-				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
+				if (!le32_andz(le32_xor(ni->flags, cpu_to_le32(attrib)),
 				             FILE_ATTR_COMPRESSED)) {
 					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
 						dirflags = const_cpu_to_le16(0);

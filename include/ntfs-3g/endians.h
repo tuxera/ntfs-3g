@@ -338,4 +338,6 @@
 
 #define le16_xor(a, b) ((a) ^ (b))
 
+#define le32_xor(a, b) ((a) ^ (b))
+
 #endif /* defined _NTFS_ENDIANS_H */
