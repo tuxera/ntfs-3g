@@ -52,6 +52,8 @@
 #include <sys/param.h>
 #endif
 
+#include "types.h"
+
 #ifndef __BYTE_ORDER
 #	if defined(_BYTE_ORDER)
 #		define __BYTE_ORDER _BYTE_ORDER
@@ -181,6 +183,8 @@
 #error "You must define __BYTE_ORDER to be __LITTLE_ENDIAN or __BIG_ENDIAN."
 
 #endif
+
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 
 /* Unsigned from LE to CPU conversion. */
 
@@ -347,5 +351,274 @@
 #define le32_not(a) (~(a))
 
 #define le64_not(a) (~(a))
+
+#else
+
+/* Unsigned from LE to CPU conversion. */
+
+static inline u16 le16_to_cpu(le16 x) { return (u16) __le16_to_cpu(x.value); }
+static inline u32 le32_to_cpu(le32 x) { return (u32) __le32_to_cpu(x.value); }
+static inline u64 le64_to_cpu(le64 x) { return (u64) __le64_to_cpu(x.value); }
+
+static inline u16 le16_to_cpup(const le16 *x) {
+	return (u16) __le16_to_cpu(x->value);
+}
+static inline u32 le32_to_cpup(const le32 *x) {
+	return (u32) __le32_to_cpu(x->value);
+}
+static inline u64 le64_to_cpup(const le64 *x) {
+	return (u64) __le64_to_cpu(x->value);
+}
+
+/* Signed from LE to CPU conversion. */
+
+static inline s16 sle16_to_cpu(sle16 x) { return (s16) __le16_to_cpu(x.value); }
+static inline s32 sle32_to_cpu(sle32 x) { return (s32) __le32_to_cpu(x.value); }
+static inline s64 sle64_to_cpu(sle64 x) { return (s64) __le64_to_cpu(x.value); }
+
+static inline s16 sle16_to_cpup(const sle16 *x) {
+	return (s16) __le16_to_cpu(x->value);
+}
+static inline s32 sle32_to_cpup(const sle32 *x) {
+	return (s32) __le32_to_cpu(x->value);
+}
+static inline s64 sle64_to_cpup(const sle64 *x) {
+	return (s64) __le64_to_cpu(x->value);
+}
+
+/* Unsigned from CPU to LE conversion. */
+
+static inline le16 cpu_to_le16(u16 x) {
+	le16 leval; leval.value = __cpu_to_le16(x); return leval;
+}
+static inline le32 cpu_to_le32(u32 x) {
+	le32 leval; leval.value = __cpu_to_le32(x); return leval;
+}
+static inline le64 cpu_to_le64(u64 x) {
+	le64 leval; leval.value = __cpu_to_le64(x); return leval;
+}
+
+static inline le16 cpu_to_le16p(const u16 *x) {
+	le16 leval; leval.value = __cpu_to_le16(*x); return leval;
+}
+static inline le32 cpu_to_le32p(const u32 *x) {
+	le32 leval; leval.value = __cpu_to_le32(*x); return leval;
+}
+static inline le64 cpu_to_le64p(const u64 *x) {
+	le64 leval; leval.value = __cpu_to_le64(*x); return leval;
+}
+
+/* Signed from CPU to LE conversion. */
+
+static inline sle16 cpu_to_sle16(s16 x) {
+	sle16 leval; leval.value = __cpu_to_le16(x); return leval;
+}
+static inline sle32 cpu_to_sle32(s32 x) {
+	sle32 leval; leval.value = __cpu_to_le32(x); return leval;
+}
+static inline sle64 cpu_to_sle64(s64 x) {
+	sle64 leval; leval.value = __cpu_to_le64(x); return leval;
+}
+
+static inline sle16 cpu_to_sle16p(const s16 *x) {
+	sle16 leval; leval.value = __cpu_to_le16(*x); return leval;
+}
+static inline sle32 cpu_to_sle32p(const s32 *x) {
+	sle32 leval; leval.value = __cpu_to_le32(*x); return leval;
+}
+static inline sle64 cpu_to_sle64p(const s64 *x) {
+	sle64 leval; leval.value = __cpu_to_le64(*x); return leval;
+}
+
+/* Unsigned from BE to CPU conversion. */
+
+static inline u16 be16_to_cpu(be16 x) { return (u16) __be16_to_cpu(x.value); }
+static inline u32 be32_to_cpu(be32 x) { return (u32) __be32_to_cpu(x.value); }
+static inline u64 be64_to_cpu(be64 x) { return (u64) __be64_to_cpu(x.value); }
+
+static inline u16 be16_to_cpup(const be16 *x) {
+	return (u16) __be16_to_cpu(x->value);
+}
+static inline u32 be32_to_cpup(const be32 *x) {
+	return (u32) __be32_to_cpu(x->value);
+}
+static inline u64 be64_to_cpup(const be64 *x) {
+	return (u64) __be64_to_cpu(x->value);
+}
+
+/* Signed from BE to CPU conversion. */
+
+static inline s16 sbe16_to_cpu(sbe16 x) { return (s16) __be16_to_cpu(x.value); }
+static inline s32 sbe32_to_cpu(sbe32 x) { return (s32) __be32_to_cpu(x.value); }
+static inline s64 sbe64_to_cpu(sbe64 x) { return (s64) __be64_to_cpu(x.value); }
+
+static inline s16 sbe16_to_cpup(const sbe16 *x) {
+	return (s16) __be16_to_cpu(x->value);
+}
+static inline s32 sbe32_to_cpup(const sbe32 *x) {
+	return (s32) __be32_to_cpu(x->value);
+}
+static inline s64 sbe64_to_cpup(const sbe64 *x) {
+	return (s64) __be64_to_cpu(x->value);
+}
+
+/* Unsigned from CPU to BE conversion. */
+
+static inline be16 cpu_to_be16(u16 x) {
+	be16 beval; beval.value = __cpu_to_be16(x); return beval;
+}
+static inline be32 cpu_to_be32(u32 x) {
+	be32 beval; beval.value = __cpu_to_be32(x); return beval;
+}
+static inline be64 cpu_to_be64(u64 x) {
+	be64 beval; beval.value = __cpu_to_be64(x); return beval;
+}
+
+static inline be16 cpu_to_be16p(const u16 *x) {
+	be16 beval; beval.value = __cpu_to_be16(*x); return beval;
+}
+static inline be32 cpu_to_be32p(const u32 *x) {
+	be32 beval; beval.value = __cpu_to_be32(*x); return beval;
+}
+static inline be64 cpu_to_be64p(const u64 *x) {
+	be64 beval; beval.value = __cpu_to_be64(*x); return beval;
+}
+
+/* Signed from CPU to BE conversion. */
+
+static inline sbe16 cpu_to_sbe16(s16 x) {
+	sbe16 beval; beval.value = __cpu_to_be16(x); return beval;
+}
+static inline sbe32 cpu_to_sbe32(s32 x) {
+	sbe32 beval; beval.value = __cpu_to_be32(x); return beval;
+}
+static inline sbe64 cpu_to_sbe64(s64 x) {
+	sbe64 beval; beval.value = __cpu_to_be64(x); return beval;
+}
+
+static inline sbe16 cpu_to_sbe16p(const s16 *x) {
+	sbe16 beval; beval.value = __cpu_to_be16(*x); return beval;
+}
+static inline sbe32 cpu_to_sbe32p(const s32 *x) {
+	sbe32 beval; beval.value = __cpu_to_be32(*x); return beval;
+}
+static inline sbe64 cpu_to_sbe64p(const s64 *x) {
+	sbe64 beval; beval.value = __cpu_to_be64(*x); return beval;
+}
+
+/* Constant endianness conversion defines. */
+
+#define const_le16_to_cpu(x)	__constant_le16_to_cpu((u16)(x.value))
+#define const_le32_to_cpu(x)	__constant_le32_to_cpu((u32)(x.value))
+#define const_le64_to_cpu(x)	__constant_le64_to_cpu((u64)(x.value))
+
+#define const_cpu_to_le16(x)	((le16)(u16) __constant_cpu_to_le16((u16)(x)))
+#define const_cpu_to_le32(x)	((le32) __constant_cpu_to_le32((u32)(x)))
+#define const_cpu_to_le64(x)	((le64) __constant_cpu_to_le64((u64)(x)))
+
+#define const_sle16_to_cpu(x)	__constant_le16_to_cpu((u16)(x.value))
+#define const_sle32_to_cpu(x)	__constant_le32_to_cpu((u32)(x.value))
+#define const_sle64_to_cpu(x)	__constant_le64_to_cpu((u64)(x.value))
+
+#define const_cpu_to_sle16(x)	((sle16)(u16) __constant_cpu_to_le16((u16)(x)))
+#define const_cpu_to_sle32(x)	((sle32) __constant_cpu_to_le32((u32)(x)))
+#define const_cpu_to_sle64(x)	((sle64) __constant_cpu_to_le64((u64)(x)))
+
+#define const_be16_to_cpu(x)	__constant_be16_to_cpu((u16)(x.value))
+#define const_be32_to_cpu(x)	__constant_be32_to_cpu((u32)(x.value))
+#define const_be64_to_cpu(x)	__constant_be64_to_cpu((u64)(x.value))
+
+#define const_cpu_to_be16(x)	((be16)(u16) __constant_cpu_to_be16((u16)(x)))
+#define const_cpu_to_be32(x)	((be32) __constant_cpu_to_be32((u32)(x)))
+#define const_cpu_to_be64(x)	((be64) __constant_cpu_to_be64((u64)(x)))
+
+#define const_sbe16_to_cpu(x)	__constant_be16_to_cpu((u16)(x.value))
+#define const_sbe32_to_cpu(x)	__constant_be32_to_cpu((u32)(x.value))
+#define const_sbe64_to_cpu(x)	__constant_be64_to_cpu((u64)(x.value))
+
+#define const_cpu_to_sbe16(x)	((sbe16)(u16) __constant_cpu_to_be16((u16)(x)))
+#define const_cpu_to_sbe32(x)	((sbe32) __constant_cpu_to_be32((u32)(x)))
+#define const_cpu_to_sbe64(x)	((sbe64) __constant_cpu_to_be64((u64)(x)))
+
+static inline int le16_eq(le16 a, le16 b) { return (a.value == b.value); }
+
+static inline int le32_eq(le32 a, le32 b) { return (a.value == b.value); }
+
+static inline int le64_eq(le64 a, le64 b) { return (a.value == b.value); }
+
+static inline int sle16_eq(sle16 a, sle16 b) { return (a.value == b.value); }
+
+static inline int sle64_eq(sle64 a, sle64 b) { return (a.value == b.value); }
+
+static inline int be16_eq(be16 a, be16 b) { return (a.value == b.value); }
+
+static inline int be32_eq(be32 a, be32 b) { return (a.value == b.value); }
+
+static inline int le16_cmpz(le16 a) { return !a.value; }
+
+static inline int le32_cmpz(le32 a) { return !a.value; }
+
+static inline int le64_cmpz(le64 a) { return !a.value; }
+
+static inline int sle64_cmpz(sle64 a) { return !a.value; }
+
+static inline int be16_cmpz(be16 a) { return !a.value; }
+
+static inline int le16_andz(le16 a, le16 b) { return !(a.value & b.value); }
+
+static inline int le32_andz(le32 a, le32 b) { return !(a.value & b.value); }
+
+static inline le16 le16_and(le16 a, le16 b)
+{
+	return (le16) ((u16) (a.value & b.value));
+}
+
+static inline le32 le32_and(le32 a, le32 b)
+{
+	return (le32) (a.value & b.value);
+}
+
+static inline le64 le64_and(le64 a, le64 b)
+{
+	return (le64) (a.value & b.value);
+}
+
+static inline le16 le16_or(le16 a, le16 b)
+{
+	return (le16) ((u16) (a.value | b.value));
+}
+
+static inline le32 le32_or(le32 a, le32 b)
+{
+	return (le32) (a.value | b.value);
+}
+
+static inline le64 le64_or(le64 a, le64 b)
+{
+	return (le64) (a.value | b.value);
+}
+
+static inline le16 le16_xor(le16 a, le16 b)
+{
+	return (le16) ((u16) (a.value ^ b.value));
+}
+
+static inline le32 le32_xor(le32 a, le32 b)
+{
+	return (le32) (a.value ^ b.value);
+}
+
+static inline le64 le64_xor(le64 a, le64 b)
+{
+	return (le64) (a.value ^ b.value);
+}
+
+static inline le16 le16_not(le16 a) { return (le16) ((u16) (~a.value)); }
+
+static inline le32 le32_not(le32 a) { return (le32) (~a.value); }
+
+static inline le64 le64_not(le64 a) { return (le64) (~a.value); }
+
+#endif /* !ENABLE_STRICT_ENDIANNESS_CHECKING ... */
 
 #endif /* defined _NTFS_ENDIANS_H */

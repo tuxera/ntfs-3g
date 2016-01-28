@@ -27,6 +27,10 @@
 #include "config.h"
 #endif
 
+#if !defined(ENABLE_STRICT_ENDIANNESS_CHECKING)
+#define ENABLE_STRICT_ENDIANNESS_CHECKING 1
+#endif /* !defined(ENABLE_STRICT_ENDIANNESS_CHECKING) */
+
 #if HAVE_STDINT_H || !HAVE_CONFIG_H
 #include <stdint.h>
 #endif
@@ -44,6 +48,7 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 typedef u16 le16;
 typedef u32 le32;
 typedef u64 le64;
@@ -63,6 +68,71 @@ typedef u64 sle64;
 typedef u16 sbe16;
 typedef u32 sbe32;
 typedef u64 sbe64;
+#else
+typedef union {
+	u8 data[2];
+	u16 value;
+} le16;
+
+typedef union {
+	u8 data[4];
+	u32 value;
+} le32;
+
+typedef union {
+	u8 data[8];
+	u64 value;
+} le64;
+
+typedef union {
+	u8 data[2];
+	u16 value;
+} be16;
+
+typedef union {
+	u8 data[4];
+	u32 value;
+} be32;
+
+typedef union {
+	u8 data[8];
+	u64 value;
+} be64;
+
+/*
+ * Declare s{l,b}e{16,32,64} to be unsigned because we do not want sign
+ * extension on BE architectures.
+ */
+typedef union {
+	u8 data[2];
+	u16 value;
+} sle16;
+
+typedef union {
+	u8 data[4];
+	u32 value;
+} sle32;
+
+typedef union {
+	u8 data[8];
+	u64 value;
+} sle64;
+
+typedef union {
+	u8 data[2];
+	u16 value;
+} sbe16;
+
+typedef union {
+	u8 data[4];
+	u32 value;
+} sbe32;
+
+typedef union {
+	u8 data[8];
+	u64 value;
+} sbe64;
+#endif /* !ENABLE_STRICT_ENDIANNESS_CHECKING ... */
 
 typedef le16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1

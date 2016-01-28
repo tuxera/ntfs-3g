@@ -96,13 +96,23 @@ typedef enum {
  * this registry key.  It would be interesting to check out encryption on one
  * of the "crippled" crypto Windows versions...
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 NTFS_CRYPTO_ALGORITHMS;
+
+static const le32
+#else
 typedef enum {
+#endif
 	CALG_DES	= const_cpu_to_le32(0x6601),
 	/* If not one of the below three, fall back to standard Des. */
 	CALG_3DES	= const_cpu_to_le32(0x6603),
 	CALG_DESX	= const_cpu_to_le32(0x6604),
 	CALG_AES_256	= const_cpu_to_le32(0x6610),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } NTFS_CRYPTO_ALGORITHMS;
+#else
+	__NTFS_CRYPTO_ALGORITHMS_end;
+#endif
 
 typedef struct {
 	u64 in_whitening, out_whitening;

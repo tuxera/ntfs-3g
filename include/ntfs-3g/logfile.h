@@ -108,10 +108,18 @@ typedef struct {
  * These are the so far known RESTART_AREA_* flags (16-bit) which contain
  * information about the log file in which they are present.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+static const le16
+#else
 enum {
+#endif
 	RESTART_VOLUME_IS_CLEAN	= const_cpu_to_le16(0x0002),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 	RESTART_SPACE_FILLER	= 0xffff, /* gcc: Force enum bit width to 16. */
 } __attribute__((__packed__));
+#else
+	__RESTART_AREA_FLAGS_end;
+#endif
 
 typedef le16 RESTART_AREA_FLAGS;
 
@@ -335,12 +343,22 @@ typedef struct {
  *
  * (Or is it log record pages?)
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 LOG_RECORD_FLAGS;
+
+static const LOG_RECORD_FLAGS
+#else
 typedef enum {
+#endif
 	LOG_RECORD_MULTI_PAGE = const_cpu_to_le16(0x0001),	/* ??? */
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 	LOG_RECORD_SIZE_PLACE_HOLDER = 0xffff,
 		/* This has nothing to do with the log record. It is only so
 		   gcc knows to make the flags 16-bit. */
 } __attribute__((__packed__)) LOG_RECORD_FLAGS;
+#else
+	__LOG_RECORD_FLAGS_end;
+#endif
 
 /**
  * struct LOG_CLIENT_ID - The log client id structure identifying a log client.

@@ -100,7 +100,13 @@ typedef struct {
  * Magic identifiers present at the beginning of all ntfs record containing
  * records (like mft records for example).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 NTFS_RECORD_TYPES;
+
+static const le32
+#else
 typedef enum {
+#endif
 	/* Found in $MFT/$DATA. */
 	magic_FILE = const_cpu_to_le32(0x454c4946), /* Mft entry. */
 	magic_INDX = const_cpu_to_le32(0x58444e49), /* Index buffer. */
@@ -125,14 +131,18 @@ typedef enum {
 	magic_empty = const_cpu_to_le32(0xffffffff),/* Record is empty and has
 						       to be initialized before
 						       it can be used. */
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } NTFS_RECORD_TYPES;
+#else
+	__NTFS_RECORD_TYPES_end;
+#endif
 
 /*
  * Generic magic comparison macros. Finally found a use for the ## preprocessor
  * operator! (-8
  */
-#define ntfs_is_magic(x, m)	(   (u32)(x) == (u32)magic_##m )
-#define ntfs_is_magicp(p, m)	( *(u32*)(p) == (u32)magic_##m )
+#define ntfs_is_magic(x, m)	( le32_eq(x, magic_##m)   )
+#define ntfs_is_magicp(p, m)	( le32_eq(*p, magic_##m)  )
 
 /*
  * Specialised magic comparison macros for the NTFS_RECORD_TYPES defined above.
@@ -254,14 +264,24 @@ typedef enum {
  * index, that means an INDEX_ROOT and an INDEX_ALLOCATION with a name other
  * than "$I30". It is unknown if it is limited to metadata files only.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 MFT_RECORD_FLAGS;
+
+static const MFT_RECORD_FLAGS
+#else
 typedef enum {
+#endif
 	MFT_RECORD_IN_USE		= const_cpu_to_le16(0x0001),
 	MFT_RECORD_IS_DIRECTORY		= const_cpu_to_le16(0x0002),
 	MFT_RECORD_IS_4			= const_cpu_to_le16(0x0004),
 	MFT_RECORD_IS_VIEW_INDEX	= const_cpu_to_le16(0x0008),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 	MFT_REC_SPACE_FILLER		= 0xffff, /* Just to make flags
 						     16-bit. */
 } __attribute__((__packed__)) MFT_RECORD_FLAGS;
+#else
+	__MFT_RECORD_FLAGS_end;
+#endif
 
 /*
  * mft references (aka file references or file record segment references) are
@@ -489,7 +509,13 @@ typedef struct {
  * enum exchanging AT_ for the dollar sign ($). If that isn't a revealing
  * choice of symbol... (-;
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 ATTR_TYPES;
+
+static const ATTR_TYPES
+#else
 typedef enum {
+#endif
 	AT_UNUSED			= const_cpu_to_le32(         0),
 	AT_STANDARD_INFORMATION		= const_cpu_to_le32(      0x10),
 	AT_ATTRIBUTE_LIST		= const_cpu_to_le32(      0x20),
@@ -509,7 +535,11 @@ typedef enum {
 	AT_LOGGED_UTILITY_STREAM	= const_cpu_to_le32(     0x100),
 	AT_FIRST_USER_DEFINED_ATTRIBUTE	= const_cpu_to_le32(    0x1000),
 	AT_END				= const_cpu_to_le32(0xffffffff),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } ATTR_TYPES;
+#else
+	__ATTR_TYPES_end;
+#endif
 
 /**
  * enum COLLATION_RULES - The collation rules for sorting views/indexes/etc
@@ -548,7 +578,13 @@ typedef enum {
  *	the 2nd object_id. If the first le32 values of both object_ids were
  *	equal then the second le32 values would be compared, etc.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 COLLATION_RULES;
+
+static const COLLATION_RULES
+#else
 typedef enum {
+#endif
 	COLLATION_BINARY	 = const_cpu_to_le32(0), /* Collate by binary
 					compare where the first byte is most
 					significant. */
@@ -564,7 +600,11 @@ typedef enum {
 	COLLATION_NTOFS_SID		= const_cpu_to_le32(17),
 	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(18),
 	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(19),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } COLLATION_RULES;
+#else
+	__COLLATION_RULES_end;
+#endif
 
 /**
  * enum ATTR_DEF_FLAGS -
@@ -576,7 +616,13 @@ typedef enum {
  * name attribute has this flag set and this is the only attribute indexed in
  * NT4.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 ATTR_DEF_FLAGS;
+
+static const ATTR_DEF_FLAGS
+#else
 typedef enum {
+#endif
 	ATTR_DEF_INDEXABLE	= const_cpu_to_le32(0x02), /* Attribute can be
 					indexed. */
 	ATTR_DEF_MULTIPLE	= const_cpu_to_le32(0x04), /* Attribute type
@@ -601,7 +647,11 @@ typedef enum {
 					non-resident.  Without this, only log
 					modifications if the attribute is
 					resident. */
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } ATTR_DEF_FLAGS;
+#else
+	__ATTR_DEF_FLAGS_end;
+#endif
 
 /**
  * struct ATTR_DEF -
@@ -631,14 +681,24 @@ typedef struct {
 /**
  * enum ATTR_FLAGS - Attribute flags (16-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 ATTR_FLAGS;
+
+static const ATTR_FLAGS
+#else
 typedef enum {
+#endif
 	ATTR_IS_COMPRESSED	= const_cpu_to_le16(0x0001),
 	ATTR_COMPRESSION_MASK	= const_cpu_to_le16(0x00ff),  /* Compression
 						method mask. Also, first
 						illegal value. */
 	ATTR_IS_ENCRYPTED	= const_cpu_to_le16(0x4000),
 	ATTR_IS_SPARSE		= const_cpu_to_le16(0x8000),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } __attribute__((__packed__)) ATTR_FLAGS;
+#else
+	__ATTR_FLAGS_end;
+#endif
 
 /*
  * Attribute compression.
@@ -828,7 +888,13 @@ typedef ATTR_RECORD ATTR_REC;
 /**
  * enum FILE_ATTR_FLAGS - File attribute flags (32-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 FILE_ATTR_FLAGS;
+
+static const FILE_ATTR_FLAGS
+#else
 typedef enum {
+#endif
 	/*
 	 * These flags are only present in the STANDARD_INFORMATION attribute
 	 * (in the field file_attributes).
@@ -889,7 +955,11 @@ typedef enum {
 	 * $FILE_NAME attributes.
 	 */
 	FILE_ATTR_VIEW_INDEX_PRESENT	= const_cpu_to_le32(0x20000000),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } __attribute__((__packed__)) FILE_ATTR_FLAGS;
+#else
+	__FILE_ATTR_FLAGS_end;
+#endif
 
 /*
  * NOTE on times in NTFS: All times are in MS standard time format, i.e. they
@@ -1481,7 +1551,13 @@ typedef struct {
  *
  * Defines the access rights.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 ACCESS_MASK;
+
+static const ACCESS_MASK
+#else
 typedef enum {
+#endif
 	/*
 	 * The specific rights (bits 0 to 15). Depend on the type of the
 	 * object being secured by the ACE.
@@ -1609,7 +1685,11 @@ typedef enum {
 	 * above for the descriptions of the rights granted.
 	 */
 	GENERIC_READ			= const_cpu_to_le32(0x80000000),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } ACCESS_MASK;
+#else
+	__ACCESS_MASK_end;
+#endif
 
 /**
  * struct GENERIC_MAPPING -
@@ -1649,10 +1729,20 @@ typedef struct {
 /**
  * enum OBJECT_ACE_FLAGS - The object ACE flags (32-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 OBJECT_ACE_FLAGS;
+
+static const OBJECT_ACE_FLAGS
+#else
 typedef enum {
+#endif
 	ACE_OBJECT_TYPE_PRESENT			= const_cpu_to_le32(1),
 	ACE_INHERITED_OBJECT_TYPE_PRESENT	= const_cpu_to_le32(2),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } OBJECT_ACE_FLAGS;
+#else
+	__OBJECT_ACE_FLAGS_end;
+#endif
 
 /**
  * struct ACCESS_ALLOWED_OBJECT_ACE -
@@ -1757,7 +1847,13 @@ typedef enum {
  *	and all pointer fields are expressed as offsets from the
  *	beginning of the security descriptor.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 SECURITY_DESCRIPTOR_CONTROL;
+
+static const SECURITY_DESCRIPTOR_CONTROL
+#else
 typedef enum {
+#endif
 	SE_OWNER_DEFAULTED		= const_cpu_to_le16(0x0001),
 	SE_GROUP_DEFAULTED		= const_cpu_to_le16(0x0002),
 	SE_DACL_PRESENT			= const_cpu_to_le16(0x0004),
@@ -1772,7 +1868,11 @@ typedef enum {
 	SE_SACL_PROTECTED		= const_cpu_to_le16(0x2000),
 	SE_RM_CONTROL_VALID		= const_cpu_to_le16(0x4000),
 	SE_SELF_RELATIVE		= const_cpu_to_le16(0x8000),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } __attribute__((__packed__)) SECURITY_DESCRIPTOR_CONTROL;
+#else
+	__SECURITY_DESCRIPTOR_CONTROL_end;
+#endif
 
 /**
  * struct SECURITY_DESCRIPTOR_RELATIVE -
@@ -1986,7 +2086,13 @@ typedef struct {
 /**
  * enum VOLUME_FLAGS - Possible flags for the volume (16-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 VOLUME_FLAGS;
+
+static const VOLUME_FLAGS
+#else
 typedef enum {
+#endif
 	VOLUME_IS_DIRTY			= const_cpu_to_le16(0x0001),
 	VOLUME_RESIZE_LOG_FILE		= const_cpu_to_le16(0x0002),
 	VOLUME_UPGRADE_ON_MOUNT		= const_cpu_to_le16(0x0004),
@@ -1996,7 +2102,11 @@ typedef enum {
 	VOLUME_CHKDSK_UNDERWAY		= const_cpu_to_le16(0x4000),
 	VOLUME_MODIFIED_BY_CHKDSK	= const_cpu_to_le16(0x8000),
 	VOLUME_FLAGS_MASK		= const_cpu_to_le16(0xc03f),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } __attribute__((__packed__)) VOLUME_FLAGS;
+#else
+	__VOLUME_FLAGS_end;
+#endif
 
 /**
  * struct VOLUME_INFORMATION - Attribute: Volume information (0x70).
@@ -2170,7 +2280,13 @@ typedef struct {
 /**
  * enum QUOTA_FLAGS - Quota flags (32-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 QUOTA_FLAGS;
+
+static const QUOTA_FLAGS
+#else
 typedef enum {
+#endif
 	/* The user quota flags. Names explain meaning. */
 	QUOTA_FLAG_DEFAULT_LIMITS	= const_cpu_to_le32(0x00000001),
 	QUOTA_FLAG_LIMIT_REACHED	= const_cpu_to_le32(0x00000002),
@@ -2189,7 +2305,11 @@ typedef enum {
 	QUOTA_FLAG_OUT_OF_DATE		= const_cpu_to_le32(0x00000200),
 	QUOTA_FLAG_CORRUPT		= const_cpu_to_le32(0x00000400),
 	QUOTA_FLAG_PENDING_DELETES	= const_cpu_to_le32(0x00000800),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } QUOTA_FLAGS;
+#else
+	__QUOTA_FLAGS_end;
+#endif
 
 /**
  * struct QUOTA_CONTROL_ENTRY -
@@ -2246,16 +2366,32 @@ typedef struct {
 /**
  * enum PREDEFINED_OWNER_IDS - Predefined owner_id values (32-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 PREDEFINED_OWNER_IDS;
+
+static const PREDEFINED_OWNER_IDS
+#else
 typedef enum {
+#endif
 	QUOTA_INVALID_ID	= const_cpu_to_le32(0x00000000),
 	QUOTA_DEFAULTS_ID	= const_cpu_to_le32(0x00000001),
 	QUOTA_FIRST_USER_ID	= const_cpu_to_le32(0x00000100),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } PREDEFINED_OWNER_IDS;
+#else
+	__PREDEFINED_OWNER_IDS_end;
+#endif
 
 /**
  * enum INDEX_ENTRY_FLAGS - Index entry flags (16-bit).
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 INDEX_ENTRY_FLAGS;
+
+static const INDEX_ENTRY_FLAGS
+#else
 typedef enum {
+#endif
 	INDEX_ENTRY_NODE = const_cpu_to_le16(1), /* This entry contains a
 					sub-node, i.e. a reference to an index
 					block in form of a virtual cluster
@@ -2264,8 +2400,12 @@ typedef enum {
 					entry in an index block. The index
 					entry does not represent a file but it
 					can point to a sub-node. */
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 	INDEX_ENTRY_SPACE_FILLER = 0xffff, /* Just to force 16-bit width. */
 } __attribute__((__packed__)) INDEX_ENTRY_FLAGS;
+#else
+	__INDEX_ENTRY_FLAGS_end;
+#endif
 
 /**
  * struct INDEX_ENTRY_HEADER - This the index entry header (see below).
@@ -2391,7 +2531,13 @@ typedef struct {
  *	bit 31: Microsoft bit. If set, the tag is owned by Microsoft. User
  *		defined tags have to use zero here.
  */
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 PREDEFINED_REPARSE_TAGS;
+
+static const PREDEFINED_REPARSE_TAGS
+#else
 typedef enum {
+#endif
 	IO_REPARSE_TAG_IS_ALIAS		= const_cpu_to_le32(0x20000000),
 	IO_REPARSE_TAG_IS_HIGH_LATENCY	= const_cpu_to_le32(0x40000000),
 	IO_REPARSE_TAG_IS_MICROSOFT	= const_cpu_to_le32(0x80000000),
@@ -2413,7 +2559,11 @@ typedef enum {
 	IO_REPARSE_TAG_WIM		= const_cpu_to_le32(0x80000008),
 
 	IO_REPARSE_TAG_VALID_VALUES	= const_cpu_to_le32(0xf000ffff),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } PREDEFINED_REPARSE_TAGS;
+#else
+	__PREDEFINED_REPARSE_TAGS_end;
+#endif
 
 /**
  * struct REPARSE_POINT - Attribute: Reparse point (0xc0).
@@ -2639,14 +2789,24 @@ typedef struct {
 
 typedef EFS_DF_CERTIFICATE_THUMBPRINT_HEADER EFS_DF_CERT_THUMBPRINT_HEADER;
 
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le64 INTX_FILE_TYPES;
+
+static const INTX_FILE_TYPES
+#else
 typedef enum {
+#endif
 	INTX_SYMBOLIC_LINK =
 		const_cpu_to_le64(0x014B4E4C78746E49ULL), /* "IntxLNK\1" */
 	INTX_CHARACTER_DEVICE =
 		const_cpu_to_le64(0x0052484378746E49ULL), /* "IntxCHR\0" */
 	INTX_BLOCK_DEVICE =
 		const_cpu_to_le64(0x004B4C4278746E49ULL), /* "IntxBLK\0" */
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
 } INTX_FILE_TYPES;
+#else
+	__INTX_FILE_TYPES_end;
+#endif
 
 typedef struct {
 	INTX_FILE_TYPES magic;		/* Intx file magic. */
