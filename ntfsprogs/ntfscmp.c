@@ -722,7 +722,7 @@ static void vprint_attribute(ATTR_TYPES atype, char  *name)
 	if (!opt.verbose)
 		return;
 
-	printf("0x%x", atype);
+	printf("0x%x", le32_to_cpu(atype));
 	if (name)
 		printf(":%s", name);
 	printf(" ");
