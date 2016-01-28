@@ -777,7 +777,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				stbuf->st_blocks = na->allocated_size >> 9;
 			}
 			/* Check whether it's Interix FIFO or socket. */
-			if (!(ni->flags & FILE_ATTR_HIDDEN) &&
+			if (le32_andz(ni->flags, FILE_ATTR_HIDDEN) &&
 					!stream_name_len) {
 				/* FIFO. */
 				if (na->data_size == 0)
@@ -943,7 +943,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	/* Sanity checks. */
-	if (!(ni->flags & FILE_ATTR_SYSTEM)) {
+	if (le32_andz(ni->flags, FILE_ATTR_SYSTEM)) {
 		res = -EINVAL;
 		goto exit;
 	}
@@ -3106,7 +3106,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
-		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+		if (le32_andz(ni->flags, FILE_ATTR_ARCHIVE)) {
 			set_archive(ni);
 			NInoFileNameSetDirty(ni);
 		}
@@ -3143,7 +3143,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	}
 	if (!res) {
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+		if (le32_andz(ni->flags, FILE_ATTR_ARCHIVE)) {
 			set_archive(ni);
 			NInoFileNameSetDirty(ni);
 		}
@@ -3334,7 +3334,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	}
 	if (!res) {
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+		if (le32_andz(ni->flags, FILE_ATTR_ARCHIVE)) {
 			set_archive(ni);
 			NInoFileNameSetDirty(ni);
 		}

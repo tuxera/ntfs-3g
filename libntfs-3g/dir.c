@@ -887,7 +887,7 @@ static u32 ntfs_interix_types(ntfs_inode *ni)
 		/* Unrecognized patterns (eg HID + SYST) are plain files */
 		dt_type = NTFS_DT_REG;
 		if (na->data_size <= 1) {
-			if (!(ni->flags & FILE_ATTR_HIDDEN))
+			if (le32_andz(ni->flags, FILE_ATTR_HIDDEN))
 				dt_type = (na->data_size ?
 						NTFS_DT_SOCK : NTFS_DT_FIFO);
 		} else {
@@ -930,7 +930,7 @@ static u32 ntfs_dir_entry_type(ntfs_inode *dir_ni, MFT_REF mref,
 			dt_type = NTFS_DT_LNK;
 		else
 			if (!le32_andz(attributes, FILE_ATTR_SYSTEM)
-			   && !(attributes & FILE_ATTR_I30_INDEX_PRESENT))
+			   && le32_andz(attributes, FILE_ATTR_I30_INDEX_PRESENT))
 				dt_type = ntfs_interix_types(ni);
 			else
 				dt_type = (!le32_andz(attributes,
@@ -1000,7 +1000,7 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 
 		/* return metadata files and hidden files if requested */
         if ((!metadata && (NVolShowHidFiles(dir_ni->vol)
-				|| !(fn->file_attributes & FILE_ATTR_HIDDEN)))
+				|| le32_andz(fn->file_attributes, FILE_ATTR_HIDDEN)))
             || (NVolShowSysFiles(dir_ni->vol) && (NVolShowHidFiles(dir_ni->vol)
 				|| metadata))) {
 		if (NVolCaseSensitive(dir_ni->vol)) {

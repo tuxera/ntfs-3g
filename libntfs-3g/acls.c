@@ -674,10 +674,10 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 		&& (!offsacl
 			|| ((offsacl >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
 			    && (offsacl+sizeof(ACL) <= attrsz)))
-		&& !(phead->owner & const_cpu_to_le32(3))
-		&& !(phead->group & const_cpu_to_le32(3))
-		&& !(phead->dacl & const_cpu_to_le32(3))
-		&& !(phead->sacl & const_cpu_to_le32(3))
+		&& le32_andz(phead->owner, const_cpu_to_le32(3))
+		&& le32_andz(phead->group, const_cpu_to_le32(3))
+		&& le32_andz(phead->dacl, const_cpu_to_le32(3))
+		&& le32_andz(phead->sacl, const_cpu_to_le32(3))
 		&& (ntfs_attr_size(securattr) <= attrsz)
 		&& ntfs_valid_sid((const SID*)&securattr[offowner])
 		&& ntfs_valid_sid((const SID*)&securattr[offgroup])
@@ -3223,7 +3223,7 @@ static int build_std_permissions(const char *securattr,
 					denyown |= pace->mask;
 				} else
 				if (ntfs_same_sid(gsid, &pace->sid)
-				    && !(pace->mask & WRITE_OWNER)) {
+				    && le32_andz(pace->mask, WRITE_OWNER)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						allowgrp |= pace->mask;
 					else if (pace->type == ACCESS_DENIED_ACE_TYPE)
@@ -3313,7 +3313,7 @@ static int build_owngrp_permissions(const char *securattr,
 				}
 			} else
 				if (ntfs_same_sid(usid, &pace->sid)
-				   && (!(pace->mask & WRITE_OWNER))) {
+				   && le32_andz(pace->mask, WRITE_OWNER)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 						allowgrp |= pace->mask;
 						grppresent = TRUE;
@@ -3494,7 +3494,7 @@ static int build_ownadmin_permissions(const char *securattr,
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)
-		   && !(~pace->mask & (ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK))) {
+		   && le32_andz(~pace->mask, ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK)) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			     && ((!le32_andz(pace->mask, WRITE_OWNER) && firstapply))) {
@@ -3506,7 +3506,7 @@ static int build_ownadmin_permissions(const char *securattr,
 						denyown |= pace->mask;
 				} else
 				    if (ntfs_same_sid(gsid, &pace->sid)
-					&& (!(pace->mask & WRITE_OWNER))) {
+				    && (le32_andz(pace->mask, WRITE_OWNER))) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 							allowgrp |= pace->mask;
 							isforeign &= ~2;

@@ -3645,7 +3645,7 @@ static int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPE
 		if (!ad)
 			return -1;
 		/* Check the flags and return the result. */
-		allowed = !(ad->flags & ATTR_DEF_RESIDENT);
+		allowed = le32_andz(ad->flags, ATTR_DEF_RESIDENT);
 	}
 	if (!allowed) {
 		errno = EPERM;

@@ -253,7 +253,7 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 			}
 		} while (ni
 		    && !le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
-		    && !(ni->flags & FILE_ATTR_REPARSE_POINT)
+		    && le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)
 		    && (start < count));
 	if (ni
 	    && ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY) ? isdir : !isdir)
@@ -776,8 +776,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				/* reparse data consistency has been checked */
 			switch (kind) {
 			case FULL_TARGET :
-				if (!(symlink_data->flags
-				   & const_cpu_to_le32(1))) {
+				if (le32_andz(symlink_data->flags,
+				   const_cpu_to_le32(1))) {
 					target = ntfs_get_fulllink(vol,
 						p, lth/2,
 						mnt_point, isdir);
