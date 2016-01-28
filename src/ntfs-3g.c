@@ -972,7 +972,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	/* Sanity check. */
-	if (intx_file->magic != INTX_SYMBOLIC_LINK) {
+	if (!le64_eq(intx_file->magic, INTX_SYMBOLIC_LINK)) {
 		res = -EINVAL;
 		goto exit;
 	}

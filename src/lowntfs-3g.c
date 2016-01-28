@@ -940,7 +940,7 @@ static void ntfs_fuse_readlink(fuse_req_t req, fuse_ino_t ino)
 		goto exit;
 	}
 	/* Sanity check. */
-	if (intx_file->magic != INTX_SYMBOLIC_LINK) {
+	if (!le64_eq(intx_file->magic, INTX_SYMBOLIC_LINK)) {
 		res = -EINVAL;
 		goto exit;
 	}
