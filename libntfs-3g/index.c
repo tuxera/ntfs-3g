@@ -1159,7 +1159,7 @@ retry :
 	ntfs_ir_nill(ir);
 	
 	ie = ntfs_ie_get_first(&ir->index);
-	ie->ie_flags |= INDEX_ENTRY_NODE;
+	ie->ie_flags = le16_or(ie->ie_flags, INDEX_ENTRY_NODE);
 	ie->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN));
 	
 	ir->index.ih_flags = LARGE_INDEX;
@@ -1283,7 +1283,7 @@ static int ntfs_ie_add_vcn(INDEX_ENTRY **ie)
 	if (!p)
 		return STATUS_ERROR;
 	
-	p->ie_flags |= INDEX_ENTRY_NODE;
+	p->ie_flags = le16_or(p->ie_flags, INDEX_ENTRY_NODE);
 	*ie = p;
 
 	return STATUS_OK;

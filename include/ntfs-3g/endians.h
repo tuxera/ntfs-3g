@@ -330,4 +330,6 @@
 
 #define le64_and(a, b) ((a) & (b))
 
+#define le16_or(a, b) ((a) | (b))
+
 #endif /* defined _NTFS_ENDIANS_H */

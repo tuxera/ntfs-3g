@@ -1463,7 +1463,7 @@ found_free_rec:
 	if (!le16_cmpz(seq_no) && !le16_eq(seq_no, const_cpu_to_le16(0xffff)))
 		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
-	m->flags |= MFT_RECORD_IN_USE;
+	m->flags = le16_or(m->flags, MFT_RECORD_IN_USE);
 	/* Now need to open an ntfs inode for the mft record. */
 	ni = ntfs_inode_allocate(vol);
 	if (!ni) {
@@ -1766,7 +1766,7 @@ found_free_rec:
 	if (!le16_cmpz(seq_no) && !le16_eq(seq_no, const_cpu_to_le16(0xffff)))
 		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
-	m->flags |= MFT_RECORD_IN_USE;
+	m->flags = le16_or(m->flags, MFT_RECORD_IN_USE);
 	/* Now need to open an ntfs inode for the mft record. */
 	ni = ntfs_inode_allocate(vol);
 	if (!ni) {
@@ -1913,7 +1913,7 @@ bitmap_rollback:
 		ntfs_log_debug("Eeek! Rollback failed in ntfs_mft_record_free().  "
 				"Leaving inconsistent metadata!\n");
 sync_rollback:
-	ni->mrec->flags |= MFT_RECORD_IN_USE;
+	ni->mrec->flags = le16_or(ni->mrec->flags, MFT_RECORD_IN_USE);
 	ni->mrec->sequence_number = old_seq_no;
 	ntfs_inode_mark_dirty(ni);
 	errno = err;

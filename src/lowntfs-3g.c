@@ -2677,7 +2677,7 @@ static void ntfs_fuse_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
 		goto close_inode;
 	}
         
-	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED)
+	if (!le16_andz(na->data_flags, le16_or(ATTR_COMPRESSION_MASK, ATTR_IS_ENCRYPTED))
 			 || !NAttrNonResident(na)) {
 		ret = -EINVAL;
 		goto close_attr;

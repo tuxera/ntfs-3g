@@ -2818,7 +2818,7 @@ static void prepare_volume_fixup(ntfs_volume *vol)
 {
 	printf("Schedule chkdsk for NTFS consistency check at Windows boot "
 			"time ...\n");
-	vol->flags |= VOLUME_IS_DIRTY;
+	vol->flags = le16_or(vol->flags, VOLUME_IS_DIRTY);
 	if (ntfs_volume_write_flags(vol, vol->flags))
 		perr_exit("Failed to set the volume dirty");
 

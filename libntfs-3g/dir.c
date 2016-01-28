@@ -1713,7 +1713,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	/* Set hard links count and directory flag. */
 	ni->mrec->link_count = cpu_to_le16(1);
 	if (S_ISDIR(type))
-		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
+		ni->mrec->flags = le16_or(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY);
 	ntfs_inode_mark_dirty(ni);
 	/* Done! */
 	free(fn);

@@ -305,7 +305,7 @@ static int set_dirty_flag(ntfs_volume *vol)
 	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
 	 * and fix it for us.
 	 */
-	flags = vol->flags | VOLUME_IS_DIRTY;
+	flags = le16_or(vol->flags, VOLUME_IS_DIRTY);
 	if (!opt.no_action && OLD_ntfs_volume_set_flags(vol, flags)) {
 		ntfs_log_info(FAILED);
 		ntfs_log_error("Error setting volume flags.\n");
@@ -1614,7 +1614,7 @@ int main(int argc, char **argv)
 	if (opt.clear_dirty)
 		vol->flags = le16_and(vol->flags, ~VOLUME_IS_DIRTY);
 	else
-		vol->flags |= VOLUME_IS_DIRTY;
+		vol->flags = le16_or(vol->flags, VOLUME_IS_DIRTY);
 	if (!opt.no_action && ntfs_volume_write_flags(vol, vol->flags)) {
 		ntfs_log_error("Error: Failed to set volume dirty flag (%d "
 			"(%s))!\n", errno, strerror(errno));

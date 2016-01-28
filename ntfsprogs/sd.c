@@ -37,7 +37,7 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	sd = (SECURITY_DESCRIPTOR_RELATIVE*)&sd_array;
 	sd->revision = 1;
 	sd->alignment = 0;
-	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
+	sd->control = le16_or(SE_SELF_RELATIVE, SE_DACL_PRESENT);
 	*sd_val_len = 0x64;
 	sd->owner = const_cpu_to_le32(0x48);
 	sd->group = const_cpu_to_le32(0x54);
@@ -184,7 +184,7 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	sd = (SECURITY_DESCRIPTOR_RELATIVE*)sd_array;
 	sd->revision = SECURITY_DESCRIPTOR_REVISION;
 	sd->alignment = 0;
-	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
+	sd->control = le16_or(SE_SELF_RELATIVE, SE_DACL_PRESENT);
 	sd->owner = const_cpu_to_le32(0x1014);
 	sd->group = const_cpu_to_le32(0x1020);
 	sd->sacl = 0;
@@ -424,7 +424,7 @@ void init_secure_sds(char *sd_val)
 			sizeof(SECURITY_DESCRIPTOR_HEADER));
 	sd->revision = 0x01;
 	sd->alignment = 0x00;
-	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
+	sd->control = le16_or(SE_SELF_RELATIVE, SE_DACL_PRESENT);
 	sd->owner = const_cpu_to_le32(0x48);
 	sd->group = const_cpu_to_le32(0x58);
 	sd->sacl = const_cpu_to_le32(0x00);
@@ -520,7 +520,7 @@ void init_secure_sds(char *sd_val)
 		 sizeof(SECURITY_DESCRIPTOR_HEADER));
 	sd->revision = 0x01;
 	sd->alignment = 0x00;
-	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
+	sd->control = le16_or(SE_SELF_RELATIVE, SE_DACL_PRESENT);
 	sd->owner = const_cpu_to_le32(0x48);
 	sd->group = const_cpu_to_le32(0x58);
 	sd->sacl = const_cpu_to_le32(0x00);

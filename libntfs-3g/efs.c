@@ -423,7 +423,7 @@ int ntfs_efs_fixup_attribute(ntfs_attr_search_ctx *ctx, ntfs_attr *na)
 	ctx->attr->data_size = cpu_to_le64(newsize);
 	if (le64_to_cpu(ctx->attr->initialized_size) > newsize)
 		ctx->attr->initialized_size = ctx->attr->data_size;
-	ctx->attr->flags |= ATTR_IS_ENCRYPTED;
+	ctx->attr->flags = le16_or(ctx->attr->flags, ATTR_IS_ENCRYPTED);
 	if (close_ctx)
 		ntfs_attr_put_search_ctx(ctx);
 		

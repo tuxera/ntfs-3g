@@ -472,10 +472,10 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		    && (ni->vol->major_ver >= 3)
 		    && NVolCompression(ni->vol)
 		    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE))
-			a->flags |= ATTR_IS_COMPRESSED;
+			a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 	}
 	
-	cs = le16_and(a->flags, ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+	cs = le16_and(a->flags, le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE));
 
 	/* a file may be sparse though its unnamed data is not (cf $UsnJrnl) */
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED &&
@@ -1358,7 +1358,7 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 				 lcn_seek_from, DATA_ZONE);
 	if (!rlc)
 		goto err_out;
-	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK | ATTR_IS_SPARSE))
+	if (!le16_andz(na->data_flags, le16_or(ATTR_COMPRESSION_MASK, ATTR_IS_SPARSE)))
 		na->compressed_size += need << vol->cluster_size_bits;
 	
 	*rl = ntfs_runlists_merge(na->rl, rlc);
@@ -3950,7 +3950,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	dataruns_size = (dataruns_size + 7) & ~7;
 	length = offsetof(ATTR_RECORD, compressed_size) + ((sizeof(ntfschar) *
 			name_len + 7) & ~7) + dataruns_size +
-			(!le16_andz(flags, ATTR_IS_COMPRESSED | ATTR_IS_SPARSE) ?
+			(!le16_andz(flags, le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE)) ?
 			sizeof(a->compressed_size) : 0);
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
@@ -3964,7 +3964,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->non_resident = 1;
 	a->name_length = name_len;
 	a->name_offset = cpu_to_le16(offsetof(ATTR_RECORD, compressed_size) +
-			(!le16_andz(flags, ATTR_IS_COMPRESSED | ATTR_IS_SPARSE) ?
+			(!le16_andz(flags, le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE)) ?
 			sizeof(a->compressed_size) : 0));
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
@@ -4386,8 +4386,8 @@ int ntfs_attr_set_flags(ntfs_inode *ni, ATTR_TYPES type, const ntfschar *name,
 		if (!ntfs_attr_lookup(type, name, name_len,
 					CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			/* do the requested change (all small endian le16) */
-			ctx->attr->flags = le16_and(ctx->attr->flags, ~mask)
-						| le16_and(flags, mask);
+			ctx->attr->flags = le16_or(le16_and(ctx->attr->flags, ~mask),
+						le16_and(flags, mask));
 			NInoSetDirty(ni);
 			res = 0;
 		}
@@ -4887,7 +4887,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 * The decisions about compression can only be made when
 	 * creating/recreating the stream, not when making non resident.
 	 */
-	a->flags = le16_and(a->flags, ~(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED));
+	a->flags = le16_and(a->flags, ~(le16_or(ATTR_IS_SPARSE, ATTR_IS_ENCRYPTED)));
 	if (le16_eq(le16_and(a->flags, ATTR_COMPRESSION_MASK), ATTR_IS_COMPRESSED)) {
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
@@ -5350,7 +5350,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	    && NVolCompression(na->ni->vol)
 	    && (na->ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	    && !le32_andz(na->ni->flags, FILE_ATTR_COMPRESSED)) {
-		a->flags |= ATTR_IS_COMPRESSED;
+		a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 		na->data_flags = a->flags;
 	}
 	/*
@@ -5446,7 +5446,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	/* Check whether attribute becomes sparse, unless check is delayed. */
 	if ((holes != HOLES_DELAY)
 	    && sparse
-	    && le16_andz(a->flags, ATTR_IS_SPARSE | ATTR_IS_COMPRESSED)) {
+	    && le16_andz(a->flags, le16_or(ATTR_IS_SPARSE, ATTR_IS_COMPRESSED))) {
 		/*
 		 * Move attribute to another mft record, if attribute is too 
 		 * small to add compressed_size field to it and we have no 
@@ -5478,7 +5478,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 		}
 		
 		NAttrSetSparse(na);
-		a->flags |= ATTR_IS_SPARSE;
+		a->flags = le16_or(a->flags, ATTR_IS_SPARSE);
 		na->data_flags = a->flags;
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;  /* Windows
 		 set it so, even if attribute is not actually compressed. */
@@ -5818,7 +5818,7 @@ retry:
 			a = ctx->attr;
 			a->allocated_size = cpu_to_sle64(na->allocated_size);
 			spcomp = le16_and(na->data_flags,
-				ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+				le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE));
 			if (!le16_cmpz(spcomp))
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
 			if (le32_eq(na->type, AT_DATA) && (na->name == AT_UNNAMED)) {

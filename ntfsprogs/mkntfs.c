@@ -1477,7 +1477,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (!le16_andz(flags, ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
+	if (!le16_andz(flags, le16_or(ATTR_IS_ENCRYPTED, ATTR_IS_SPARSE))) {
 		ntfs_log_error("Encrypted/sparse attributes not supported.\n");
 		err = -EOPNOTSUPP;
 		goto err_out;
@@ -1566,7 +1566,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
 			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
-			a->flags |= ATTR_IS_COMPRESSED;
+			a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 		}
 		a->compression_unit = 4;
 		inited_size = val_len;
@@ -1668,7 +1668,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (!le16_andz(flags, ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
+	if (!le16_andz(flags, le16_or(ATTR_IS_ENCRYPTED, ATTR_IS_SPARSE))) {
 		ntfs_log_error("Encrypted/sparse attributes not supported.\n");
 		err = -EOPNOTSUPP;
 		goto err_out;
@@ -1763,7 +1763,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
 			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
-			a->flags |= ATTR_IS_COMPRESSED;
+			a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 		}
 		a->compression_unit = 4;
 		/* FIXME: Set the compressed size. */
@@ -2524,7 +2524,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	}
 	/* Now fixup empty index root with pointer to index allocation VCN 0. */
 	r->index.ih_flags = LARGE_INDEX;
-	re->ie_flags |= INDEX_ENTRY_NODE;
+	re->ie_flags = le16_or(re->ie_flags, INDEX_ENTRY_NODE);
 	if (le16_to_cpu(re->length) < sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN))
 		re->length = cpu_to_le16(le16_to_cpu(re->length) + sizeof(VCN));
 	r->index.index_length = cpu_to_le32(le32_to_cpu(r->index.entries_offset)
@@ -4437,7 +4437,7 @@ static BOOL mkntfs_create_root_structures(void)
 		m = (MFT_RECORD*)(g_buf + i * g_vol->mft_record_size);
 		if (i < 16 || i > 23) {
 			m->mft_record_number = cpu_to_le32(i);
-			m->flags |= MFT_RECORD_IN_USE;
+			m->flags = le16_or(m->flags, MFT_RECORD_IN_USE);
 			ntfs_bit_set(g_mft_bitmap, 0LL + i, 1);
 		}
 		file_attrs = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM;
@@ -4476,7 +4476,7 @@ static BOOL mkntfs_create_root_structures(void)
 	extend_ref = MK_LE_MREF(11,11);
 	ntfs_log_verbose("Creating root directory (mft record 5)\n");
 	m = (MFT_RECORD*)(g_buf + 5 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_DIRECTORY;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_DIRECTORY);
 	m->link_count = cpu_to_le16(le16_to_cpu(m->link_count) + 1);
 	err = add_attr_file_name(m, root_ref, 0LL, 0LL,
 			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
@@ -4724,7 +4724,7 @@ static BOOL mkntfs_create_root_structures(void)
 		 * odd and we failed to set the device block size to the sector
 		 * size, hence we schedule chkdsk to create it.
 		 */
-		volume_flags |= VOLUME_IS_DIRTY;
+		volume_flags = le16_or(volume_flags, VOLUME_IS_DIRTY);
 	}
 	free(bs);
 	/*
@@ -4768,7 +4768,7 @@ static BOOL mkntfs_create_root_structures(void)
 	/* create $Secure (NTFS 3.0+) */
 	ntfs_log_verbose("Creating $Secure (mft record 9)\n");
 	m = (MFT_RECORD*)(g_buf + 9 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_VIEW_INDEX;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_VIEW_INDEX);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(9, 9), 0LL, 0LL,
@@ -4840,7 +4840,7 @@ static BOOL mkntfs_create_root_structures(void)
 	 * volume as corrupt. (ERSO)
 	 */
 	m = (MFT_RECORD*)(g_buf + 11 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_DIRECTORY;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_DIRECTORY);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(11, 11), 0LL, 0LL,
@@ -4879,8 +4879,8 @@ static BOOL mkntfs_create_root_structures(void)
 		FILE_ATTR_ARCHIVE | FILE_ATTR_VIEW_INDEX_PRESENT;
 	ntfs_log_verbose("Creating $Quota (mft record 24)\n");
 	m = (MFT_RECORD*)(g_buf + 24 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_4;
-	m->flags |= MFT_RECORD_IS_VIEW_INDEX;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_4);
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_VIEW_INDEX);
 	if (!err)
 		err = create_hardlink_res((MFT_RECORD*)(g_buf +
 			11 * g_vol->mft_record_size), extend_ref, m,
@@ -4902,8 +4902,8 @@ static BOOL mkntfs_create_root_structures(void)
 	}
 	ntfs_log_verbose("Creating $ObjId (mft record 25)\n");
 	m = (MFT_RECORD*)(g_buf + 25 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_4;
-	m->flags |= MFT_RECORD_IS_VIEW_INDEX;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_4);
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_VIEW_INDEX);
 	if (!err)
 		err = create_hardlink_res((MFT_RECORD*)(g_buf +
 				11 * g_vol->mft_record_size), extend_ref,
@@ -4926,8 +4926,8 @@ static BOOL mkntfs_create_root_structures(void)
 	}
 	ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
 	m = (MFT_RECORD*)(g_buf + 26 * g_vol->mft_record_size);
-	m->flags |= MFT_RECORD_IS_4;
-	m->flags |= MFT_RECORD_IS_VIEW_INDEX;
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_4);
+	m->flags = le16_or(m->flags, MFT_RECORD_IS_VIEW_INDEX);
 	if (!err)
 		err = create_hardlink_res((MFT_RECORD*)(g_buf +
 				11 * g_vol->mft_record_size),

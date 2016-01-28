@@ -260,7 +260,7 @@ get_size:
 		if (ctx->attr->non_resident) {
 			ni->data_size = sle64_to_cpu(ctx->attr->data_size);
 			if (!le16_andz(ctx->attr->flags,
-					(ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)))
+					le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE)))
 				ni->allocated_size = sle64_to_cpu(
 						ctx->attr->compressed_size);
 			else

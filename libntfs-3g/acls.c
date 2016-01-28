@@ -2883,8 +2883,8 @@ char *ntfs_build_descr(mode_t mode,
 			 * The flag SE_DACL_PROTECTED prevents the ACL
 			 * to be changed in an inheritance after creation
 			 */
-		pnhead->control = SE_DACL_PRESENT | SE_DACL_PROTECTED
-				    | SE_SELF_RELATIVE;
+		pnhead->control = le16_or(SE_DACL_PRESENT, le16_or(SE_DACL_PROTECTED,
+					SE_SELF_RELATIVE));
 			/*
 			 * Windows prefers ACL first, do the same to
 			 * get the same hash value and avoid duplication
