@@ -186,7 +186,7 @@ static ntfs_inode *ntfs_inode_real_open(ntfs_volume *vol, const MFT_REF mref)
 	/* Receive some basic information about inode. */
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		if (!ni->mrec->base_mft_record)
+		if (le64_cmpz(ni->mrec->base_mft_record))
 			ntfs_log_perror("No STANDARD_INFORMATION in base record"
 					" %lld", (long long)MREF(mref));
 		goto put_err_out;

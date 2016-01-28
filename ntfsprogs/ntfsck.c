@@ -449,7 +449,7 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 	// If this is the first attribute:
 	// todo: instance number must be smaller than next_instance.
 	if ((u8*)attr_rec == ((u8*)mft_rec) + attrs_offset) {
-		if (!mft_rec->base_mft_record)
+		if (le64_cmpz(mft_rec->base_mft_record))
 			assert_u32_equal(attr_type, 0x10,
 				"First attribute type");
 		// The following not always holds.

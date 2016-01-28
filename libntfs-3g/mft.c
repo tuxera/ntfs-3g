@@ -1395,7 +1395,7 @@ ntfs_inode *ntfs_mft_rec_alloc(ntfs_volume *vol, BOOL mft_data)
 			 * no extents and no name cannot be in use.
 			 * Otherwise apply standard procedure.
 			 */
-   			if (!ext_ni->mrec->base_mft_record
+   			if (le64_cmpz(ext_ni->mrec->base_mft_record)
 			    && !ext_ni->nr_extents)
 				forced_mft_data = TRUE;
 			ntfs_inode_close(ext_ni);

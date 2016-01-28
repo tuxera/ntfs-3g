@@ -1033,7 +1033,7 @@ int mft_next_record(struct mft_search_ctx *ctx)
 				mrec = (MFT_RECORD*)NULL;
 				r = ntfs_file_record_read(ctx->vol,
 					(MFT_REF) ctx->mft_num, &mrec, NULL);
-				if (r || !mrec || !mrec->base_mft_record)
+				if (r || !mrec || le64_cmpz(mrec->base_mft_record))
 					ntfs_log_error(
 						"Error reading inode %lld.\n",
 						(long long)ctx->mft_num);

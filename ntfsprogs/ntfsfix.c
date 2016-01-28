@@ -972,7 +972,7 @@ static BOOL spare_record_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			mft2) == vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft2,
 			vol->mft_record_size)) {
-		if (!mft2->base_mft_record
+		if (le64_cmpz(mft2->base_mft_record)
 		    && (mft2->flags & MFT_RECORD_IN_USE)
 		    && !find_unnamed_attr(mft2,AT_ATTRIBUTE_LIST)
 		    && !find_unnamed_attr(mft2,AT_FILE_NAME)) {
