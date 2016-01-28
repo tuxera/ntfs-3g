@@ -736,7 +736,7 @@ int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
 			}
 #else /* XATTR_MAPPINGS */
 		/* List efs info xattr for encrypted files */
-	if (ni->vol->efs_raw && (ni->flags & FILE_ATTR_ENCRYPTED)) {
+	if (ni->vol->efs_raw && !le32_andz(ni->flags, FILE_ATTR_ENCRYPTED)) {
 		ret += sizeof(nf_ns_alt_xattr_efsinfo);
 		if ((size_t)ret <= size) {
 			memcpy(to, nf_ns_alt_xattr_efsinfo,

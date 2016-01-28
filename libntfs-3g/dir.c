@@ -925,16 +925,16 @@ static u32 ntfs_dir_entry_type(ntfs_inode *dir_ni, MFT_REF mref,
 	dt_type = NTFS_DT_UNKNOWN;
 	ni = ntfs_inode_open(dir_ni->vol, mref);
 	if (ni) {
-		if ((attributes & FILE_ATTR_REPARSE_POINT)
+		if (!le32_andz(attributes, FILE_ATTR_REPARSE_POINT)
 		    && ntfs_possible_symlink(ni))
 			dt_type = NTFS_DT_LNK;
 		else
-			if ((attributes & FILE_ATTR_SYSTEM)
+			if (!le32_andz(attributes, FILE_ATTR_SYSTEM)
 			   && !(attributes & FILE_ATTR_I30_INDEX_PRESENT))
 				dt_type = ntfs_interix_types(ni);
 			else
-				dt_type = (attributes
-						& FILE_ATTR_I30_INDEX_PRESENT
+				dt_type = (!le32_andz(attributes,
+						FILE_ATTR_I30_INDEX_PRESENT)
 					? NTFS_DT_DIR : NTFS_DT_REG);
 		if (ntfs_inode_close(ni)) {
 				 /* anything special worth doing ? */
@@ -987,13 +987,13 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 	/* Skip root directory self reference entry. */
 	if (MREF_LE(ie->indexed_file) == FILE_root)
 		return 0;
-	if ((ie->key.file_name.file_attributes
-		     & (FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYSTEM))
+	if (!le32_andz(ie->key.file_name.file_attributes,
+		     FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYSTEM)
 	    && !metadata)
 		dt_type = ntfs_dir_entry_type(dir_ni, mref,
 					ie->key.file_name.file_attributes);
-	else if (ie->key.file_name.file_attributes
-		     & FILE_ATTR_I30_INDEX_PRESENT)
+	else if (!le32_andz(ie->key.file_name.file_attributes,
+		     FILE_ATTR_I30_INDEX_PRESENT))
 		dt_type = NTFS_DT_DIR;
 	else
 		dt_type = NTFS_DT_REG;
@@ -1500,7 +1500,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		return NULL;
 	}
 	
-	if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+	if (!le32_andz(dir_ni->flags, FILE_ATTR_REPARSE_POINT)) {
 		errno = EOPNOTSUPP;
 		return NULL;
 	}
@@ -1552,7 +1552,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		 * unless NTFS version < 3.0 or cluster size > 4K
 		 * or compression has been disabled
 		 */
-	if ((dir_ni->flags & FILE_ATTR_COMPRESSED)
+	if (!le32_andz(dir_ni->flags, FILE_ATTR_COMPRESSED)
 	   && (dir_ni->vol->major_ver >= 3)
 	   && NVolCompression(dir_ni->vol)
 	   && (dir_ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
@@ -2157,7 +2157,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		goto err_out;
 	}
 	
-	if ((ni->flags & FILE_ATTR_REPARSE_POINT)
+	if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)
 	   && !ntfs_possible_symlink(ni)) {
 		err = EOPNOTSUPP;
 		goto err_out;

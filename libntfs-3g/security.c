@@ -4435,9 +4435,9 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 				 * and set index root accordingly
 				 */
 				settable |= FILE_ATTR_COMPRESSED;
-				if ((ni->flags ^ cpu_to_le32(attrib))
-				             & FILE_ATTR_COMPRESSED) {
-					if (ni->flags & FILE_ATTR_COMPRESSED)
+				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
+				             FILE_ATTR_COMPRESSED)) {
+					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
 						dirflags = const_cpu_to_le16(0);
 					else
 						dirflags = ATTR_IS_COMPRESSED;
@@ -5040,9 +5040,9 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				 * and set index root accordingly
 				 */
 				settable |= FILE_ATTR_COMPRESSED;
-				if ((ni->flags ^ cpu_to_le32(attrib))
-				             & FILE_ATTR_COMPRESSED) {
-					if (ni->flags & FILE_ATTR_COMPRESSED)
+				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
+				             FILE_ATTR_COMPRESSED)) {
+					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
 						dirflags = const_cpu_to_le16(0);
 					else
 						dirflags = ATTR_IS_COMPRESSED;

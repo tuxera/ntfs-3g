@@ -766,15 +766,15 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 		if ((poldace->flags & selection)
 		    && (!fordir
 			|| (poldace->flags & NO_PROPAGATE_INHERIT_ACE)
-			|| (poldace->mask & (GENERIC_ALL | GENERIC_READ
-					| GENERIC_WRITE | GENERIC_EXECUTE)))
+			|| !le32_andz(poldace->mask, GENERIC_ALL | GENERIC_READ
+					| GENERIC_WRITE | GENERIC_EXECUTE))
 		    && !ntfs_same_sid(&poldace->sid, ownersid)
 		    && !ntfs_same_sid(&poldace->sid, groupsid)) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
 				/* reencode GENERIC_ALL */
-			if (pnewace->mask & GENERIC_ALL) {
+			if (!le32_andz(pnewace->mask, GENERIC_ALL)) {
 				pnewace->mask &= ~GENERIC_ALL;
 				if (fordir)
 					pnewace->mask |= OWNER_RIGHTS
@@ -793,7 +793,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 							| const_cpu_to_le32(0x40);
 			}
 				/* reencode GENERIC_READ (+ EXECUTE) */
-			if (pnewace->mask & GENERIC_READ) {
+			if (!le32_andz(pnewace->mask, GENERIC_READ)) {
 				if (fordir)
 					pnewace->mask |= OWNER_RIGHTS
 							| DIR_READ
@@ -810,7 +810,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 						| FILE_WRITE_ATTRIBUTES);
 			}
 				/* reencode GENERIC_WRITE */
-			if (pnewace->mask & GENERIC_WRITE) {
+			if (!le32_andz(pnewace->mask, GENERIC_WRITE)) {
 				if (fordir)
 					pnewace->mask |= OWNER_RIGHTS
 							| DIR_WRITE;
@@ -916,8 +916,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			    && !(poldace->flags & NO_PROPAGATE_INHERIT_ACE)
 			    && !ntfs_same_sid(&poldace->sid, ownersid)
 			    && !ntfs_same_sid(&poldace->sid, groupsid)) {
-				if ((poldace->mask & (GENERIC_ALL | GENERIC_READ
-					| GENERIC_WRITE | GENERIC_EXECUTE)))
+				if (!le32_andz(poldace->mask, GENERIC_ALL | GENERIC_READ
+					| GENERIC_WRITE | GENERIC_EXECUTE))
 					pnewace->flags |= INHERIT_ONLY_ACE;
 				else
 					pnewace->flags &= ~INHERIT_ONLY_ACE;
@@ -2938,23 +2938,23 @@ static int merge_permissions(BOOL isdir,
 	if (!le32_cmpz(owner)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
-			if (owner & DIR_GEXEC)
+			if (!le32_andz(owner, DIR_GEXEC))
 				perm |= S_IXUSR;
 			/* write if any of addfile, adddir, delchild */
-			if (owner & DIR_GWRITE)
+			if (!le32_andz(owner, DIR_GWRITE))
 				perm |= S_IWUSR;
 			/* read if any of list */
-			if (owner & DIR_GREAD)
+			if (!le32_andz(owner, DIR_GREAD))
 				perm |= S_IRUSR;
 		} else {
 			/* exec if execute or generic execute */
-			if (owner & FILE_GEXEC)
+			if (!le32_andz(owner, FILE_GEXEC))
 				perm |= S_IXUSR;
 			/* write if any of writedata or generic write */
-			if (owner & FILE_GWRITE)
+			if (!le32_andz(owner, FILE_GWRITE))
 				perm |= S_IWUSR;
 			/* read if any of readdata or generic read */
-			if (owner & FILE_GREAD)
+			if (!le32_andz(owner, FILE_GREAD))
 				perm |= S_IRUSR;
 		}
 	}
@@ -2962,23 +2962,23 @@ static int merge_permissions(BOOL isdir,
 	if (!le32_cmpz(group)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
-			if (group & DIR_GEXEC)
+			if (!le32_andz(group, DIR_GEXEC))
 				perm |= S_IXGRP;
 			/* write if any of addfile, adddir, delchild */
-			if (group & DIR_GWRITE)
+			if (!le32_andz(group, DIR_GWRITE))
 				perm |= S_IWGRP;
 			/* read if any of list */
-			if (group & DIR_GREAD)
+			if (!le32_andz(group, DIR_GREAD))
 				perm |= S_IRGRP;
 		} else {
 			/* exec if execute */
-			if (group & FILE_GEXEC)
+			if (!le32_andz(group, FILE_GEXEC))
 				perm |= S_IXGRP;
 			/* write if any of writedata, appenddata */
-			if (group & FILE_GWRITE)
+			if (!le32_andz(group, FILE_GWRITE))
 				perm |= S_IWGRP;
 			/* read if any of readdata */
-			if (group & FILE_GREAD)
+			if (!le32_andz(group, FILE_GREAD))
 				perm |= S_IRGRP;
 		}
 	}
@@ -2986,33 +2986,33 @@ static int merge_permissions(BOOL isdir,
 	if (!le32_cmpz(world)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
-			if (world & DIR_GEXEC)
+			if (!le32_andz(world, DIR_GEXEC))
 				perm |= S_IXOTH;
 			/* write if any of addfile, adddir, delchild */
-			if (world & DIR_GWRITE)
+			if (!le32_andz(world, DIR_GWRITE))
 				perm |= S_IWOTH;
 			/* read if any of list */
-			if (world & DIR_GREAD)
+			if (!le32_andz(world, DIR_GREAD))
 				perm |= S_IROTH;
 		} else {
 			/* exec if execute */
-			if (world & FILE_GEXEC)
+			if (!le32_andz(world, FILE_GEXEC))
 				perm |= S_IXOTH;
 			/* write if any of writedata, appenddata */
-			if (world & FILE_GWRITE)
+			if (!le32_andz(world, FILE_GWRITE))
 				perm |= S_IWOTH;
 			/* read if any of readdata */
-			if (world & FILE_GREAD)
+			if (!le32_andz(world, FILE_GREAD))
 				perm |= S_IROTH;
 		}
 	}
 	/* build special permission flags */
 	if (!le32_cmpz(special)) {
-		if (special & FILE_APPEND_DATA)
+		if (!le32_andz(special, FILE_APPEND_DATA))
 			perm |= S_ISUID;
-		if (special & FILE_WRITE_DATA)
+		if (!le32_andz(special, FILE_WRITE_DATA))
 			perm |= S_ISGID;
-		if (special & FILE_READ_DATA)
+		if (!le32_andz(special, FILE_READ_DATA))
 			perm |= S_ISVTX;
 	}
 	return (perm);
@@ -3306,7 +3306,7 @@ static int build_owngrp_permissions(const char *securattr,
 		if (!(pace->flags & INHERIT_ONLY_ACE)) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
-			    && (pace->mask & WRITE_OWNER)) {
+			    && !le32_andz(pace->mask, WRITE_OWNER)) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 					allowown |= pace->mask;
 					ownpresent = TRUE;
@@ -3497,7 +3497,7 @@ static int build_ownadmin_permissions(const char *securattr,
 		   && !(~pace->mask & (ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK))) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
-			     && (((pace->mask & WRITE_OWNER) && firstapply))) {
+			     && ((!le32_andz(pace->mask, WRITE_OWNER) && firstapply))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 					allowown |= pace->mask;
 					isforeign &= ~1;
@@ -3576,7 +3576,7 @@ const SID *ntfs_acl_owner(const char *securattr)
 		nace = 0;
 		do {
 			pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-			if ((pace->mask & WRITE_OWNER)
+			if (!le32_andz(pace->mask, WRITE_OWNER)
 			   && (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 			   && ntfs_is_user_sid(&pace->sid))
 				found = TRUE;

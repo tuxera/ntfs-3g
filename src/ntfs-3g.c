@@ -697,9 +697,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 #endif
 	if ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
-		|| (ni->flags & FILE_ATTR_REPARSE_POINT))
+		|| !le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT))
 	    && !stream_name_len) {
-		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
 			char *target;
 			int attr_size;
 
@@ -752,7 +752,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		 * also include 2 bytes for padding info
 		*/
 		if (ctx->efs_raw
-		    && (ni->flags & FILE_ATTR_ENCRYPTED)
+		    && (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED))
 		    && ni->data_size)
 			stbuf->st_size = ((ni->data_size + 511) & ~511) + 2;
 #endif /* HAVE_SETXATTR */
@@ -762,7 +762,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		 */
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
-		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
+		if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM) || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
 					stream_name_len);
 			if (!na) {
@@ -925,7 +925,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		/*
 		 * Reparse point : analyze as a junction point
 		 */
-	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+	if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
 		char *target;
 		int attr_size;
 
@@ -1209,7 +1209,7 @@ static int ntfs_fuse_open(const char *org_path,
 			/* mark a future need to fixup encrypted inode */
 				if (ctx->efs_raw
 				    && le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
-				    && (ni->flags & FILE_ATTR_ENCRYPTED))
+				    && !le32_andz(ni->flags, FILE_ATTR_ENCRYPTED))
 					fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
 			/* mark a future need to update the mtime */
@@ -1768,14 +1768,14 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			}
 			set_archive(ni);
 			/* mark a need to compress the end of file */
-			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
+			if (fi && !le32_andz(ni->flags, FILE_ATTR_COMPRESSED)) {
 				fi->fh |= CLOSE_COMPRESSED;
 			}
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 			if (fi
 			    && ctx->efs_raw
-			    && (ni->flags & FILE_ATTR_ENCRYPTED))
+			    && !le32_andz(ni->flags, FILE_ATTR_ENCRYPTED))
 				fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
 			/* mark a need to update the mtime */
@@ -1842,12 +1842,12 @@ static int ntfs_fuse_create_stream(const char *path,
 	    && fi
 	    && (fi->flags & (O_WRONLY | O_RDWR))) {
 		/* mark a future need to compress the last block */
-		if (ni->flags & FILE_ATTR_COMPRESSED)
+		if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
 			fi->fh |= CLOSE_COMPRESSED;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 		/* mark a future need to fixup encrypted inode */
 		if (ctx->efs_raw
-		    && (ni->flags & FILE_ATTR_ENCRYPTED))
+		    && !le32_andz(ni->flags, FILE_ATTR_ENCRYPTED))
 			fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
 		if (ctx->dmtime)
@@ -2689,7 +2689,7 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
-	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
 		goto exit;
 		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2891,7 +2891,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
-	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
 		res = -ENODATA;
 		goto exit;
 	}
@@ -3080,7 +3080,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
 		res = -EPERM;
 		goto exit;
 	}
@@ -3136,7 +3136,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		res = -errno;
 	else {
 		if (ctx->efs_raw 
-		   && (ni->flags & FILE_ATTR_ENCRYPTED)) {
+		   && !le32_andz(ni->flags, FILE_ATTR_ENCRYPTED)) {
 			if (ntfs_efs_fixup_attribute(NULL,na))
 				res = -errno;
 		}
@@ -3317,7 +3317,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
 		res = -EPERM;
 		goto exit;
 	}

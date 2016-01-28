@@ -86,7 +86,7 @@ ntfschar TXF_DATA[] = { const_cpu_to_le16('$'),
 static int NAttrFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
-		return (na->ni->flags & flag);
+		return !le32_andz(na->ni->flags, flag);
 	return 0;
 }
 
@@ -468,7 +468,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * or cluster size > 4K or compression is disabled
 		 */
 		a->flags &= ~ATTR_COMPRESSION_MASK;
-		if ((ni->flags & FILE_ATTR_COMPRESSED)
+		if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED)
 		    && (ni->vol->major_ver >= 3)
 		    && NVolCompression(ni->vol)
 		    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE))
@@ -4296,7 +4296,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 add_attr_record:
-	if ((ni->flags & FILE_ATTR_COMPRESSED)
+	if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED)
 	    && (ni->vol->major_ver >= 3)
 	    && NVolCompression(ni->vol)
 	    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
@@ -4843,7 +4843,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 		goto cluster_free_err_out;
 	}
 	/* Calculate new offsets for the name and the mapping pairs array. */
-	if (na->ni->flags & FILE_ATTR_COMPRESSED)
+	if (!le32_andz(na->ni->flags, FILE_ATTR_COMPRESSED))
 		name_ofs = (sizeof(ATTR_REC) + 7) & ~7;
 	else
 		name_ofs = (sizeof(ATTR_REC) - sizeof(a->compressed_size) + 7) & ~7;
@@ -5349,7 +5349,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	    && (na->ni->vol->major_ver >= 3)
 	    && NVolCompression(na->ni->vol)
 	    && (na->ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
-	    && (na->ni->flags & FILE_ATTR_COMPRESSED)) {
+	    && !le32_andz(na->ni->flags, FILE_ATTR_COMPRESSED)) {
 		a->flags |= ATTR_IS_COMPRESSED;
 		na->data_flags = a->flags;
 	}

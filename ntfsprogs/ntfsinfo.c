@@ -514,71 +514,71 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 	const le32 original_flags = flags;
 
 	printf("%sFile attributes:\t", indent);
-	if (flags & FILE_ATTR_READONLY) {
+	if (!le32_andz(flags, FILE_ATTR_READONLY)) {
 		printf(" READONLY");
 		flags &= ~FILE_ATTR_READONLY;
 	}
-	if (flags & FILE_ATTR_HIDDEN) {
+	if (!le32_andz(flags, FILE_ATTR_HIDDEN)) {
 		printf(" HIDDEN");
 		flags &= ~FILE_ATTR_HIDDEN;
 	}
-	if (flags & FILE_ATTR_SYSTEM) {
+	if (!le32_andz(flags, FILE_ATTR_SYSTEM)) {
 		printf(" SYSTEM");
 		flags &= ~FILE_ATTR_SYSTEM;
 	}
-	if (flags & FILE_ATTR_DIRECTORY) {
+	if (!le32_andz(flags, FILE_ATTR_DIRECTORY)) {
 		printf(" DIRECTORY");
 		flags &= ~FILE_ATTR_DIRECTORY;
 	}
-	if (flags & FILE_ATTR_ARCHIVE) {
+	if (!le32_andz(flags, FILE_ATTR_ARCHIVE)) {
 		printf(" ARCHIVE");
 		flags &= ~FILE_ATTR_ARCHIVE;
 	}
-	if (flags & FILE_ATTR_DEVICE) {
+	if (!le32_andz(flags, FILE_ATTR_DEVICE)) {
 		printf(" DEVICE");
 		flags &= ~FILE_ATTR_DEVICE;
 	}
-	if (flags & FILE_ATTR_NORMAL) {
+	if (!le32_andz(flags, FILE_ATTR_NORMAL)) {
 		printf(" NORMAL");
 		flags &= ~FILE_ATTR_NORMAL;
 	}
-	if (flags & FILE_ATTR_TEMPORARY) {
+	if (!le32_andz(flags, FILE_ATTR_TEMPORARY)) {
 		printf(" TEMPORARY");
 		flags &= ~FILE_ATTR_TEMPORARY;
 	}
-	if (flags & FILE_ATTR_SPARSE_FILE) {
+	if (!le32_andz(flags, FILE_ATTR_SPARSE_FILE)) {
 		printf(" SPARSE_FILE");
 		flags &= ~FILE_ATTR_SPARSE_FILE;
 	}
-	if (flags & FILE_ATTR_REPARSE_POINT) {
+	if (!le32_andz(flags, FILE_ATTR_REPARSE_POINT)) {
 		printf(" REPARSE_POINT");
 		flags &= ~FILE_ATTR_REPARSE_POINT;
 	}
-	if (flags & FILE_ATTR_COMPRESSED) {
+	if (!le32_andz(flags, FILE_ATTR_COMPRESSED)) {
 		printf(" COMPRESSED");
 		flags &= ~FILE_ATTR_COMPRESSED;
 	}
-	if (flags & FILE_ATTR_OFFLINE) {
+	if (!le32_andz(flags, FILE_ATTR_OFFLINE)) {
 		printf(" OFFLINE");
 		flags &= ~FILE_ATTR_OFFLINE;
 	}
-	if (flags & FILE_ATTR_NOT_CONTENT_INDEXED) {
+	if (!le32_andz(flags, FILE_ATTR_NOT_CONTENT_INDEXED)) {
 		printf(" NOT_CONTENT_INDEXED");
 		flags &= ~FILE_ATTR_NOT_CONTENT_INDEXED;
 	}
-	if (flags & FILE_ATTR_ENCRYPTED) {
+	if (!le32_andz(flags, FILE_ATTR_ENCRYPTED)) {
 		printf(" ENCRYPTED");
 		flags &= ~FILE_ATTR_ENCRYPTED;
 	}
 	/* We know that FILE_ATTR_I30_INDEX_PRESENT only exists on $FILE_NAME,
 	   and in case we are wrong, let it appear as UNKNOWN */
 	if (le32_eq(type, AT_FILE_NAME)) {
-		if (flags & FILE_ATTR_I30_INDEX_PRESENT) {
+		if (!le32_andz(flags, FILE_ATTR_I30_INDEX_PRESENT)) {
 			printf(" I30_INDEX");
 			flags &= ~FILE_ATTR_I30_INDEX_PRESENT;
 		}
 	}
-	if (flags & FILE_ATTR_VIEW_INDEX_PRESENT) {
+	if (!le32_andz(flags, FILE_ATTR_VIEW_INDEX_PRESENT)) {
 		printf(" VIEW_INDEX");
 		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
 	}
@@ -812,7 +812,7 @@ static void ntfs_dump_filename(const char *indent,
 			(unsigned)file_name_attr->file_name_length,
 			(unsigned)file_name_attr->file_name_length);
 	ntfs_dump_flags(indent, AT_FILE_NAME, file_name_attr->file_attributes);
-	if (file_name_attr->file_attributes & FILE_ATTR_REPARSE_POINT &&
+	if (!le32_andz(file_name_attr->file_attributes, FILE_ATTR_REPARSE_POINT) &&
 			!le32_cmpz(file_name_attr->reparse_point_tag))
 		printf("%sReparse point tag:\t 0x%x\n", indent, (unsigned)
 				le32_to_cpu(file_name_attr->reparse_point_tag));

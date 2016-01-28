@@ -79,7 +79,7 @@ int ntfs_get_efs_info(ntfs_inode *ni, char *value, size_t size)
 	s64 attr_size = 0;
 
 	if (ni) {
-		if (ni->flags & FILE_ATTR_ENCRYPTED) {
+		if (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED)) {
 			efs_info = (EFS_ATTR_HEADER*)ntfs_attr_readall(ni,
 				AT_LOGGED_UTILITY_STREAM,(ntfschar*)NULL, 0,
 				&attr_size);
@@ -222,8 +222,8 @@ int ntfs_set_efs_info(ntfs_inode *ni, const char *value, size_t size,
 
 	res = 0;
 	if (ni && value && size) {
-		if (ni->flags & (FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
-			if (ni->flags & FILE_ATTR_ENCRYPTED) {
+		if (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
+			if (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED)) {
 				ntfs_log_trace("Inode %lld already encrypted\n",
 						(long long)ni->mft_no);
 				errno = EEXIST;

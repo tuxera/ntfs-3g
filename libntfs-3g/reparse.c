@@ -257,7 +257,7 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 		    && (start < count));
 	if (ni
 	    && ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY) ? isdir : !isdir)
-		|| (ni->flags & FILE_ATTR_REPARSE_POINT)))
+		|| (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT))))
 		if (ntfs_ucstombs(path, count, &target, 0) < 0) {
 			if (target) {
 				free(target);
@@ -347,7 +347,7 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 					if (!curni)
 						ok = FALSE;
 					else {
-						if (curni->flags & FILE_ATTR_REPARSE_POINT)
+						if (!le32_andz(curni->flags, FILE_ATTR_REPARSE_POINT))
 							morelinks = TRUE;
 						if (ok && ((pos + lth) < count)) {
 							path[pos + lth] = const_cpu_to_le16('/');
@@ -786,8 +786,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				}
 				break;
 			case ABS_TARGET :
-				if (symlink_data->flags
-				   & const_cpu_to_le32(1)) {
+				if (!le32_andz(symlink_data->flags,
+				   const_cpu_to_le32(1))) {
 					target = ntfs_get_abslink(vol,
 						p, lth/2,
 						mnt_point, isdir);
@@ -796,8 +796,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				}
 				break;
 			case REL_TARGET :
-				if (symlink_data->flags
-				   & const_cpu_to_le32(1)) {
+				if (!le32_andz(symlink_data->flags,
+				   const_cpu_to_le32(1))) {
 					target = ntfs_get_rellink(ni,
 						p, lth/2);
 					if (target)
@@ -1081,7 +1081,7 @@ int ntfs_get_ntfs_reparse_data(ntfs_inode *ni, char *value, size_t size)
 
 	attr_size = 0;	/* default to no data and no error */
 	if (ni) {
-		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
 			reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 				AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 			if (reparse_attr) {

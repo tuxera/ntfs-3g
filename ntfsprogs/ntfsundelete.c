@@ -1578,17 +1578,17 @@ static void dump_record(struct ufile *file)
 
 		ntfs_log_quiet("Filename: (%d) %s\n", f->name_space, f->name);
 		ntfs_log_quiet("File Flags: ");
-		if (f->flags & FILE_ATTR_SYSTEM)
+		if (!le32_andz(f->flags, FILE_ATTR_SYSTEM))
 			ntfs_log_quiet("System ");
-		if (f->flags & FILE_ATTR_DIRECTORY)
+		if (!le32_andz(f->flags, FILE_ATTR_DIRECTORY))
 			ntfs_log_quiet("Directory ");
-		if (f->flags & FILE_ATTR_SPARSE_FILE)
+		if (!le32_andz(f->flags, FILE_ATTR_SPARSE_FILE))
 			ntfs_log_quiet("Sparse ");
-		if (f->flags & FILE_ATTR_REPARSE_POINT)
+		if (!le32_andz(f->flags, FILE_ATTR_REPARSE_POINT))
 			ntfs_log_quiet("Reparse ");
-		if (f->flags & FILE_ATTR_COMPRESSED)
+		if (!le32_andz(f->flags, FILE_ATTR_COMPRESSED))
 			ntfs_log_quiet("Compressed ");
-		if (f->flags & FILE_ATTR_ENCRYPTED)
+		if (!le32_andz(f->flags, FILE_ATTR_ENCRYPTED))
 			ntfs_log_quiet("Encrypted ");
 		if (!(f->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_DIRECTORY |
 		    FILE_ATTR_SPARSE_FILE | FILE_ATTR_REPARSE_POINT |
