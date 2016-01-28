@@ -358,7 +358,7 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 						} else {
 							pos += lth;
 							if (!morelinks
-							  && !le16_andz(ni->mrec->flags ^ curni->mrec->flags,
+							  && !le16_andz(le16_xor(ni->mrec->flags, curni->mrec->flags),
 							    MFT_RECORD_IS_DIRECTORY))
 								ok = FALSE;
 							if (ntfs_inode_close(curni))
