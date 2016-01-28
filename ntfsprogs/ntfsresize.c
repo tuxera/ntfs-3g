@@ -735,11 +735,11 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		if (inode != FILE_MFTMirr)
 			supported = 1;
 
-	} else if (flags & ATTR_IS_SPARSE) {
+	} else if (!le16_andz(flags, ATTR_IS_SPARSE)) {
 		llcn = &resize->last_sparse;
 		supported = 1;
 
-	} else if (flags & ATTR_IS_COMPRESSED) {
+	} else if (!le16_andz(flags, ATTR_IS_COMPRESSED)) {
 		llcn = &resize->last_compressed;
 		supported = 1;
 
@@ -2777,7 +2777,7 @@ static ntfs_volume *mount_volume(void)
 	}
 	vol = check_volume();
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY))
 		if (opt.force-- <= 0)
 			err_exit("Volume is scheduled for check.\nRun chkdsk /f"
 				 " and please try again, or see option -f.\n");
@@ -3004,7 +3004,7 @@ static ATTR_RECORD *get_unnamed_attr(expand_t *expand, ATTR_TYPES type,
 		+ (inum << vol->mft_record_size_bits)
 		+ expand->byte_increment;
 	got = ntfs_mst_pread(vol->dev, pos, 1, vol->mft_record_size, mrec);
-	if ((got == 1) && (mrec->flags & MFT_RECORD_IN_USE)) {
+	if ((got == 1) && !le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 		a = find_attr(expand->mrec, type, NULL, 0);
 		found = a && le32_eq(a->type, type) && !a->name_length;
 	}
@@ -3039,7 +3039,7 @@ static ATTR_RECORD *read_and_get_attr(expand_t *expand, ATTR_TYPES type,
 		+ (inum << vol->mft_record_size_bits)
 		+ expand->byte_increment;
 	got = ntfs_mst_pread(vol->dev, pos, 1, vol->mft_record_size, mrec);
-	if ((got == 1) && (mrec->flags & MFT_RECORD_IN_USE)) {
+	if ((got == 1) && !le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 		a = find_attr(expand->mrec, type, name, namelen);
 	}
 	if (!a) {
@@ -3242,7 +3242,7 @@ static int check_expand_constraints(expand_t *expand)
 		volinfo = (VOLUME_INFORMATION*)
 				(le16_to_cpu(a->value_offset) + (char*)a);
 		flags = volinfo->flags;
-		if ((flags & VOLUME_IS_DIRTY) && (opt.force-- <= 0)) {
+		if (!le16_andz(flags, VOLUME_IS_DIRTY) && (opt.force-- <= 0)) {
 			err_printf("Volume is scheduled for check.\nRun chkdsk /f"
 			 " and please try again, or see option -f.\n");
 			res = -1;
@@ -4054,7 +4054,7 @@ static int rebase_inode(expand_t *expand, const runlist_element *prl,
 			+ ((inum - jnum) << vol->mft_record_size_bits);
 		if ((ntfs_mst_pread(vol->dev, pos, 1,
 					vol->mft_record_size, mrec) == 1)
-		    && (mrec->flags & MFT_RECORD_IN_USE)) {
+		    && !le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 			switch (inum) {
 			case FILE_Bitmap :
 			case FILE_Boot :
@@ -4128,7 +4128,7 @@ static int rebase_all_inodes(expand_t *expand)
 				<< vol->cluster_size_bits;
 	got = ntfs_mst_pread(vol->dev, pos, 1,
 			vol->mft_record_size, mrec);
-	if ((got == 1) && (mrec->flags & MFT_RECORD_IN_USE)) {
+	if ((got == 1) && !le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 		pos = expand->mft_lcn << vol->cluster_size_bits;
 		if (opt.verbose)
 			ntfs_log_verbose("Rebasing inode %lld cluster 0x%llx\n",

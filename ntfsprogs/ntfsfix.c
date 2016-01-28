@@ -298,7 +298,7 @@ static int set_dirty_flag(ntfs_volume *vol)
 
 	/* Porting note: We test for the current state of VOLUME_IS_DIRTY. This
 	 * should actually be more appropriate than testing for NVolWasDirty. */
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY))
 		return 0;
 	ntfs_log_info("Setting required flags on partition... ");
 	/*
@@ -483,7 +483,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 
 		use_mirr = FALSE;
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
-		if (mrec->flags & MFT_RECORD_IN_USE) {
+		if (!le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 			if (ntfs_is_baad_record(mrec->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFT error: Incomplete multi "
@@ -501,7 +501,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 			}
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
-		if (mrec2->flags & MFT_RECORD_IN_USE) {
+		if (!le16_andz(mrec2->flags, MFT_RECORD_IN_USE)) {
 			if (ntfs_is_baad_record(mrec2->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFTMirr error: Incomplete "
@@ -920,7 +920,7 @@ static BOOL self_mapped_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 				>> vol->cluster_size_bits;
 		a = find_unnamed_attr(mft1,AT_DATA);
 		if (a
-		    && (mft1->flags & MFT_RECORD_IN_USE)
+		    && !le16_andz(mft1->flags, MFT_RECORD_IN_USE)
 		    && ((VCN)le64_to_cpu(a->lowest_vcn) == lowest_vcn)
 		    && (le64_to_cpu(mft1->base_mft_record)
 				== selfloc->mft_ref0)
@@ -973,7 +973,7 @@ static BOOL spare_record_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft2,
 			vol->mft_record_size)) {
 		if (le64_cmpz(mft2->base_mft_record)
-		    && (mft2->flags & MFT_RECORD_IN_USE)
+		    && !le16_andz(mft2->flags, MFT_RECORD_IN_USE)
 		    && !find_unnamed_attr(mft2,AT_ATTRIBUTE_LIST)
 		    && !find_unnamed_attr(mft2,AT_FILE_NAME)) {
 			ok = TRUE;

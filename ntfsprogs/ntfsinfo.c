@@ -421,9 +421,9 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	printf("\tVolume Name: %s\n", vol->vol_name);
 	printf("\tVolume State: %lu\n", vol->state);
 	printf("\tVolume Flags: 0x%04x", (int)vol->flags);
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY))
 		printf(" DIRTY");
-	if (vol->flags & VOLUME_MODIFIED_BY_CHKDSK)
+	if (!le16_andz(vol->flags, VOLUME_MODIFIED_BY_CHKDSK))
 		printf(" MODIFIED_BY_CHKDSK");
 	printf("\n");
 	printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
@@ -983,7 +983,7 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	printf("%s\tControl:\t\t 0x%04x\n", indent,
 			le16_to_cpu(sec_desc->control));
 
-	if (~sec_desc->control & SE_SELF_RELATIVE) {
+	if (!le16_andz(~sec_desc->control, SE_SELF_RELATIVE)) {
 		SECURITY_DESCRIPTOR *sd = (SECURITY_DESCRIPTOR *)sec_desc;
 
 		printf("%s\tOwner SID pointer:\t %p\n", indent, sd->owner);
@@ -1011,8 +1011,8 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 		printf("%s\tGroup SID:\t\t missing\n", indent);
 
 	printf("%s\tSystem ACL:\t\t ", indent);
-	if (sec_desc->control & SE_SACL_PRESENT) {
-		if (sec_desc->control & SE_SACL_DEFAULTED) {
+	if (!le16_andz(sec_desc->control, SE_SACL_PRESENT)) {
+		if (!le16_andz(sec_desc->control, SE_SACL_DEFAULTED)) {
 			printf("defaulted");
 		}
 		printf("\n");
@@ -1024,8 +1024,8 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	}
 
 	printf("%s\tDiscretionary ACL:\t ", indent);
-	if (sec_desc->control & SE_DACL_PRESENT) {
-		if (sec_desc->control & SE_SACL_DEFAULTED) {
+	if (!le16_andz(sec_desc->control, SE_DACL_PRESENT)) {
+		if (!le16_andz(sec_desc->control, SE_SACL_DEFAULTED)) {
 			printf("defaulted");
 		}
 		printf("\n");
@@ -1131,28 +1131,28 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 	printf("\tVolume Version:\t\t %d.%d\n", vol_information->major_ver,
 		vol_information->minor_ver);
 	printf("\tVolume Flags:\t\t ");
-	if (vol_information->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol_information->flags, VOLUME_IS_DIRTY))
 		printf("DIRTY ");
-	if (vol_information->flags & VOLUME_RESIZE_LOG_FILE)
+	if (!le16_andz(vol_information->flags, VOLUME_RESIZE_LOG_FILE))
 		printf("RESIZE_LOG ");
-	if (vol_information->flags & VOLUME_UPGRADE_ON_MOUNT)
+	if (!le16_andz(vol_information->flags, VOLUME_UPGRADE_ON_MOUNT))
 		printf("UPG_ON_MOUNT ");
-	if (vol_information->flags & VOLUME_MOUNTED_ON_NT4)
+	if (!le16_andz(vol_information->flags, VOLUME_MOUNTED_ON_NT4))
 		printf("MOUNTED_NT4 ");
-	if (vol_information->flags & VOLUME_DELETE_USN_UNDERWAY)
+	if (!le16_andz(vol_information->flags, VOLUME_DELETE_USN_UNDERWAY))
 		printf("DEL_USN ");
-	if (vol_information->flags & VOLUME_REPAIR_OBJECT_ID)
+	if (!le16_andz(vol_information->flags, VOLUME_REPAIR_OBJECT_ID))
 		printf("REPAIR_OBJID ");
-	if (vol_information->flags & VOLUME_CHKDSK_UNDERWAY)
+	if (!le16_andz(vol_information->flags, VOLUME_CHKDSK_UNDERWAY))
 		printf("CHKDSK_UNDERWAY ");
-	if (vol_information->flags & VOLUME_MODIFIED_BY_CHKDSK)
+	if (!le16_andz(vol_information->flags, VOLUME_MODIFIED_BY_CHKDSK))
 		printf("MOD_BY_CHKDSK ");
-	if (vol_information->flags & VOLUME_FLAGS_MASK) {
+	if (!le16_andz(vol_information->flags, VOLUME_FLAGS_MASK)) {
 		printf("(0x%04x)\n",
 				(unsigned)le16_to_cpu(vol_information->flags));
 	} else
 		printf("none set (0x0000)\n");
-	if (vol_information->flags & (~VOLUME_FLAGS_MASK))
+	if (!le16_andz(vol_information->flags, ~VOLUME_FLAGS_MASK))
 		printf("\t\t\t\t Unknown Flags: 0x%04x\n",
 				le16_to_cpu(vol_information->flags &
 					(~VOLUME_FLAGS_MASK)));
@@ -1358,8 +1358,8 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
 				(long long)sle64_to_cpu(a->initialized_size),
 				(unsigned long long)
 				sle64_to_cpu(a->initialized_size));
-		if (a->compression_unit || a->flags & ATTR_IS_COMPRESSED ||
-				a->flags & ATTR_IS_SPARSE)
+		if (a->compression_unit || !le16_andz(a->flags, ATTR_IS_COMPRESSED) ||
+				!le16_andz(a->flags, ATTR_IS_SPARSE))
 			printf("\tCompressed size:\t %llu (0x%llx)\n",
 					(signed long long)
 					sle64_to_cpu(a->compressed_size),
@@ -1614,7 +1614,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 	int numb_entries = 1;
 	while (1) {
 		if (!opts.verbose) {
-			if (entry->ie_flags & INDEX_ENTRY_END)
+			if (!le16_andz(entry->ie_flags, INDEX_ENTRY_END))
 				break;
 			entry = (INDEX_ENTRY *)((u8 *)entry +
 						le16_to_cpu(entry->length));
@@ -1630,11 +1630,11 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tIndex entry flags:\t 0x%02x\n",
 				(unsigned)le16_to_cpu(entry->ie_flags));
 
-		if (entry->ie_flags & INDEX_ENTRY_NODE)
+		if (!le16_andz(entry->ie_flags, INDEX_ENTRY_NODE))
 			ntfs_log_verbose("\t\tSubnode VCN:\t\t %lld (0x%llx)\n",
 					 (long long)ntfs_ie_get_vcn(entry),
 					 (long long)ntfs_ie_get_vcn(entry));
-		if (entry->ie_flags & INDEX_ENTRY_END)
+		if (!le16_andz(entry->ie_flags, INDEX_ENTRY_END))
 			break;
 
 		switch (type) {
@@ -2189,20 +2189,20 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 
 	printf("MFT Record Flags:\t ");
 	if (!le16_cmpz(inode_flags)) {
-		if (MFT_RECORD_IN_USE & inode_flags) {
+		if (!le16_andz(MFT_RECORD_IN_USE, inode_flags)) {
 			printf("IN_USE ");
 			inode_flags &= ~MFT_RECORD_IN_USE;
 		}
-		if (MFT_RECORD_IS_DIRECTORY & inode_flags) {
+		if (!le16_andz(MFT_RECORD_IS_DIRECTORY, inode_flags)) {
 			printf("DIRECTORY ");
 			inode_flags &= ~MFT_RECORD_IS_DIRECTORY;
 		}
 		/* The meaning of IS_4 is illusive but not its existence. */
-		if (MFT_RECORD_IS_4 & inode_flags) {
+		if (!le16_andz(MFT_RECORD_IS_4, inode_flags)) {
 			printf("IS_4 ");
 			inode_flags &= ~MFT_RECORD_IS_4;
 		}
-		if (MFT_RECORD_IS_VIEW_INDEX & inode_flags) {
+		if (!le16_andz(MFT_RECORD_IS_VIEW_INDEX, inode_flags)) {
 			printf("VIEW_INDEX ");
 			inode_flags &= ~MFT_RECORD_IS_VIEW_INDEX;
 		}

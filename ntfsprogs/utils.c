@@ -303,7 +303,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags)
 	 * libntfs-3g does not record whether the volume log file was dirty
 	 * before mount, so we can only warn if the VOLUME_IS_DIRTY flag is set
 	 * in VOLUME_INFORMATION. */
-	if (vol->flags & VOLUME_IS_DIRTY) {
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY)) {
 		if (!(flags & NTFS_MNT_RECOVER)) {
 			ntfs_log_error("%s", dirty_volume_msg);
 			ntfs_umount(vol, FALSE);

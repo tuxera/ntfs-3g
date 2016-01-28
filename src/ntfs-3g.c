@@ -696,7 +696,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
                	goto exit;
 	}
 #endif
-	if (((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+	if ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 		|| (ni->flags & FILE_ATTR_REPARSE_POINT))
 	    && !stream_name_len) {
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
@@ -790,7 +790,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			/* encrypted named stream */
 			/* round size up to next 512 byte boundary */
 			if (ctx->efs_raw && stream_name_len && 
-			    (na->data_flags & ATTR_IS_ENCRYPTED) &&
+			    !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED) &&
 			    NAttrNonResident(na)) 
 				stbuf->st_size = ((na->data_size+511) & ~511)+2;
 #endif /* HAVE_SETXATTR */
@@ -1203,7 +1203,7 @@ static int ntfs_fuse_open(const char *org_path,
 			if ((res >= 0)
 			    && (fi->flags & (O_WRONLY | O_RDWR))) {
 			/* mark a future need to compress the last chunk */
-				if (na->data_flags & ATTR_COMPRESSION_MASK)
+				if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK))
 					fi->fh |= CLOSE_COMPRESSED;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
@@ -1264,7 +1264,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	/* limit reads at next 512 byte boundary for encrypted attributes */
 	if (ctx->efs_raw
 	    && max_read
-	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na)) {
 		max_read = ((na->data_size+511) & ~511) + 2;
 	}
@@ -1462,7 +1462,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 		 * zero, which is optimized as creating a hole when possible. 
 		 */
 	oldsize = na->data_size;
-	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK)
 	    && (size > na->initialized_size)) {
 		char zero = 0;
 		if (ntfs_attr_pwrite(na, size - 1, 1, &zero) <= 0)
@@ -2494,7 +2494,7 @@ static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 		goto close_inode;
 	}
 	
-	if ((na->data_flags & (ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED))
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED)
 			 || !NAttrNonResident(na)) {
 		ret = -EINVAL;
 		goto close_attr;
@@ -2915,7 +2915,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	rsize = na->data_size;
 	if (ctx->efs_raw
 	    && rsize
-	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na))
 		rsize = ((na->data_size + 511) & ~511) + 2;
 	if (size) {

@@ -469,7 +469,7 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 	// todo: instance is unique.
 
 	// Check flags.
-	if (attr_rec->flags & ~(const_cpu_to_le16(0xc0ff))) {
+	if (!le16_andz(attr_rec->flags, ~(const_cpu_to_le16(0xc0ff)))) {
 		check_failed("Attribute %lld:0x%x Unknown flags (0x%x).\n",
 			(long long)current_mft_record, (int)attr_type,
 			(int)le16_to_cpu(attr_rec->flags));
@@ -858,7 +858,7 @@ int main(int argc, char **argv)
 
 	replay_log(vol);
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY))
 		ntfs_log_warning("Volume is dirty.\n");
 
 	check_volume(vol);

@@ -1278,8 +1278,8 @@ static int get_data(struct ufile *file, ntfs_volume *vol)
 		}
 
 		data->resident   = !rec->non_resident;
-		data->compressed = (rec->flags & ATTR_IS_COMPRESSED) ? 1 : 0;
-		data->encrypted  = (rec->flags & ATTR_IS_ENCRYPTED) ? 1 : 0;
+		data->compressed = !le16_andz(rec->flags, ATTR_IS_COMPRESSED) ? 1 : 0;
+		data->encrypted  = !le16_andz(rec->flags, ATTR_IS_ENCRYPTED) ? 1 : 0;
 
 		if (rec->name_length) {
 			data->uname = (ntfschar *)((char *)rec +
@@ -1973,7 +1973,7 @@ static int undelete_file(ntfs_volume *vol, long long inode)
 	 * list_record(). Otherwise, when undeleting, a file will always be
 	 * listed as 0% recoverable even if successfully undeleted. +mabs
 	 */
-	if (file->mft->flags & MFT_RECORD_IN_USE) {
+	if (!le16_andz(file->mft->flags, MFT_RECORD_IN_USE)) {
 		ntfs_log_error("Record is in use by the mft\n");
 		if (!opts.force) {
 			free(buffer);

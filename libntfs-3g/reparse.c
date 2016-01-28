@@ -169,7 +169,7 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 		 * We generally only get the first matching candidate,
 		 * so we still have to check whether this is a real match
 		 */
-		if (icx->entry && (icx->entry->ie_flags & INDEX_ENTRY_END))
+		if (icx->entry && !le16_andz(icx->entry->ie_flags, INDEX_ENTRY_END))
 				/* get next entry if reaching end of block */
 			entry = ntfs_index_next(icx->entry, icx);
 		else
@@ -252,11 +252,11 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 					path[start++] = const_cpu_to_le16('/');
 			}
 		} while (ni
-		    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		    && !le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 		    && !(ni->flags & FILE_ATTR_REPARSE_POINT)
 		    && (start < count));
 	if (ni
-	    && ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? isdir : !isdir)
+	    && ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY) ? isdir : !isdir)
 		|| (ni->flags & FILE_ATTR_REPARSE_POINT)))
 		if (ntfs_ucstombs(path, count, &target, 0) < 0) {
 			if (target) {
@@ -358,8 +358,8 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 						} else {
 							pos += lth;
 							if (!morelinks
-							  && (ni->mrec->flags ^ curni->mrec->flags)
-							    & MFT_RECORD_IS_DIRECTORY)
+							  && !le16_andz(ni->mrec->flags ^ curni->mrec->flags,
+							    MFT_RECORD_IS_DIRECTORY))
 								ok = FALSE;
 							if (ntfs_inode_close(curni))
 								ok = FALSE;

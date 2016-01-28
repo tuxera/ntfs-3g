@@ -2161,7 +2161,7 @@ static void mount_volume(unsigned long new_mntflag)
 			exit(1);
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY))
 		if (opt.force-- <= 0)
 			err_exit(dirty_volume_msg, opt.volume);
 

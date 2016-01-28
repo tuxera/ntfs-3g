@@ -311,7 +311,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->ie_flags & INDEX_ENTRY_END)
+		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
 		if (!le16_to_cpu(ie->length)) {
@@ -450,7 +450,7 @@ descend_into_child_node:
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->ie_flags & INDEX_ENTRY_END)
+		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
 		if (!le16_to_cpu(ie->length)) {
@@ -487,7 +487,7 @@ descend_into_child_node:
 	 * We have finished with this index buffer without success. Check for
 	 * the presence of a child node.
 	 */
-	if (ie->ie_flags & INDEX_ENTRY_NODE) {
+	if (!le16_andz(ie->ie_flags, INDEX_ENTRY_NODE)) {
 		if ((ia->index.ih_flags & NODE_MASK) == LEAF_NODE) {
 			ntfs_log_error("Index entry with child node found in a leaf "
 					"node in directory inode %lld.\n",
@@ -1244,7 +1244,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 				index_end)
 			goto dir_err_out;
 		/* The last entry cannot contain a name. */
-		if (ie->ie_flags & INDEX_ENTRY_END)
+		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
 		if (!le16_to_cpu(ie->length))
@@ -1400,7 +1400,7 @@ find_next_index_buffer:
 			goto dir_err_out;
 		}
 		/* The last entry cannot contain a name. */
-		if (ie->ie_flags & INDEX_ENTRY_END)
+		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
 		if (!le16_to_cpu(ie->length))
@@ -1690,7 +1690,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	fn->last_data_change_time = ni->last_data_change_time;
 	fn->last_mft_change_time = ni->last_mft_change_time;
 	fn->last_access_time = ni->last_access_time;
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
 	else {
 		fn->data_size = cpu_to_sle64(ni->data_size);
@@ -2184,7 +2184,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 	fn->file_name_length = name_len;
 	fn->file_name_type = nametype;
 	fn->file_attributes = ni->flags;
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
 		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
 	} else {

@@ -236,11 +236,11 @@ static void dump_mft_record(MFT_RECORD *m)
 	u = le16_to_cpu(m->attrs_offset);
 	ntfs_log_info("First attribute offset = %u (0x%x)\n", u, u);
 	ntfs_log_info("Flags = %u: ", le16_to_cpu(m->flags));
-	if (m->flags & MFT_RECORD_IN_USE)
+	if (!le16_andz(m->flags, MFT_RECORD_IN_USE))
 		ntfs_log_info("MFT_RECORD_IN_USE");
 	else
 		ntfs_log_info("MFT_RECORD_NOT_IN_USE");
-	if (m->flags & MFT_RECORD_IS_DIRECTORY)
+	if (!le16_andz(m->flags, MFT_RECORD_IS_DIRECTORY))
 		ntfs_log_info(" | MFT_RECORD_IS_DIRECTORY");
 	ntfs_log_info("\n");
 	u = le32_to_cpu(m->bytes_in_use);

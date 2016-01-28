@@ -1443,7 +1443,7 @@ found_free_rec:
 	/* Sanity check that the mft record is really not in use. */
 	if (!forced_mft_data
 	    && (ntfs_is_file_record(m->magic)
-	    && (m->flags & MFT_RECORD_IN_USE))) {
+	    && !le16_andz(m->flags, MFT_RECORD_IN_USE))) {
 		ntfs_log_error("Inode %lld is used but it wasn't marked in "
 			       "$MFT bitmap. Fixed.\n", (long long)bit);
 		free(m);
@@ -1747,7 +1747,7 @@ found_free_rec:
 		goto undo_mftbmp_alloc;
 	}
 	/* Sanity check that the mft record is really not in use. */
-	if (ntfs_is_file_record(m->magic) && (m->flags & MFT_RECORD_IN_USE)) {
+	if (ntfs_is_file_record(m->magic) && !le16_andz(m->flags, MFT_RECORD_IN_USE)) {
 		ntfs_log_error("Inode %lld is used but it wasn't marked in "
 			       "$MFT bitmap. Fixed.\n", (long long)bit);
 		free(m);

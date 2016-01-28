@@ -612,13 +612,13 @@ static int set_sizes(struct ALLOC_CONTEXT *alctx, ntfs_attr_search_ctx *ctx)
 	attr->data_size = cpu_to_le64(na->data_size);
 	attr->initialized_size = cpu_to_le64(na->initialized_size);
 	attr->allocated_size = cpu_to_le64(na->allocated_size);
-	if (na->data_flags & ATTR_IS_SPARSE)
+	if (!le16_andz(na->data_flags, ATTR_IS_SPARSE))
 		attr->compressed_size = cpu_to_le64(na->compressed_size);
 		/* Copy the unnamed data attribute sizes to inode */
 	if (le32_eq(opts.attribute, AT_DATA) && !na->name_len) {
 		ni = na->ni;
 		ni->data_size = na->data_size;
-		if (na->data_flags & ATTR_IS_SPARSE) {
+		if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 			ni->allocated_size = na->compressed_size;
 			ni->flags |= FILE_ATTR_SPARSE_FILE;
 		} else
@@ -865,7 +865,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
 	NVolSetCompression(vol); /* allow compression */
@@ -961,7 +961,7 @@ int main(int argc, char *argv[])
 		free(parent_dirname);
 	}
 	/* The destination is a directory. */
-	if ((out->mrec->flags & MFT_RECORD_IS_DIRECTORY) && !opts.inode) {
+	if (!le16_andz(out->mrec->flags, MFT_RECORD_IS_DIRECTORY) && !opts.inode) {
 		char *filename;
 		char *overwrite_filename;
 		int overwrite_filename_len;
@@ -1107,7 +1107,7 @@ int main(int argc, char *argv[])
 		}
 		offset += bw;
 	}
-	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK)
 	    && ntfs_attr_pclose(na))
 		ntfs_log_perror("ERROR: ntfs_attr_pclose failed");
 	ntfs_log_verbose("Syncing.\n");

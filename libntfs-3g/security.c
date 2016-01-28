@@ -873,7 +873,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 			 * lookup() may return a node with no data,
 			 * if so get next
 			 */
-			if (entry->ie_flags & INDEX_ENTRY_END)
+			if (!le16_andz(entry->ie_flags, INDEX_ENTRY_END))
 				entry = ntfs_index_next(entry,xsdh);
 			do {
 				collision = FALSE;
@@ -1685,7 +1685,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 	} else {
 		cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 #if CACHE_LEGACY_SIZE
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 			struct CACHED_PERMISSIONS_LEGACY wanted;
 			struct CACHED_PERMISSIONS_LEGACY *legacy;
 
@@ -1768,7 +1768,7 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 #if CACHE_LEGACY_SIZE
 	else {
 		cacheentry = (struct CACHED_PERMISSIONS*)NULL;
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 			struct CACHED_PERMISSIONS_LEGACY wanted;
 			struct CACHED_PERMISSIONS_LEGACY *legacy;
 
@@ -3214,7 +3214,7 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			 * For safety, invalidate even if updating
 			 * failed.
 			 */
-			if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 			   && le32_cmpz(ni->security_id)) {
 				struct CACHED_PERMISSIONS_LEGACY legacy;
 
@@ -3450,7 +3450,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	if (!scx->mapping[MAPUSERS]
 	    || (!scx->uid
 		&& (!(accesstype & S_IEXEC)
-		    || (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))))
+		    || !le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))))
 		allow = 1;
 	else {
 		perm = ntfs_get_perm(scx, ni, accesstype);
@@ -4390,7 +4390,7 @@ int ntfs_get_ntfs_attrib(ntfs_inode *ni, char *value, size_t size)
 	outsize = 0;	/* default to no data and no error */
 	if (ni) {
 		attrib = le32_to_cpu(ni->flags);
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 			attrib |= const_le32_to_cpu(FILE_ATTR_DIRECTORY);
 		else
 			attrib &= ~const_le32_to_cpu(FILE_ATTR_DIRECTORY);
@@ -4429,7 +4429,7 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 			memcpy(&attrib,value,sizeof(FILE_ATTR_FLAGS));
 			settable = FILE_ATTR_SETTABLE;
 			res = 0;
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+			if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 				/*
 				 * Accept changing compression for a directory
 				 * and set index root accordingly
@@ -4737,7 +4737,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 					& (SE_DACL_PRESENT
 					   | SE_DACL_DEFAULTED
 					   | SE_DACL_PROTECTED);
-			if (newhead->control & SE_DACL_AUTO_INHERIT_REQ)
+			if (!le16_andz(newhead->control, SE_DACL_AUTO_INHERIT_REQ))
 				control |= SE_DACL_AUTO_INHERITED;
 		} else
 			control |= oldhead->control
@@ -4769,7 +4769,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 					& (SE_SACL_PRESENT
 					   | SE_SACL_DEFAULTED
 					   | SE_SACL_PROTECTED);
-			if (newhead->control & SE_SACL_AUTO_INHERIT_REQ)
+			if (!le16_andz(newhead->control, SE_SACL_AUTO_INHERIT_REQ))
 				control |= SE_SACL_AUTO_INHERITED;
 		} else
 			control |= oldhead->control
@@ -4932,7 +4932,7 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 				&& le32_cmpz(phead->group)
 				&& !(phead->control & SE_GROUP_DEFAULTED));
 		if (!missing
-		    && (phead->control & SE_SELF_RELATIVE)
+		    && !le16_andz(phead->control, SE_SELF_RELATIVE)
 		    && ntfs_valid_descr(attr, attrsz)) {
 			ni = ntfs_pathname_to_inode(scapi->security.vol,
 				NULL, path);
@@ -4987,7 +4987,7 @@ int ntfs_get_file_attributes(struct SECURITY_API *scapi, const char *path)
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
 			attrib = le32_to_cpu(ni->flags);
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 				attrib |= const_le32_to_cpu(FILE_ATTR_DIRECTORY);
 			else
 				attrib &= ~const_le32_to_cpu(FILE_ATTR_DIRECTORY);
@@ -5034,7 +5034,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
 			settable = FILE_ATTR_SETTABLE;
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+			if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 				/*
 				 * Accept changing compression for a directory
 				 * and set index root accordingly
@@ -5079,7 +5079,7 @@ BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && callback) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+			if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 				pos = 0;
 				ntfs_readdir(ni,&pos,context,callback);
 				ok = !ntfs_inode_close(ni);

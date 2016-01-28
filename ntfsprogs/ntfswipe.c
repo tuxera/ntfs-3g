@@ -771,7 +771,7 @@ static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 
 	if (!offset)
 		return 0;
-	if (na->data_flags & ATTR_IS_ENCRYPTED)
+	if (!le16_andz(na->data_flags, ATTR_IS_ENCRYPTED))
 		offset = (((offset - 1) >> 10) + 1) << 10;
 	size = (vol->cluster_size - offset) % vol->cluster_size;
 
@@ -831,7 +831,7 @@ static s64 wipe_attr_tail(ntfs_inode *ni, ntfschar *name, int namelen,
 		goto close_attr;
 	}
 
-	if (na->data_flags & ATTR_COMPRESSION_MASK)
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK))
 		wiped = wipe_compressed_attribute(vol, byte, act, na);
 	else
 		wiped = wipe_attribute(vol, byte, act, na);
@@ -2142,7 +2142,7 @@ int main(int argc, char *argv[])
 	if (!vol)
 		goto free;
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
 	if (opts.info) {

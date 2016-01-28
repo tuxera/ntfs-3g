@@ -259,8 +259,8 @@ get_size:
 	} else {
 		if (ctx->attr->non_resident) {
 			ni->data_size = sle64_to_cpu(ctx->attr->data_size);
-			if (ctx->attr->flags &
-					(ATTR_IS_COMPRESSED | ATTR_IS_SPARSE))
+			if (!le16_andz(ctx->attr->flags,
+					(ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)))
 				ni->allocated_size = sle64_to_cpu(
 						ctx->attr->compressed_size);
 			else
@@ -872,7 +872,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 		fnx->file_attributes =
 				(fnx->file_attributes & ~FILE_ATTR_VALID_FLAGS) |
 				(ni->flags & FILE_ATTR_VALID_FLAGS);
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 			fnx->data_size = fnx->allocated_size
 				= const_cpu_to_le64(0);
 		else {
@@ -956,7 +956,7 @@ static int ntfs_inode_sync_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni)
 	ntfs_log_enter("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
-	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			ntfs_inode_sync_standard_information(ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
@@ -966,7 +966,7 @@ static int ntfs_inode_sync_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni)
 	}
 
 	/* Update FILE_NAME's in the index. */
-	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			NInoFileNameTestAndClearDirty(ni) &&
 			ntfs_inode_sync_file_name(ni, dir_ni)) {
 		if (!err || errno == EIO) {
@@ -980,7 +980,7 @@ static int ntfs_inode_sync_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni)
 	}
 
 	/* Write out attribute list from cache to disk. */
-	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			NInoAttrList(ni) && NInoAttrListTestAndClearDirty(ni)) {
 		ntfs_attr *na;
 

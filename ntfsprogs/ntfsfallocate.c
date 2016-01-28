@@ -545,7 +545,7 @@ static int ntfs_merge_allocation(ntfs_attr *na, runlist_element *rl,
 		err = ntfs_inner_zero(na, rl);
 	}
 	if (!err) {
-		if (na->data_flags & ATTR_IS_SPARSE) {
+		if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 			na->compressed_size += size;
 			if (na->compressed_size >= na->allocated_size) {
 				na->data_flags &= ~ATTR_IS_SPARSE;
@@ -709,14 +709,14 @@ static int ntfs_full_allocation(ntfs_attr *na, ntfs_attr_search_ctx *ctx,
 				= cpu_to_le64(na->initialized_size);
 			attr->allocated_size
 				= cpu_to_le64(na->allocated_size);
-			if (na->data_flags & ATTR_IS_SPARSE)
+			if (!le16_andz(na->data_flags, ATTR_IS_SPARSE))
 				attr->compressed_size
 					= cpu_to_le64(na->compressed_size);
 			/* Copy the unnamed data attribute sizes to inode */
 			if (le32_eq(attr_type, AT_DATA) && !attr_name_len) {
 				ni = na->ni;
 				ni->data_size = na->data_size;
-				if (na->data_flags & ATTR_IS_SPARSE) {
+				if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 					ni->allocated_size
 						= na->compressed_size;
 					ni->flags |= FILE_ATTR_SPARSE_FILE;
@@ -754,7 +754,7 @@ static int ntfs_fallocate(ntfs_inode *ni, s64 alloc_offs, s64 alloc_len)
 		err = -1;
 	} else {
 		errmess = (const char*)NULL;
-		if (na->data_flags & ATTR_IS_COMPRESSED) {
+		if (!le16_andz(na->data_flags, ATTR_IS_COMPRESSED)) {
 			errmess= "Cannot fallocate a compressed file";
 		}
 
@@ -850,7 +850,7 @@ int main(int argc, char **argv)
 		err_exit(vol, "Failed to mount %s: %s\n", dev_name,
 			strerror(errno));
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
+	if (!le16_andz(vol->flags, VOLUME_IS_DIRTY) && !opts.force)
 		err_exit(vol, "Volume is dirty, please run chkdsk.\n");
 
 	if (ntfs_volume_get_free_space(vol))

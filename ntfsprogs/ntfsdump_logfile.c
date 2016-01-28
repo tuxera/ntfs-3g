@@ -563,11 +563,11 @@ static void dump_log_record(LOG_RECORD *lr)
 	else {
 		int _b = 0;
 
-		if (lr->flags & LOG_RECORD_MULTI_PAGE) {
+		if (!le16_andz(lr->flags, LOG_RECORD_MULTI_PAGE)) {
 			ntfs_log_info(" LOG_RECORD_MULTI_PAGE");
 			_b = 1;
 		}
-		if (lr->flags & ~LOG_RECORD_MULTI_PAGE) {
+		if (!le16_andz(lr->flags, ~LOG_RECORD_MULTI_PAGE)) {
 			if (_b)
 				ntfs_log_info(" |");
 			ntfs_log_info(" Unknown flags");

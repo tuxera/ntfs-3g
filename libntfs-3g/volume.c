@@ -329,8 +329,8 @@ mft_has_no_attr_list:
 			goto io_error_exit;
 		}
 		/* $MFT must be uncompressed and unencrypted. */
-		if (a->flags & ATTR_COMPRESSION_MASK ||
-				a->flags & ATTR_IS_ENCRYPTED) {
+		if (!le16_andz(a->flags, ATTR_COMPRESSION_MASK) ||
+				!le16_andz(a->flags, ATTR_IS_ENCRYPTED)) {
 			ntfs_log_error("$MFT must be uncompressed and "
 				       "unencrypted.\n");
 			goto io_error_exit;
@@ -962,7 +962,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			s = "mft record";
 
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
-		if (mrec->flags & MFT_RECORD_IN_USE) {
+		if (!le16_andz(mrec->flags, MFT_RECORD_IN_USE)) {
 			if (ntfs_is_baad_recordp(mrec)) {
 				ntfs_log_error("$MFT error: Incomplete multi "
 					       "sector transfer detected in "
@@ -976,7 +976,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			}
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
-		if (mrec2->flags & MFT_RECORD_IN_USE) {
+		if (!le16_andz(mrec2->flags, MFT_RECORD_IN_USE)) {
 			if (ntfs_is_baad_recordp(mrec2)) {
 				ntfs_log_error("$MFTMirr error: Incomplete "
 						"multi sector transfer "

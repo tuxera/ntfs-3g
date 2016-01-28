@@ -364,46 +364,46 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			return;
 		}
 		j = 0;
-		if (i & VOLUME_MODIFIED_BY_CHKDSK) {
+		if (!le16_andz(i, VOLUME_MODIFIED_BY_CHKDSK)) {
 			j = 1;
 			printf("VOLUME_MODIFIED_BY_CHKDSK");
 		}
-		if (i & VOLUME_REPAIR_OBJECT_ID) {
+		if (!le16_andz(i, VOLUME_REPAIR_OBJECT_ID)) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_REPAIR_OBJECT_ID");
 		}
-		if (i & VOLUME_DELETE_USN_UNDERWAY) {
+		if (!le16_andz(i, VOLUME_DELETE_USN_UNDERWAY)) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_DELETE_USN_UNDERWAY");
 		}
-		if (i & VOLUME_MOUNTED_ON_NT4) {
+		if (!le16_andz(i, VOLUME_MOUNTED_ON_NT4)) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_MOUNTED_ON_NT4");
 		}
-		if (i & VOLUME_UPGRADE_ON_MOUNT) {
+		if (!le16_andz(i, VOLUME_UPGRADE_ON_MOUNT)) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_UPGRADE_ON_MOUNT");
 		}
-		if (i & VOLUME_RESIZE_LOG_FILE) {
+		if (!le16_andz(i, VOLUME_RESIZE_LOG_FILE)) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_RESIZE_LOG_FILE");
 		}
-		if (i & VOLUME_IS_DIRTY) {
+		if (!le16_andz(i, VOLUME_IS_DIRTY)) {
 			if (j)
 				printf(" | ");
 			else
@@ -514,7 +514,7 @@ static void dump_non_resident_attr(ATTR_RECORD *a)
 	l = sle64_to_cpu(a->initialized_size);
 	printf("Initialized size = %lli (0x%llx)\n", (long long)l,
 			(unsigned long long)l);
-	if (a->flags & ATTR_COMPRESSION_MASK) {
+	if (!le16_andz(a->flags, ATTR_COMPRESSION_MASK)) {
 		l = sle64_to_cpu(a->compressed_size);
 		printf("Compressed size = %lli (0x%llx)\n", (long long)l,
 				(unsigned long long)l);
@@ -584,12 +584,12 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 		printf("NONE");
 	else {
 		int first = TRUE;
-		if (u & ATTR_COMPRESSION_MASK) {
-			if (u & ATTR_IS_COMPRESSED) {
+		if (!le16_andz(u, ATTR_COMPRESSION_MASK)) {
+			if (!le16_andz(u, ATTR_IS_COMPRESSED)) {
 				printf("ATTR_IS_COMPRESSED");
 				first = FALSE;
 			}
-			if ((u & ATTR_COMPRESSION_MASK) & ~ATTR_IS_COMPRESSED) {
+			if (!le16_andz(u & ATTR_COMPRESSION_MASK, ~ATTR_IS_COMPRESSED)) {
 				if (!first)
 					printf(" | ");
 				else
@@ -597,14 +597,14 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 				printf("ATTR_UNKNOWN_COMPRESSION");
 			}
 		}
-		if (u & ATTR_IS_ENCRYPTED) {
+		if (!le16_andz(u, ATTR_IS_ENCRYPTED)) {
 			if (!first)
 				printf(" | ");
 			else
 				first = FALSE;
 			printf("ATTR_IS_ENCRYPTED");
 		}
-		if (u & ATTR_IS_SPARSE) {
+		if (!le16_andz(u, ATTR_IS_SPARSE)) {
 			if (!first)
 				printf(" | ");
 			else
@@ -645,11 +645,11 @@ static void dump_mft_record(MFT_RECORD *m)
 	u = le16_to_cpu(m->attrs_offset);
 	printf("First attribute offset = %u (0x%x)\n", u, u);
 	printf("Flags = %u: ", le16_to_cpu(m->flags));
-	if (m->flags & MFT_RECORD_IN_USE)
+	if (!le16_andz(m->flags, MFT_RECORD_IN_USE))
 		printf("MFT_RECORD_IN_USE");
 	else
 		printf("MFT_RECORD_NOT_IN_USE");
-	if (m->flags & MFT_RECORD_IS_DIRECTORY)
+	if (!le16_andz(m->flags, MFT_RECORD_IS_DIRECTORY))
 		printf(" | MFT_RECORD_IS_DIRECTORY");
 	printf("\n");
 	u = le32_to_cpu(m->bytes_in_use);

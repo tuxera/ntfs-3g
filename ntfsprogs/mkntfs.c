@@ -1470,19 +1470,19 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		goto err_out;
 	}
 	a = ctx->attr;
-	if (flags & ATTR_COMPRESSION_MASK) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
 		ntfs_log_error("Compressed attributes not supported yet.\n");
 		/* FIXME: Compress attribute into a temporary buffer, set */
 		/* val accordingly and save the compressed size. */
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (flags & (ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
+	if (!le16_andz(flags, ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
 		ntfs_log_error("Encrypted/sparse attributes not supported.\n");
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (flags & ATTR_COMPRESSION_MASK) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
 		hdr_size = 72;
 		/* FIXME: This compression stuff is all wrong. Never mind for */
 		/* now. (AIA) */
@@ -1561,8 +1561,8 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	a->data_size = cpu_to_sle64(val_len);
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
-	if (flags & ATTR_COMPRESSION_MASK) {
-		if (flags & ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
+		if (!le16_andz(flags, ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED)) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
 			a->flags &= ~ATTR_COMPRESSION_MASK;
@@ -1661,14 +1661,14 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		goto err_out;
 	}
 	a = ctx->attr;
-	if (flags & ATTR_COMPRESSION_MASK) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
 		ntfs_log_error("Compressed attributes not supported yet.\n");
 		/* FIXME: Compress attribute into a temporary buffer, set */
 		/* val accordingly and save the compressed size. */
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (flags & (ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
+	if (!le16_andz(flags, ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
 		ntfs_log_error("Encrypted/sparse attributes not supported.\n");
 		err = -EOPNOTSUPP;
 		goto err_out;
@@ -1684,7 +1684,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	} else {
 		rl = NULL;
 	}
-	if (flags & ATTR_COMPRESSION_MASK) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
 		hdr_size = 72;
 		/* FIXME: This compression stuff is all wrong. Never mind for */
 		/* now. (AIA) */
@@ -1758,8 +1758,8 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->initialized_size = cpu_to_sle64(val_len);
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
-	if (flags & ATTR_COMPRESSION_MASK) {
-		if (flags & ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED) {
+	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
+		if (!le16_andz(flags, ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED)) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
 			a->flags &= ~ATTR_COMPRESSION_MASK;
@@ -4301,7 +4301,7 @@ static BOOL create_file_volume(MFT_RECORD *m, leMFT_REF root_ref,
 		err = add_attr_vol_name(m, g_vol->vol_name, g_vol->vol_name ?
 				strlen(g_vol->vol_name) : 0);
 	if (!err) {
-		if (fl & VOLUME_IS_DIRTY)
+		if (!le16_andz(fl, VOLUME_IS_DIRTY))
 			ntfs_log_quiet("Setting the volume dirty so check "
 					"disk runs on next reboot into "
 					"Windows.\n");

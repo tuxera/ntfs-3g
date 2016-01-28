@@ -687,12 +687,12 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
 			 */
 		&& (!offdacl
-		    || ((phead->control & SE_DACL_PRESENT)
+		    || (!le16_andz(phead->control, SE_DACL_PRESENT)
 			&& ((pdacl->revision == ACL_REVISION)
 			   || (pdacl->revision == ACL_REVISION_DS))))
 			/* same for SACL */
 		&& (!offsacl
-		    || ((phead->control & SE_SACL_PRESENT)
+		    || (!le16_andz(phead->control, SE_SACL_PRESENT)
 			&& ((psacl->revision == ACL_REVISION)
 			    || (psacl->revision == ACL_REVISION_DS))))) {
 			/*

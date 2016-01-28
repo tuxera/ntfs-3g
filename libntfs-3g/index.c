@@ -222,7 +222,7 @@ static u8 *ntfs_ie_get_end(INDEX_HEADER *ih)
 
 static int ntfs_ie_end(INDEX_ENTRY *ie)
 {
-	return ie->ie_flags & INDEX_ENTRY_END || le16_cmpz(ie->length);
+	return !le16_andz(ie->ie_flags, INDEX_ENTRY_END) || le16_cmpz(ie->length);
 }
 
 /** 
@@ -376,7 +376,7 @@ static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 	
 	ntfs_log_trace("Entering\n");
 	
-	if (ie->ie_flags & INDEX_ENTRY_NODE)
+	if (!le16_andz(ie->ie_flags, INDEX_ENTRY_NODE))
 		size -= sizeof(VCN);
 	
 	dup = ntfs_malloc(size);
@@ -1077,7 +1077,7 @@ static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *ib,
 	ies_end   = (char *)ntfs_ie_get_end(&ib->index);
 	
 	ie_last   = ntfs_ie_get_last((INDEX_ENTRY *)ies_start, ies_end);
-	if (ie_last->ie_flags & INDEX_ENTRY_NODE)
+	if (!le16_andz(ie_last->ie_flags, INDEX_ENTRY_NODE))
 		ntfs_ie_set_vcn(ie_last, ntfs_ie_get_vcn(ie));
 	
 	memcpy(ie, ie_last, le16_to_cpu(ie_last->length));
@@ -1816,7 +1816,7 @@ int ntfs_index_rm(ntfs_index_context *icx)
 	else
 		ih = &icx->ib->index;
 	
-	if (icx->entry->ie_flags & INDEX_ENTRY_NODE) {
+	if (!le16_andz(icx->entry->ie_flags, INDEX_ENTRY_NODE)) {
 		
 		ret = ntfs_index_rm_node(icx);
 
@@ -1955,7 +1955,7 @@ static INDEX_ENTRY *ntfs_index_walk_down(INDEX_ENTRY *ie,
 			entry = ictx->entry;
 		} else
 			entry = (INDEX_ENTRY*)NULL;
-	} while (entry && (entry->ie_flags & INDEX_ENTRY_NODE));
+	} while (entry && !le16_andz(entry->ie_flags, INDEX_ENTRY_NODE));
 	return (entry);
 }
 
@@ -2006,7 +2006,7 @@ static INDEX_ENTRY *ntfs_index_walk_up(INDEX_ENTRY *ie,
 			}
 		ictx->entry = entry;
 		} while (entry && (ictx->pindex > 0)
-			 && (entry->ie_flags & INDEX_ENTRY_END));
+			 && !le16_andz(entry->ie_flags, INDEX_ENTRY_END));
 	} else
 		entry = (INDEX_ENTRY*)NULL;
 	return (entry);
@@ -2050,7 +2050,7 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
 			 * if this happens, walk up
 			 */
 
-	if (ie->ie_flags & INDEX_ENTRY_END)
+	if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 		next = ntfs_index_walk_up(ie, ictx);
 	else {
 			/*
@@ -2064,20 +2064,20 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
 
 			/* walk down if it has a subnode */
 
-		if (flags & INDEX_ENTRY_NODE) {
+		if (!le16_andz(flags, INDEX_ENTRY_NODE)) {
 			next = ntfs_index_walk_down(next,ictx);
 		} else {
 
 				/* walk up it has no subnode, nor data */
 
-			if (flags & INDEX_ENTRY_END) {
+			if (!le16_andz(flags, INDEX_ENTRY_END)) {
 				next = ntfs_index_walk_up(next, ictx);
 			}
 		}
 	}
 		/* return NULL if stuck at end of a block */
 
-	if (next && (next->ie_flags & INDEX_ENTRY_END))
+	if (next && !le16_andz(next->ie_flags, INDEX_ENTRY_END))
 		next = (INDEX_ENTRY*)NULL;
 	return (next);
 }

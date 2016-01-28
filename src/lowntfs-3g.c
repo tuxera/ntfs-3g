@@ -602,7 +602,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 
 	memset(stbuf, 0, sizeof(struct stat));
 	withusermapping = (scx->mapping[MAPUSERS] != (struct MAPPING*)NULL);
-	if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 	    || (ni->flags & FILE_ATTR_REPARSE_POINT)) {
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
 			char *target;
@@ -1266,7 +1266,7 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 			if ((res >= 0)
 			    && (fi->flags & (O_WRONLY | O_RDWR))) {
 			/* mark a future need to compress the last chunk */
-				if (na->data_flags & ATTR_COMPRESSION_MASK)
+				if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK))
 					state |= CLOSE_COMPRESSED;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
@@ -1346,7 +1346,7 @@ static void ntfs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 	/* limit reads at next 512 byte boundary for encrypted attributes */
 	if (ctx->efs_raw
 	    && max_read
-	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na)) {
 		max_read = ((na->data_size+511) & ~511) + 2;
 	}
@@ -1595,7 +1595,7 @@ static int ntfs_fuse_trunc(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		 * zero, which is optimized as creating a hole when possible. 
 		 */
 	oldsize = na->data_size;
-	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK)
 	    && (size > na->initialized_size)) {
 		char zero = 0;
 		if (ntfs_attr_pwrite(na, size - 1, 1, &zero) <= 0)
@@ -2091,7 +2091,7 @@ static int ntfs_fuse_newlink(fuse_req_t req __attribute__((unused)),
 	}
         
 	/* Do not accept linking to a directory (except for renaming) */
-	if (e && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+	if (e && !le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 		errno = EPERM;
 		res = -errno;
 		goto exit;
@@ -2213,7 +2213,7 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 #if defined(__sun) && defined (__SVR4)
 	/* on Solaris : deny unlinking directories */
 	if (rm_type
-	    == (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? RM_LINK : RM_DIR)) {
+	    == (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY) ? RM_LINK : RM_DIR)) {
 		errno = EPERM;
 		res = -errno;
 		goto exit;
@@ -2677,7 +2677,7 @@ static void ntfs_fuse_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
 		goto close_inode;
 	}
         
-	if ((na->data_flags & (ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED))
+	if (!le16_andz(na->data_flags, ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED)
 			 || !NAttrNonResident(na)) {
 		ret = -EINVAL;
 		goto close_attr;
@@ -3064,7 +3064,7 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	rsize = na->data_size;
 	if (ctx->efs_raw
 	    && rsize
-	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na))
 		rsize = ((na->data_size + 511) & ~511) + 2;
 	if (size) {

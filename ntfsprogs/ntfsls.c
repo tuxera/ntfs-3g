@@ -671,7 +671,7 @@ int main(int argc, char **argv)
 	pos = 0;
 	memset(&dirent, 0, sizeof(dirent));
 	dirent.vol = vol;
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
 		if (opts.recursive)
 			readdir_recursive(ni, &pos, &dirent);
 		else
