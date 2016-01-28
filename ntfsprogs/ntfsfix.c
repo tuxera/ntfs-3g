@@ -871,7 +871,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			    && al->length
 			    && le32_eq(al->type, AT_DATA)
 			    && !al->name_length
-			    && ((leVCN)al->lowest_vcn == levcn)
+			    && sle64_eq(al->lowest_vcn, levcn)
 			    && (MREF_LE(al->mft_reference) >= SELFLOC_LIMIT)) {
 				selfloc->mft_ref1
 					= le64_to_cpu(al->mft_reference);

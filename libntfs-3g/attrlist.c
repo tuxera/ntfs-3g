@@ -155,7 +155,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			le16_to_cpu(attr->value_offset)), (attr->non_resident) ?
 			0 : le32_to_cpu(attr->value_length), ctx)) {
 		/* Found some extent, check it to be before new extent. */
-		if (ctx->al_entry->lowest_vcn == attr->lowest_vcn) {
+		if (sle64_eq(ctx->al_entry->lowest_vcn, attr->lowest_vcn)) {
 			err = EEXIST;
 			ntfs_log_trace("Such attribute already present in the "
 					"attribute list.\n");
