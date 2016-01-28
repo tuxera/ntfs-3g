@@ -675,8 +675,8 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 		 * after such an event.
 		 */
 	if (rp
-	    && (rp->major_ver == const_cpu_to_le16(2))
-	    && (rp->minor_ver == const_cpu_to_le16(0))) {
+	    && sle16_eq(rp->major_ver, const_cpu_to_sle16(2))
+	    && sle16_eq(rp->minor_ver, const_cpu_to_sle16(0))) {
 		ntfs_log_error("Metadata kept in Windows cache, refused to mount.\n");
 		err = EPERM;
 	}
