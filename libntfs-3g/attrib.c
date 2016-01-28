@@ -187,7 +187,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	/* Attribute is not resident. */
 
 	/* If no data, return 0. */
-	if (!(a->data_size)) {
+	if (sle64_cmpz(a->data_size)) {
 		errno = 0;
 		return 0;
 	}
@@ -455,7 +455,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		a->flags = 0;
 
 	if (le32_eq(type, AT_DATA)
-	   && (a->non_resident ? !a->initialized_size : le32_cmpz(a->value_length))) {
+	   && (a->non_resident ? sle64_cmpz(a->initialized_size) : le32_cmpz(a->value_length))) {
 		/*
 		 * Define/redefine the compression state if stream is
 		 * empty, based on the compression mark on parent
@@ -655,7 +655,7 @@ static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
 					done = TRUE;
 				}
 				needed = highest_vcn + 1;
-				if (!a->lowest_vcn)
+				if (sle64_cmpz(a->lowest_vcn))
 					startseen = TRUE;
 			}
 		} else {
@@ -5654,7 +5654,7 @@ retry:
 				CASE_SENSITIVE, from_vcn, NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
-		if (!a->lowest_vcn)
+		if (sle64_cmpz(a->lowest_vcn))
 			first_updated = TRUE;
 		/*
 		 * If runlist is updating not from the beginning, then set

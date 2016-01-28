@@ -900,7 +900,7 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 							NULL, 0, ctx)) {
 			a = ctx->attr;
 
-			if (!ctx->al_entry || !ctx->al_entry->lowest_vcn) {
+			if (!ctx->al_entry || sle64_cmpz(ctx->al_entry->lowest_vcn)) {
 				name = (ntfschar*)((u8*)a
 						+ le16_to_cpu(a->name_offset));
 				attr_wiped = wipe_attr_tail(ni, name,

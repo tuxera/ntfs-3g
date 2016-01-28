@@ -1739,7 +1739,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		 * because its logical blocks may be larger than
 		 * a cluster and split over two extents.
 		 */
-		if (mft_data && !a->lowest_vcn) {
+		if (mft_data && sle64_cmpz(a->lowest_vcn)) {
 			na = ntfs_attr_open(walk->image->ni,
 					AT_DATA, NULL, 0);
 			if (na) {
@@ -1755,7 +1755,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 				perr_exit("Failed to open data of inode %lld",
 					(long long)walk->image->ni->mft_no);
 		}
-		if (index_i30 && !a->lowest_vcn) {
+		if (index_i30 && sle64_cmpz(a->lowest_vcn)) {
 			na = ntfs_attr_open(walk->image->ni,
 					AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 			if (na) {

@@ -940,7 +940,7 @@ mpa_err:
 		goto err_out;
 	}
 	/* Setup not mapped runlist element if this is the base extent. */
-	if (!attr->lowest_vcn) {
+	if (sle64_cmpz(attr->lowest_vcn)) {
 		VCN max_cluster;
 
 		max_cluster = ((sle64_to_cpu(attr->allocated_size) +

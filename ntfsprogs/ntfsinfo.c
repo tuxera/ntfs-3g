@@ -1346,7 +1346,7 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
 			(unsigned)a->compression_unit);
 	/* TODO: dump the 5 reserved bytes here in verbose mode */
 
-	if (!a->lowest_vcn) {
+	if (sle64_cmpz(a->lowest_vcn)) {
 		printf("\tData size:\t\t %llu (0x%llx)\n",
 				(long long)sle64_to_cpu(a->data_size),
 				(unsigned long long)sle64_to_cpu(a->data_size));
