@@ -1301,11 +1301,11 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	}
 	/* Apply the IV. */
 	if (le32_eq(fek->alg_id, CALG_AES_256)) {
-		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
-		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
+		((le64*)data)[0] = le64_xor(((le64*)data)[0], cpu_to_le64(0x5816657be9161312ULL + offset));
+		((le64*)data)[1] = le64_xor(((le64*)data)[1], cpu_to_le64(0x1989adbe44918961ULL + offset));
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
+		((le64*)data)[0] = le64_xor(((le64*)data)[0], cpu_to_le64(0x169119629891ad13ULL + offset));
 	}
 	return 512;
 }
@@ -1331,11 +1331,11 @@ static int ntfs_fek_encrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	 */
 	/* Apply the IV. */
 	if (le32_eq(fek->alg_id, CALG_AES_256)) {
-		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
-		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
+		((le64*)data)[0] = le64_xor(((le64*)data)[0], cpu_to_le64(0x5816657be9161312ULL + offset));
+		((le64*)data)[1] = le64_xor(((le64*)data)[1], cpu_to_le64(0x1989adbe44918961ULL + offset));
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
+		((le64*)data)[0] = le64_xor(((le64*)data)[0], cpu_to_le64(0x169119629891ad13ULL + offset));
 	}
 	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		int k;
