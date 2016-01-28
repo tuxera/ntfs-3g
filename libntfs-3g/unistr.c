@@ -166,7 +166,7 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 	cnt = min(name1_len, name2_len);
 	if (cnt > 0) {
 		if (ic == CASE_SENSITIVE) {
-			while (--cnt && (*name1 == *name2)) {
+			while (--cnt && le16_eq(*name1, *name2)) {
 				name1++;
 				name2++;
 			}
@@ -1376,8 +1376,8 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('?' - 0x20));
 
 	forbidden = (len == 0)
-			|| (name[len-1] == const_cpu_to_le16(' '))
-			|| (name[len-1] == const_cpu_to_le16('.'));
+			|| le16_eq(name[len-1], const_cpu_to_le16(' '))
+			|| le16_eq(name[len-1], const_cpu_to_le16('.'));
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
 		if ((ch < 0x20)
@@ -1432,7 +1432,7 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 			/* do a full check, depending on the third char */
 			switch (le16_to_cpu(name[2]) & ~0x20) {
 			case 'N' :
-				if (((len == 3) || (name[3] == dot))
+				if (((len == 3) || le16_eq(name[3], dot))
 				    && (!ntfs_ucsncasecmp(name, con, 3,
 						vol->upcase, vol->upcase_len)
 					|| !ntfs_ucsncasecmp(name, prn, 3,
@@ -1440,13 +1440,13 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 					forbidden = TRUE;
 				break;
 			case 'X' :
-				if (((len == 3) || (name[3] == dot))
+				if (((len == 3) || le16_eq(name[3], dot))
 				    && !ntfs_ucsncasecmp(name, aux, 3,
 						vol->upcase, vol->upcase_len))
 					forbidden = TRUE;
 				break;
 			case 'L' :
-				if (((len == 3) || (name[3] == dot))
+				if (((len == 3) || le16_eq(name[3], dot))
 				    && !ntfs_ucsncasecmp(name, nul, 3,
 						vol->upcase, vol->upcase_len))
 					forbidden = TRUE;
@@ -1455,7 +1455,7 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 				if ((len > 3)
 				    && (le16_to_cpu(name[3]) >= '1')
 				    && (le16_to_cpu(name[3]) <= '9')
-				    && ((len == 4) || (name[4] == dot))
+				    && ((len == 4) || le16_eq(name[4], dot))
 				    && !ntfs_ucsncasecmp(name, com, 3,
 						vol->upcase, vol->upcase_len))
 					forbidden = TRUE;
@@ -1464,7 +1464,7 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 				if ((len > 3)
 				    && (le16_to_cpu(name[3]) >= '1')
 				    && (le16_to_cpu(name[3]) <= '9')
-				    && ((len == 4) || (name[4] == dot))
+				    && ((len == 4) || le16_eq(name[4], dot))
 				    && !ntfs_ucsncasecmp(name, lpt, 3,
 						vol->upcase, vol->upcase_len))
 					forbidden = TRUE;

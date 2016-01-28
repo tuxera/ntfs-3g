@@ -1544,7 +1544,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	ni->flags |= FILE_ATTR_ARCHIVE;
 	if (NVolHideDotFiles(dir_ni->vol)
 	    && (name_len > 1)
-	    && (name[0] == const_cpu_to_le16('.'))
+	    && (le16_eq(name[0], const_cpu_to_le16('.')))
 	    && (name[1] != const_cpu_to_le16('.')))
 		ni->flags |= FILE_ATTR_HIDDEN;
 		/*
@@ -1970,7 +1970,7 @@ search:
 	 * (Windows also does so), however delete the name if it were
 	 * in an extent, to avoid leaving an attribute list.
 	 */
-	if ((ni->mrec->link_count == const_cpu_to_le16(1)) && !actx->base_ntfs_ino) {
+	if (le16_eq(ni->mrec->link_count, const_cpu_to_le16(1)) && !actx->base_ntfs_ino) {
 			/* make sure to not loop to another search */
 		looking_for_dos_name = FALSE;
 	} else {
@@ -2165,7 +2165,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 	if (NVolHideDotFiles(dir_ni->vol)) {
 		/* Set hidden flag according to the latest name */
 		if ((name_len > 1)
-		    && (name[0] == const_cpu_to_le16('.'))
+		    && (le16_eq(name[0], const_cpu_to_le16('.')))
 		    && (name[1] != const_cpu_to_le16('.')))
 			ni->flags |= FILE_ATTR_HIDDEN;
 		else

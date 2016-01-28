@@ -311,15 +311,15 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 		 */
 	while (curni && ok && !morelinks && (pos < (count - 1)) && --max) {
 		if ((count >= (pos + 2))
-		    && (path[pos] == const_cpu_to_le16('.'))
-		    && (path[pos+1] == const_cpu_to_le16('\\'))) {
+		    && le16_eq(path[pos], const_cpu_to_le16('.'))
+		    && le16_eq(path[pos+1], const_cpu_to_le16('\\'))) {
 			path[pos+1] = const_cpu_to_le16('/');
 			pos += 2;
 		} else {
 			if ((count >= (pos + 3))
-			    && (path[pos] == const_cpu_to_le16('.'))
-			    &&(path[pos+1] == const_cpu_to_le16('.'))
-			    && (path[pos+2] == const_cpu_to_le16('\\'))) {
+			    && le16_eq(path[pos], const_cpu_to_le16('.'))
+			    && le16_eq(path[pos+1], const_cpu_to_le16('.'))
+			    && le16_eq(path[pos+2], const_cpu_to_le16('\\'))) {
 				path[pos+2] = const_cpu_to_le16('/');
 				pos += 3;
 				newni = ntfs_dir_parent_inode(curni);
@@ -508,8 +508,8 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 	if ((count >= 7)
 	    && !memcmp(junction,dir_junction_head,8)
 	    && junction[4]
-	    && (junction[5] == const_cpu_to_le16(':'))
-	    && (junction[6] == const_cpu_to_le16('\\')))
+	    && le16_eq(junction[5], const_cpu_to_le16(':'))
+	    && le16_eq(junction[6], const_cpu_to_le16('\\')))
 		kind = DIR_JUNCTION;
 	else
 			/*
@@ -518,7 +518,7 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 			 */
 		if ((count >= 12)
 		    && !memcmp(junction,vol_junction_head,22)
-		    && (junction[count-1] == const_cpu_to_le16('\\')))
+		    && le16_eq(junction[count-1], const_cpu_to_le16('\\')))
 			kind = VOL_JUNCTION;
 		else
 			kind = NO_JUNCTION;
@@ -610,15 +610,15 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			 */
 	if ((count >= 3)
 	    && junction[0]
-	    && (junction[1] == const_cpu_to_le16(':'))
-	    && (junction[2] == const_cpu_to_le16('\\')))
+	    && le16_eq(junction[1], const_cpu_to_le16(':'))
+	    && le16_eq(junction[2], const_cpu_to_le16('\\')))
 		kind = FULL_PATH;
 	else
 			/*
 			 * For an absolute path we want an initial \
 			 */
 		if ((count >= 0)
-		    && (junction[0] == const_cpu_to_le16('\\')))
+		    && le16_eq(junction[0], const_cpu_to_le16('\\')))
 			kind = ABS_PATH;
 		else
 			kind = REJECTED_PATH;
@@ -761,14 +761,14 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				 * Predetermine the kind of target,
 				 * the called function has to make a full check
 				 */
-			if (*p++ == const_cpu_to_le16('\\')) {
-				if ((*p == const_cpu_to_le16('?'))
-				    || (*p == const_cpu_to_le16('\\')))
+			if (le16_eq(*p++, const_cpu_to_le16('\\'))) {
+				if ((le16_eq(*p, const_cpu_to_le16('?')))
+				    || (le16_eq(*p, const_cpu_to_le16('\\'))))
 					kind = FULL_TARGET;
 				else
 					kind = ABS_TARGET;
 			} else
-				if (*p == const_cpu_to_le16(':'))
+				if (le16_eq(*p, const_cpu_to_le16(':')))
 					kind = ABS_TARGET;
 				else
 					kind = REL_TARGET;

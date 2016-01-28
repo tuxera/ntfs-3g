@@ -296,4 +296,6 @@
 #define const_cpu_to_sbe32(x)	__constant_cpu_to_be32((u32) x)
 #define const_cpu_to_sbe64(x)	__constant_cpu_to_be64((u64) x)
 
+#define le16_eq(a, b) ((a) == (b))
+
 #endif /* defined _NTFS_ENDIANS_H */

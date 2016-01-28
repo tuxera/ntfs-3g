@@ -943,8 +943,8 @@ static s64 ntfs_attr_pread_i(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	/* Sanity checking arguments is done in ntfs_attr_pread(). */
 	
 	if ((na->data_flags & ATTR_COMPRESSION_MASK) && NAttrNonResident(na)) {
-		if ((na->data_flags & ATTR_COMPRESSION_MASK)
-		    == ATTR_IS_COMPRESSED)
+		if (le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+			ATTR_IS_COMPRESSED))
 			return ntfs_compressed_attr_pread(na, pos, count, b);
 		else {
 				/* compression mode not supported */
@@ -4784,8 +4784,8 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 			- 1) & ~(vol->cluster_size - 1);
 
 	if (new_allocated_size > 0) {
-			if ((a->flags & ATTR_COMPRESSION_MASK)
-					== ATTR_IS_COMPRESSED) {
+			if (le16_eq(a->flags & ATTR_COMPRESSION_MASK,
+					ATTR_IS_COMPRESSED)) {
 				/* must allocate full compression blocks */
 				new_allocated_size = ((new_allocated_size - 1)
 					| ((1L << (STANDARD_COMPRESSION_UNIT
@@ -4813,7 +4813,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 */
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
-	if ((a->flags & ATTR_COMPRESSION_MASK) == ATTR_IS_COMPRESSED) {
+	if (le16_eq(a->flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED)) {
 			/* set compression writing parameters */
 		na->compression_block_size
 			= 1 << (STANDARD_COMPRESSION_UNIT + vol->cluster_size_bits);
@@ -4888,7 +4888,7 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 * creating/recreating the stream, not when making non resident.
 	 */
 	a->flags &= ~(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED);
-	if ((a->flags & ATTR_COMPRESSION_MASK) == ATTR_IS_COMPRESSED) {
+	if (le16_eq(a->flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED)) {
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
 		a->compressed_size = const_cpu_to_le64(0);
@@ -5092,8 +5092,8 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			tna->ni->allocated_size = tna->allocated_size;
 			NInoFileNameSetDirty(tna->ni);
 		}
-		if (((tna->data_flags & ATTR_COMPRESSION_MASK)
-						== ATTR_IS_COMPRESSED)
+		if (le16_eq(tna->data_flags & ATTR_COMPRESSION_MASK,
+						ATTR_IS_COMPRESSED)
 		   && ntfs_attr_pclose(tna)) {
 			err = errno;
 			ntfs_attr_close(tna);
