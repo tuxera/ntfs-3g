@@ -710,7 +710,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 				size = le32_to_cpu(psii->datasize);
 			}
 			entry = next;
-			if (!entry && !keyid && !retries) {
+			if (!entry && le32_cmpz(keyid) && !retries) {
 				/* search failed, retry from smallest key */
 				ntfs_index_ctx_reinit(xsii);
 				found = !ntfs_index_lookup((char*)&keyid,
@@ -740,7 +740,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 			}
 		}
 	}
-	if (!keyid) {
+	if (le32_cmpz(keyid)) {
 		/*
 		 * could not find any entry, before creating the first
 		 * entry, make a double check by making sure size of $SII
@@ -756,7 +756,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 			}
 			ntfs_attr_close(na);
 		}
-		if (!securid) {
+		if (le32_cmpz(securid)) {
 			ntfs_log_error("Error creating a security_id\n");
 			errno = EIO;
 		}
@@ -2963,7 +2963,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 				}
 #if CACHE_LEGACY_SIZE
 				/* also invalidate legacy cache */
-				if (isdir && !ni->security_id) {
+				if (isdir && le32_cmpz(ni->security_id)) {
 					struct CACHED_PERMISSIONS_LEGACY legacy;
 
 					legacy.mft_no = ni->mft_no;
@@ -3215,7 +3215,7 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			 * failed.
 			 */
 			if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-			   && !ni->security_id) {
+			   && le32_cmpz(ni->security_id)) {
 				struct CACHED_PERMISSIONS_LEGACY legacy;
 
 				legacy.mft_no = ni->mft_no;
@@ -4048,7 +4048,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * Not cached or not available in cache, compute it all
 		 * Note : if parent directory has no id, it is not cacheable
 		 */
-	if (!securid) {
+	if (le32_cmpz(securid)) {
 		parentattr = getsecurityattr(scx->vol, dir_ni);
 		if (parentattr) {
 			securid = build_inherited_id(scx,
@@ -4926,10 +4926,10 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 		attrsz = ntfs_attr_size(attr);
 		/* if selected, owner and group must be present or defaulted */
 		missing = ((selection & OWNER_SECURITY_INFORMATION)
-				&& !phead->owner
+				&& le32_cmpz(phead->owner)
 				&& !(phead->control & SE_OWNER_DEFAULTED))
 			|| ((selection & GROUP_SECURITY_INFORMATION)
-				&& !phead->group
+				&& le32_cmpz(phead->group)
 				&& !(phead->control & SE_GROUP_DEFAULTED));
 		if (!missing
 		    && (phead->control & SE_SELF_RELATIVE)

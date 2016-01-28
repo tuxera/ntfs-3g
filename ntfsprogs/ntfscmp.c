@@ -764,7 +764,7 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 			 ATTR_TYPES prev_atype,
 			 char *prev_name)
 {
-	if (!prev_atype && !prev_name)
+	if (le32_cmpz(prev_atype) && !prev_name)
 		return 1;
 
 	if (!ctx->attr->non_resident)

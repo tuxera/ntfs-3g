@@ -455,7 +455,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		a->flags = 0;
 
 	if (le32_eq(type, AT_DATA)
-	   && (a->non_resident ? !a->initialized_size : !a->value_length)) {
+	   && (a->non_resident ? !a->initialized_size : le32_cmpz(a->value_length))) {
 		/*
 		 * Define/redefine the compression state if stream is
 		 * empty, based on the compression mark on parent
@@ -2779,7 +2779,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			errno = ENOENT;
 			return -1;
 		}
-		if (!a->length)
+		if (le32_cmpz(a->length))
 			break;
 		/* If this is an enumeration return this attribute. */
 		if (le32_eq(type, AT_UNUSED))
@@ -3182,7 +3182,7 @@ do_next_attr_loop:
 			break;
 		if (le32_eq(a->type, AT_END))
 			continue;
-		if (!a->length)
+		if (le32_cmpz(a->length))
 			break;
 		if (!le16_eq(al_entry->instance, a->instance))
 			goto do_next_attr;
@@ -3516,7 +3516,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 {
 	ATTR_DEF *ad;
 
-	if (!vol || !vol->attrdef || !type) {
+	if (!vol || !vol->attrdef || le32_cmpz(type)) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: type=%d", __FUNCTION__, type);
 		return NULL;
@@ -3679,7 +3679,7 @@ static int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPE
  */
 int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 {
-	if (!vol || !vol->attrdef || !type) {
+	if (!vol || !vol->attrdef || le32_cmpz(type)) {
 		errno = EINVAL;
 		return -1;
 	}

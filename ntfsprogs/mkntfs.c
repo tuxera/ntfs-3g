@@ -1239,7 +1239,7 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			errno = ENOENT;
 			return -1;
 		}
-		if (!a->length)
+		if (le32_cmpz(a->length))
 			break;
 		/* If this is an enumeration return this attribute. */
 		if (le32_eq(type, AT_UNUSED))
@@ -2849,7 +2849,7 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 	err = 0;
 
 	while ((char*)sds_header < (char*)sds + sds_size) {
-		if (!sds_header->length)
+		if (le32_cmpz(sds_header->length))
 			break;
 		/* SDH index entry */
 		idx_entry_sdh->data_offset = const_cpu_to_le16(0x18);

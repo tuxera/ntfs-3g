@@ -1959,13 +1959,13 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 				 */
 			if (ctx->security.mapping[MAPUSERS]) {
 #if POSIXACLS
-				if (!securid
+				if (le32_cmpz(securid)
 				   && ntfs_set_inherited_posix(&security, ni,
 					security.uid, gid,
 					dir_ni, perm) < 0)
 					set_fuse_error(&res);
 #else
-				if (!securid
+				if (le32_cmpz(securid)
 				   && ntfs_set_owner_mode(&security, ni,
 					security.uid, gid, 
 					perm & ~security.umask) < 0)
