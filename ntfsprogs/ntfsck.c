@@ -469,7 +469,7 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 	// todo: instance is unique.
 
 	// Check flags.
-	if (!le16_andz(attr_rec->flags, ~(const_cpu_to_le16(0xc0ff)))) {
+	if (!le16_andz(attr_rec->flags, le16_not(const_cpu_to_le16(0xc0ff)))) {
 		check_failed("Attribute %lld:0x%x Unknown flags (0x%x).\n",
 			(long long)current_mft_record, (int)attr_type,
 			(int)le16_to_cpu(attr_rec->flags));
@@ -796,7 +796,7 @@ static int reset_dirty(ntfs_volume *vol)
 
 	ntfs_log_verbose("Resetting dirty flag.\n");
 
-	flags = le16_and(vol->flags, ~VOLUME_IS_DIRTY);
+	flags = le16_and(vol->flags, le16_not(VOLUME_IS_DIRTY));
 
 	if (ntfs_volume_write_flags(vol, flags)) {
 		ntfs_log_error("Error setting volume flags.\n");

@@ -1562,10 +1562,10 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
 	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
-		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, ~ATTR_IS_COMPRESSED))) {
+		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, le16_not(ATTR_IS_COMPRESSED)))) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
-			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
+			a->flags = le16_and(a->flags, le16_not(ATTR_COMPRESSION_MASK));
 			a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 		}
 		a->compression_unit = 4;
@@ -1759,10 +1759,10 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	if (name_len)
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
 	if (!le16_andz(flags, ATTR_COMPRESSION_MASK)) {
-		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, ~ATTR_IS_COMPRESSED))) {
+		if (!le16_andz(flags, le16_and(ATTR_COMPRESSION_MASK, le16_not(ATTR_IS_COMPRESSED)))) {
 			ntfs_log_error("Unknown compression format. Reverting "
 					"to standard compression.\n");
-			a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
+			a->flags = le16_and(a->flags, le16_not(ATTR_COMPRESSION_MASK));
 			a->flags = le16_or(a->flags, ATTR_IS_COMPRESSED);
 		}
 		a->compression_unit = 4;

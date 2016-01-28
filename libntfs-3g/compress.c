@@ -838,7 +838,7 @@ do_next_cb:
 		to_read = min(count, cb_size - ofs);
 		ofs += vcn << vol->cluster_size_bits;
 		NAttrClearCompressed(na);
-		na->data_flags = le16_and(na->data_flags, ~ATTR_COMPRESSION_MASK);
+		na->data_flags = le16_and(na->data_flags, le16_not(ATTR_COMPRESSION_MASK));
 		tdata_size = na->data_size;
 		tinitialized_size = na->initialized_size;
 		na->data_size = na->initialized_size = na->allocated_size;
@@ -896,7 +896,7 @@ do_next_cb:
 		 */
 		to_read = cb_size;
 		NAttrClearCompressed(na);
-		na->data_flags = le16_and(na->data_flags, ~ATTR_COMPRESSION_MASK);
+		na->data_flags = le16_and(na->data_flags, le16_not(ATTR_COMPRESSION_MASK));
 		tdata_size = na->data_size;
 		tinitialized_size = na->initialized_size;
 		na->data_size = na->initialized_size = na->allocated_size;

@@ -1870,7 +1870,7 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	mft_no = ni->mft_no;
 
 	/* Mark the mft record as not in use. */
-	ni->mrec->flags = le16_and(ni->mrec->flags, ~MFT_RECORD_IN_USE);
+	ni->mrec->flags = le16_and(ni->mrec->flags, le16_not(MFT_RECORD_IN_USE));
 
 	/* Increment the sequence number, skipping zero, if it is not zero. */
 	old_seq_no = ni->mrec->sequence_number;

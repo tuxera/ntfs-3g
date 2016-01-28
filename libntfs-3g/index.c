@@ -382,7 +382,7 @@ static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 	dup = ntfs_malloc(size);
 	if (dup) {
 		memcpy(dup, ie, size);
-		dup->ie_flags = le16_and(dup->ie_flags, ~INDEX_ENTRY_NODE);
+		dup->ie_flags = le16_and(dup->ie_flags, le16_not(INDEX_ENTRY_NODE));
 		dup->length = cpu_to_le16(size);
 	}
 	return dup;
@@ -1597,7 +1597,7 @@ static void ntfs_ir_leafify(ntfs_index_context *icx, INDEX_HEADER *ih)
 	ntfs_log_trace("Entering\n");
 	
 	ie = ntfs_ie_get_first(ih);
-	ie->ie_flags = le16_and(ie->ie_flags, ~INDEX_ENTRY_NODE);
+	ie->ie_flags = le16_and(ie->ie_flags, le16_not(INDEX_ENTRY_NODE));
 	ie->length = cpu_to_le16(le16_to_cpu(ie->length) - sizeof(VCN));
 	
 	ih->index_length = cpu_to_le32(le32_to_cpu(ih->index_length) - sizeof(VCN));

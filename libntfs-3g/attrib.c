@@ -467,7 +467,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * Also prevent compression on NTFS version < 3.0
 		 * or cluster size > 4K or compression is disabled
 		 */
-		a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
+		a->flags = le16_and(a->flags, le16_not(ATTR_COMPRESSION_MASK));
 		if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED)
 		    && (ni->vol->major_ver >= 3)
 		    && NVolCompression(ni->vol)
@@ -4386,7 +4386,7 @@ int ntfs_attr_set_flags(ntfs_inode *ni, ATTR_TYPES type, const ntfschar *name,
 		if (!ntfs_attr_lookup(type, name, name_len,
 					CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			/* do the requested change (all small endian le16) */
-			ctx->attr->flags = le16_or(le16_and(ctx->attr->flags, ~mask),
+			ctx->attr->flags = le16_or(le16_and(ctx->attr->flags, le16_not(mask)),
 						le16_and(flags, mask));
 			NInoSetDirty(ni);
 			res = 0;
@@ -4887,14 +4887,14 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 * The decisions about compression can only be made when
 	 * creating/recreating the stream, not when making non resident.
 	 */
-	a->flags = le16_and(a->flags, ~(le16_or(ATTR_IS_SPARSE, ATTR_IS_ENCRYPTED)));
+	a->flags = le16_and(a->flags, le16_not(le16_or(ATTR_IS_SPARSE, ATTR_IS_ENCRYPTED)));
 	if (le16_eq(le16_and(a->flags, ATTR_COMPRESSION_MASK), ATTR_IS_COMPRESSED)) {
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
 		a->compressed_size = const_cpu_to_le64(0);
 	} else {
 		a->compression_unit = 0;
-		a->flags = le16_and(a->flags, ~ATTR_COMPRESSION_MASK);
+		a->flags = le16_and(a->flags, le16_not(ATTR_COMPRESSION_MASK));
 		na->data_flags = a->flags;
 	}
 
@@ -5498,7 +5498,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	    le16_andz(a->flags, ATTR_IS_COMPRESSED)) {
 		
 		NAttrClearSparse(na);
-		a->flags = le16_and(a->flags, ~ATTR_IS_SPARSE);
+		a->flags = le16_and(a->flags, le16_not(ATTR_IS_SPARSE));
 		na->data_flags = a->flags;
 		a->compression_unit = 0;
 		

@@ -589,7 +589,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 				printf("ATTR_IS_COMPRESSED");
 				first = FALSE;
 			}
-			if (!le16_andz(le16_and(u, ATTR_COMPRESSION_MASK), ~ATTR_IS_COMPRESSED)) {
+			if (!le16_andz(le16_and(u, ATTR_COMPRESSION_MASK), le16_not(ATTR_IS_COMPRESSED))) {
 				if (!first)
 					printf(" | ");
 				else
