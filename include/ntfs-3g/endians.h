@@ -306,4 +306,6 @@
 
 #define sle64_eq(a, b) ((a) == (b))
 
+#define be16_eq(a, b) ((a) == (b))
+
 #endif /* defined _NTFS_ENDIANS_H */

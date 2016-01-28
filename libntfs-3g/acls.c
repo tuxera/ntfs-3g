@@ -242,27 +242,27 @@ static int is_world_sid(const SID * usid)
 	return (
 	     /* check whether S-1-1-0 : world */
 	       ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(1))
 	    && le32_eq(usid->sub_authority[0], const_cpu_to_le32(0)))
 
 	     /* check whether S-1-5-32-545 : local user */
 	  ||   ((usid->sub_authority_count == 2)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && le32_eq(usid->sub_authority[0], const_cpu_to_le32(32))
 	    && le32_eq(usid->sub_authority[1], const_cpu_to_le32(545)))
 
 	     /* check whether S-1-5-11 : authenticated user */
 	  ||   ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && le32_eq(usid->sub_authority[0], const_cpu_to_le32(11)))
 
 #if !POSIXACLS
 	     /* check whether S-1-5-4 : interactive user */
 	  ||   ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && le32_eq(usid->sub_authority[0], const_cpu_to_le32(4)))
 #endif /* !POSIXACLS */
@@ -278,7 +278,7 @@ static int is_world_sid(const SID * usid)
 BOOL ntfs_is_user_sid(const SID *usid)
 {
 	return ((usid->sub_authority_count == 5)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && le32_eq(usid->sub_authority[0], const_cpu_to_le32(21)));
 }
@@ -296,7 +296,7 @@ static BOOL ntfs_known_group_sid(const SID *usid)
 {
 			/* count == 1 excludes S-1-5-5-X-Y (logon) */
 	return ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && be16_eq(usid->identifier_authority.high_part, const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && (le32_to_cpu(usid->sub_authority[0]) >=  1)
 	    && (le32_to_cpu(usid->sub_authority[0]) <=  6));
