@@ -423,7 +423,7 @@ static char *get_attr_name(u64 mft_no,
 	char *name = NULL;
 	int name_len;
 
-	if (atype == AT_END)
+	if (le32_eq(atype, AT_END))
 		return NULL;
 
 	name_len = ntfs_ucstombs(uname, uname_len, &name, 0);
@@ -707,7 +707,7 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 		goto close_attribs;
 	}
 
-	if (na1->type == AT_INDEX_ALLOCATION)
+	if (le32_eq(na1->type, AT_INDEX_ALLOCATION))
 		cmp_index_allocation(na1, na2);
 	else
 		cmp_attribute_data(na1, na2);

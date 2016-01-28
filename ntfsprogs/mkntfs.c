@@ -1235,14 +1235,14 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		ctx->attr = a;
 		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
 				le32_to_cpu(type))) ||
-				(a->type == AT_END)) {
+				le32_eq(a->type, AT_END)) {
 			errno = ENOENT;
 			return -1;
 		}
 		if (!a->length)
 			break;
 		/* If this is an enumeration return this attribute. */
-		if (type == AT_UNUSED)
+		if (le32_eq(type, AT_UNUSED))
 			return 0;
 		if (a->type != type)
 			continue;
@@ -1409,7 +1409,7 @@ static int mkntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		base_ni = ctx->base_ntfs_ino;
 	else
 		base_ni = ctx->ntfs_ino;
-	if (!base_ni || !NInoAttrList(base_ni) || type == AT_ATTRIBUTE_LIST)
+	if (!base_ni || !NInoAttrList(base_ni) || le32_eq(type, AT_ATTRIBUTE_LIST))
 		return mkntfs_attr_find(type, name, name_len, ic, val, val_len,
 				ctx);
 	errno = EOPNOTSUPP;
@@ -1577,9 +1577,9 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 	} else {
 		a->compression_unit = 0;
-		if ((type == AT_DATA)
-		    && (m->mft_record_number
-				 == const_cpu_to_le32(FILE_LogFile)))
+		if (le32_eq(type, AT_DATA)
+		    && le32_eq(m->mft_record_number,
+				 const_cpu_to_le32(FILE_LogFile)))
 			bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len,
 					&inited_size, WRITE_LOGFILE);
 		else
@@ -1884,7 +1884,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->length = cpu_to_le32(asize);
 	a->non_resident = 0;
 	a->name_length = name_len;
-	if (type == AT_OBJECT_ID)
+	if (le32_eq(type, AT_OBJECT_ID))
 		a->name_offset = const_cpu_to_le16(0);
 	else
 		a->name_offset = const_cpu_to_le16(24);
@@ -2276,9 +2276,9 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 	r = ntfs_malloc(val_len);
 	if (!r)
 		return -errno;
-	r->type = (indexed_attr_type == AT_FILE_NAME)
+	r->type = le32_eq(indexed_attr_type, AT_FILE_NAME)
 				? AT_FILE_NAME : const_cpu_to_le32(0);
-	if (indexed_attr_type == AT_FILE_NAME &&
+	if (le32_eq(indexed_attr_type, AT_FILE_NAME) &&
 			collation_rule != COLLATION_FILE_NAME) {
 		free(r);
 		ntfs_log_error("add_attr_index_root: indexed attribute is $FILE_NAME "
@@ -2630,7 +2630,7 @@ static int ntfs_index_keys_compare(u8 *key1, u8 *key2, int key1_length,
 	u32 u1, u2;
 	int i;
 
-	if (collation_rule == COLLATION_NTOFS_ULONG) {
+	if (le32_eq(collation_rule, COLLATION_NTOFS_ULONG)) {
 		/* i.e. $SII or $QUOTA-$Q */
 		u1 = le32_to_cpup((const le32*)key1);
 		u2 = le32_to_cpup((const le32*)key2);
@@ -2641,7 +2641,7 @@ static int ntfs_index_keys_compare(u8 *key1, u8 *key2, int key1_length,
 		/* u1 == u2 */
 		return 0;
 	}
-	if (collation_rule == COLLATION_NTOFS_ULONGS) {
+	if (le32_eq(collation_rule, COLLATION_NTOFS_ULONGS)) {
 		/* i.e $OBJID-$O */
 		i = 0;
 		while (i < min(key1_length, key2_length)) {
@@ -2660,7 +2660,7 @@ static int ntfs_index_keys_compare(u8 *key1, u8 *key2, int key1_length,
 			return 1;
 		return 0;
 	}
-	if (collation_rule == COLLATION_NTOFS_SECURITY_HASH) {
+	if (le32_eq(collation_rule, COLLATION_NTOFS_SECURITY_HASH)) {
 		/* i.e. $SDH */
 		u1 = le32_to_cpu(((SDH_INDEX_KEY*)key1)->hash);
 		u2 = le32_to_cpu(((SDH_INDEX_KEY*)key2)->hash);
@@ -2677,7 +2677,7 @@ static int ntfs_index_keys_compare(u8 *key1, u8 *key2, int key1_length,
 			return 1;
 		return 0;
 	}
-	if (collation_rule == COLLATION_NTOFS_SID) {
+	if (le32_eq(collation_rule, COLLATION_NTOFS_SID)) {
 		/* i.e. $QUOTA-O */
 		i = memcmp(key1, key2, min(key1_length, key2_length));
 		if (!i) {
@@ -2740,7 +2740,7 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx, u32 idx_size,
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	if (type == AT_FILE_NAME) {
+	if (le32_eq(type, AT_FILE_NAME)) {
 		while (((u8*)idx_entry < (u8*)idx_end) &&
 				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
 			/*
@@ -2785,7 +2785,7 @@ do_next:
 			idx_entry = (INDEX_ENTRY*)((u8*)idx_entry +
 					le16_to_cpu(idx_entry->length));
 		}
-	} else if (type == AT_UNUSED) {  /* case view */
+	} else if (le32_eq(type, AT_UNUSED)) {  /* case view */
 		while (((u8*)idx_entry < (u8*)idx_end) &&
 				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
 			i = ntfs_index_keys_compare((u8*)idx + 0x10,

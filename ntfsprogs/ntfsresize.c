@@ -724,7 +724,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 
 	if (inode == FILE_Bitmap) {
 		llcn = &resize->last_lcn;
-		if (atype == AT_DATA && NInoAttrList(resize->ni))
+		if (le32_eq(atype, AT_DATA) && NInoAttrList(resize->ni))
 		    err_exit("Highly fragmented $Bitmap isn't supported yet.");
 
 		supported = 1;
@@ -748,7 +748,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		supported = 1;
 
 		/* Fragmented $MFTMirr DATA attribute isn't supported yet */
-		if (atype == AT_DATA)
+		if (le32_eq(atype, AT_DATA))
 			if (rl[1].length != 0 || rl->vcn)
 				supported = 0;
 	} else {
@@ -782,7 +782,7 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 	if (lcn + lcn_length <= new_vol_size)
 		return;
 
-	if (inode == FILE_Bitmap && resize->ctx->attr->type == AT_DATA)
+	if (inode == FILE_Bitmap && le32_eq(resize->ctx->attr->type, AT_DATA))
 		return;
 
 	start = lcn;
@@ -911,7 +911,7 @@ static int walk_attributes(ntfs_volume *vol, ntfsck_t *fsck)
 		return -1;
 
 	while (!ntfs_attrs_walk(fsck->ctx)) {
-		if (fsck->ctx->attr->type == AT_END)
+		if (le32_eq(fsck->ctx->attr->type, AT_END))
 			break;
 		build_lcn_usage_bitmap(vol, fsck);
 	}
@@ -1128,7 +1128,7 @@ static void resize_constraints_by_attributes(ntfs_resize_t *resize)
 		exit(1);
 
 	while (!ntfs_attrs_walk(resize->ctx)) {
-		if (resize->ctx->attr->type == AT_END)
+		if (le32_eq(resize->ctx->attr->type, AT_END))
 			break;
 		build_resize_constraints(resize);
 	}
@@ -1751,7 +1751,7 @@ static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 static void relocate_clusters(ntfs_resize_t *r, runlist *dest_rl, s64 src_lcn)
 {
 	/* collect_shrink_constraints() ensured $MFTMir DATA is one run */
-	if (r->mref == FILE_MFTMirr && r->ctx->attr->type == AT_DATA) {
+	if (r->mref == FILE_MFTMirr && le32_eq(r->ctx->attr->type, AT_DATA)) {
 		if (!r->mftmir_old) {
 			r->mftmir_rl.lcn = dest_rl->lcn;
 			r->mftmir_rl.length = dest_rl->length;
@@ -1849,7 +1849,7 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 
 	hint = (resize->mref == FILE_MFTMirr) ? 1 : 0;
 	if ((resize->mref == FILE_MFT)
-	    && (resize->ctx->attr->type == AT_DATA)
+	    && le32_eq(resize->ctx->attr->type, AT_DATA)
 	    && !run
 	    && resize->new_mft_start) {
 		relocate_rl = resize->new_mft_start;
@@ -1988,7 +1988,7 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 		exit(1);
 
 	while (!ntfs_attrs_walk(resize->ctx)) {
-		if (resize->ctx->attr->type == AT_END)
+		if (le32_eq(resize->ctx->attr->type, AT_END))
 			break;
 
 		if (handle_mftdata(resize, do_mftdata) == 0)
@@ -2001,7 +2001,7 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 			continue;
 
 		if (resize->mref == FILE_Bitmap &&
-		    resize->ctx->attr->type == AT_DATA)
+		    le32_eq(resize->ctx->attr->type, AT_DATA))
 			continue;
 
 		relocate_attribute(resize);
@@ -2102,7 +2102,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 		}
 		while (!ntfs_attrs_walk(resize->ctx)
 		   && (resize->ctx->attr->type != AT_DATA)) { }
-		if (resize->ctx->attr->type == AT_DATA) {
+		if (le32_eq(resize->ctx->attr->type, AT_DATA)) {
 			le64 high_le;
 
 			high_le = resize->ctx->attr->highest_vcn;
@@ -3006,7 +3006,7 @@ static ATTR_RECORD *get_unnamed_attr(expand_t *expand, ATTR_TYPES type,
 	got = ntfs_mst_pread(vol->dev, pos, 1, vol->mft_record_size, mrec);
 	if ((got == 1) && (mrec->flags & MFT_RECORD_IN_USE)) {
 		a = find_attr(expand->mrec, type, NULL, 0);
-		found = a && (a->type == type) && !a->name_length;
+		found = a && le32_eq(a->type, type) && !a->name_length;
 	}
 		/* not finding the attribute list is not an error */
 	if (!found && (type != AT_ATTRIBUTE_LIST)) {
@@ -3970,7 +3970,7 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 							res = -1;
 					}
 				/* relocated unnamed data (not $BadClus) */
-				if ((a->type == AT_DATA)
+				if (le32_eq(a->type, AT_DATA)
 				    && !a->name_length
 				    && (inum != FILE_BadClus)) {
 					old_rl = rl;
@@ -3991,7 +3991,7 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 					a->highest_vcn = cpu_to_le64(lth - 1);
 				}
 				/* expand the named data for $BadClus */
-				if ((a->type == AT_DATA)
+				if (le32_eq(a->type, AT_DATA)
 				    && a->name_length
 				    && (inum == FILE_BadClus)) {
 					old_rl = rl;

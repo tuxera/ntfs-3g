@@ -1091,7 +1091,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 		wanted_key_size = 8;
 		gcry_algo = GCRY_CIPHER_DES;
 		gcry_mode = GCRY_CIPHER_MODE_CBC;
-		if (fek->alg_id == CALG_DES)
+		if (le32_eq(fek->alg_id, CALG_DES))
 			ntfs_log_error("DES is not supported at present\n");
 		else
 			ntfs_log_error("Unknown crypto algorithm 0x%x\n",
@@ -1120,7 +1120,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 		err = EINVAL;
 		goto out;
 	}
-	if (fek->alg_id == CALG_DESX) {
+	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		err = ntfs_desx_key_expand(fek->key_data, (u32*)ctx->des_key,
 				&ctx->out_whitening, &ctx->in_whitening);
 		if (err == GPG_ERR_NO_ERROR)
@@ -1287,7 +1287,7 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	 * that gcry_cipher_setiv() wants an iv of length 8 bytes but we give
 	 * it a length of 16 for AES256 so it does not like it.
 	 */
-	if (fek->alg_id == CALG_DESX) {
+	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		int k;
 
 		for (k=0; k<512; k+=8) {
@@ -1300,7 +1300,7 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 		return -1;
 	}
 	/* Apply the IV. */
-	if (fek->alg_id == CALG_AES_256) {
+	if (le32_eq(fek->alg_id, CALG_AES_256)) {
 		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
 		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
 	} else {
@@ -1330,14 +1330,14 @@ static int ntfs_fek_encrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	 * it a length of 16 for AES256 so it does not like it.
 	 */
 	/* Apply the IV. */
-	if (fek->alg_id == CALG_AES_256) {
+	if (le32_eq(fek->alg_id, CALG_AES_256)) {
 		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
 		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
 		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
 	}
-	if (fek->alg_id == CALG_DESX) {
+	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		int k;
 
 		for (k=0; k<512; k+=8) {

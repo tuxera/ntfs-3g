@@ -352,9 +352,9 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 		return 1;
 	}
 
-	if ((inode->mft_no < 2) && (attr->type == AT_DATA))
+	if ((inode->mft_no < 2) && le32_eq(attr->type, AT_DATA))
 		block_size = vol->mft_record_size;
-	else if (attr->type == AT_INDEX_ALLOCATION)
+	else if (le32_eq(attr->type, AT_INDEX_ALLOCATION))
 		block_size = index_get_size(inode);
 	else
 		block_size = 0;

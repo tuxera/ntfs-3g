@@ -534,7 +534,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
 			(unsigned)((u8*)a - (u8*)m));
-	if (a->type == AT_END) {
+	if (le32_eq(a->type, AT_END)) {
 		printf("Attribute type = 0x%x ($END)\n",
 				(unsigned int)le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
@@ -665,9 +665,9 @@ static void dump_mft_record(MFT_RECORD *m)
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	printf("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
-		if (a->type == cpu_to_le32(attr_type))
+		if (le32_eq(a->type, cpu_to_le32(attr_type)))
 			dump_attr_record(m, a);
-		if (a->type == AT_END)
+		if (le32_eq(a->type, AT_END))
 			break;
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
 	};

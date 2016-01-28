@@ -884,7 +884,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 				else size = 0;
 			   /* if hash is not the same, the key is not present */
 				if (psdh && (size > 0)
-				   && (psdh->keyhash == hash)) {
+				   && (le32_eq(psdh->keyhash, hash))) {
 					   /* if hash is the same */
 					   /* check the whole record */
 					realign.parts.dataoffsh = psdh->dataoffsh;

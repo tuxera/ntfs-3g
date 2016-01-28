@@ -713,7 +713,7 @@ static int ntfs_full_allocation(ntfs_attr *na, ntfs_attr_search_ctx *ctx,
 				attr->compressed_size
 					= cpu_to_le64(na->compressed_size);
 			/* Copy the unnamed data attribute sizes to inode */
-			if ((attr_type == AT_DATA) && !attr_name_len) {
+			if (le32_eq(attr_type, AT_DATA) && !attr_name_len) {
 				ni = na->ni;
 				ni->data_size = na->data_size;
 				if (na->data_flags & ATTR_IS_SPARSE) {

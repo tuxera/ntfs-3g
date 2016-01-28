@@ -85,14 +85,14 @@ ntfschar TXF_DATA[] = { const_cpu_to_le16('$'),
 
 static int NAttrFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
 		return (na->ni->flags & flag);
 	return 0;
 }
 
 static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
 		na->ni->flags |= flag;
 	else
 		ntfs_log_trace("Denied setting flag %d for not unnamed data "
@@ -101,7 +101,7 @@ static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 
 static void NAttrClearFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
 		na->ni->flags &= ~flag;
 }
 
@@ -451,10 +451,10 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	 * attribute.  Windows does not complain about invalid flags and chkdsk
 	 * does not detect or fix them so we need to cope with it, too.
 	 */
-	if (type == AT_ATTRIBUTE_LIST)
+	if (le32_eq(type, AT_ATTRIBUTE_LIST))
 		a->flags = 0;
 
-	if ((type == AT_DATA)
+	if (le32_eq(type, AT_DATA)
 	   && (a->non_resident ? !a->initialized_size : !a->value_length)) {
 		/*
 		 * Define/redefine the compression state if stream is
@@ -478,7 +478,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 
 	/* a file may be sparse though its unnamed data is not (cf $UsnJrnl) */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED &&
+	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED &&
 	    (((a->flags & ATTR_IS_SPARSE)     && !NAttrSparse(na)) ||
 	     (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
 		errno = EIO;
@@ -1827,7 +1827,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		 * file. This will make recursive calls
 		 */
 	if (compressed
-	    && (na->type == AT_DATA)
+	    && le32_eq(na->type, AT_DATA)
 	    && (pos > na->initialized_size)
 	    && stuff_hole(na,pos))
 		goto errno_set;
@@ -1852,7 +1852,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	/* If the write reaches beyond the end, extend the attribute. */
 	old_data_size = na->data_size;
 	/* identify whether this is appending to a non resident data attribute */
-	if ((na->type == AT_DATA) && (pos >= old_data_size)
+	if (le32_eq(na->type, AT_DATA) && (pos >= old_data_size)
 	    && NAttrNonResident(na))
 		NAttrSetDataAppending(na);
 	if (pos + count > na->data_size) {
@@ -2024,8 +2024,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		na->initialized_size = pos + count;
 #if CACHE_NIDATA_SIZE
 		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
-		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
-		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
+		    ? le32_eq(na->type, AT_INDEX_ROOT) && na->name == NTFS_INDEX_I30
+		    : le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
 			if ((compressed || NAttrSparse(na))
 					&& NAttrNonResident(na))
@@ -2480,8 +2480,8 @@ retry:
 		failed = ntfs_compressed_close(na, rl, ofs, &update_from);
 #if CACHE_NIDATA_SIZE
 		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
-		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
-		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
+		    ? le32_eq(na->type, AT_INDEX_ROOT) && na->name == NTFS_INDEX_I30
+		    : le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
 			na->ni->allocated_size = na->compressed_size;
 			set_nino_flag(na->ni,KnownSize);
@@ -2775,14 +2775,14 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		ctx->attr = a;
 		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
 				le32_to_cpu(type))) ||
-				(a->type == AT_END)) {
+				le32_eq(a->type, AT_END)) {
 			errno = ENOENT;
 			return -1;
 		}
 		if (!a->length)
 			break;
 		/* If this is an enumeration return this attribute. */
-		if (type == AT_UNUSED)
+		if (le32_eq(type, AT_UNUSED))
 			return 0;
 		if (a->type != type)
 			continue;
@@ -2975,7 +2975,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 	}
 	if (ni == base_ni)
 		ctx->base_attr = ctx->attr;
-	if (type == AT_END)
+	if (le32_eq(type, AT_END))
 		goto not_found;
 	vol = base_ni->vol;
 	al_start = base_ni->attr_list;
@@ -2996,7 +2996,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		 * the attribute list itself, need to return the attribute list
 		 * attribute.
 		 */
-		if ((type == AT_UNUSED) && is_first_search &&
+		if (le32_eq(type, AT_UNUSED) && is_first_search &&
 				le32_to_cpu(al_entry->type) >
 				le32_to_cpu(AT_ATTRIBUTE_LIST))
 			goto find_attr_list_attr;
@@ -3009,7 +3009,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		 * attribute list attribute from the base mft record as it is
 		 * not listed in the attribute list itself.
 		 */
-		if ((type == AT_UNUSED) && le32_to_cpu(ctx->al_entry->type) <
+		if (le32_eq(type, AT_UNUSED) && le32_to_cpu(ctx->al_entry->type) <
 				le32_to_cpu(AT_ATTRIBUTE_LIST) &&
 				le32_to_cpu(al_entry->type) >
 				le32_to_cpu(AT_ATTRIBUTE_LIST)) {
@@ -3084,7 +3084,7 @@ find_attr_list_attr:
 		 * If !@type we want the attribute represented by this
 		 * attribute list entry.
 		 */
-		if (type == AT_UNUSED)
+		if (le32_eq(type, AT_UNUSED))
 			goto is_enumeration;
 		/*
 		 * If @name is AT_UNNAMED we want an unnamed attribute.
@@ -3123,7 +3123,7 @@ find_attr_list_attr:
 					next_al_entry->length) <= al_end    &&
 				sle64_to_cpu(next_al_entry->lowest_vcn) <=
 					lowest_vcn			    &&
-				next_al_entry->type == al_entry->type	    &&
+				le32_eq(next_al_entry->type, al_entry->type) &&
 				next_al_entry->name_length == al_name_len   &&
 				ntfs_names_are_equal((ntfschar*)((char*)
 					next_al_entry +
@@ -3180,7 +3180,7 @@ do_next_attr_loop:
 		if ((char*)a < (char*)ctx->mrec || (char*)a > (char*)ctx->mrec +
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
-		if (a->type == AT_END)
+		if (le32_eq(a->type, AT_END))
 			continue;
 		if (!a->length)
 			break;
@@ -3205,7 +3205,7 @@ do_next_attr_loop:
 		 * have found it! Also, if !@type, it is an enumeration, so we
 		 * want the current attribute.
 		 */
-		if ((type == AT_UNUSED) || !val || (!a->non_resident &&
+		if (le32_eq(type, AT_UNUSED) || !val || (!a->non_resident &&
 				le32_to_cpu(a->value_length) == val_len &&
 				!memcmp((char*)a + le16_to_cpu(a->value_offset),
 				val, val_len))) {
@@ -3230,7 +3230,7 @@ not_found:
 	 * end, we reset the search context @ctx and use ntfs_attr_find() to
 	 * seek to the end of the base mft record.
 	 */
-	if (type == AT_UNUSED || type == AT_END) {
+	if (le32_eq(type, AT_UNUSED) || le32_eq(type, AT_END)) {
 		ntfs_attr_reinit_search_ctx(ctx);
 		return ntfs_attr_find(AT_END, name, name_len, ic, val, val_len,
 				ctx);
@@ -3364,7 +3364,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		base_ni = ctx->base_ntfs_ino;
 	else
 		base_ni = ctx->ntfs_ino;
-	if (!base_ni || !NInoAttrList(base_ni) || type == AT_ATTRIBUTE_LIST)
+	if (!base_ni || !NInoAttrList(base_ni) || le32_eq(type, AT_ATTRIBUTE_LIST))
 		ret = ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
 	else
 		ret = ntfs_external_attr_find(type, name, name_len, ic, 
@@ -3396,7 +3396,7 @@ int ntfs_attr_position(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 	if (ntfs_attr_lookup(type, NULL, 0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (errno != ENOENT)
 			return -1;
-		if (ctx->attr->type == AT_END) {
+		if (le32_eq(ctx->attr->type, AT_END)) {
 			errno = ENOSPC;
 			return -1;
 		}
@@ -3527,7 +3527,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		if (le32_to_cpu(ad->type) < le32_to_cpu(type))
 			continue;
 		/* We found the attribute; return it. */
-		if (ad->type == type)
+		if (le32_eq(ad->type, type))
 			return ad;
 		/* We have gone too far already. No point in continuing. */
 		break;
@@ -3569,7 +3569,7 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	 * $ATTRIBUTE_LIST shouldn't be greater than 0x40000, otherwise 
 	 * Windows would crash. This is not listed in the AttrDef.
 	 */
-	if (type == AT_ATTRIBUTE_LIST && size > 0x40000) {
+	if (le32_eq(type, AT_ATTRIBUTE_LIST) && size > 0x40000) {
 		errno = ERANGE;
 		ntfs_log_perror("Too large attrlist (%lld)", (long long)size);
 		return -1;
@@ -3587,7 +3587,7 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	 * clearing the volume name. If we want to be able to clear the volume
 	 * name we must also accept 0 as min_size, despite the $AttrDef
 	 * definition. */
-	if(type == AT_VOLUME_NAME)
+	if(le32_eq(type, AT_VOLUME_NAME))
 		min_size = 0;
 	
 	if ((min_size && (size < min_size)) || 
@@ -3634,7 +3634,7 @@ static int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPE
 	 * causes Windows Vista and later to see the volume as a RAW volume and
 	 * thus cannot mount it at all.
 	 */
-	if ((type == AT_LOGGED_UTILITY_STREAM)
+	if (le32_eq(type, AT_LOGGED_UTILITY_STREAM)
 	    && name
 	    && ntfs_names_are_equal(TXF_DATA, 9, name, name_len,
 			CASE_SENSITIVE, vol->upcase, vol->upcase_len))
@@ -3838,7 +3838,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		memcpy((u8*)a + le16_to_cpu(a->value_offset), val, size);
 	else
 		memset((u8*)a + le16_to_cpu(a->value_offset), 0, size);
-	if (type == AT_FILE_NAME)
+	if (le32_eq(type, AT_FILE_NAME))
 		a->resident_flags = RESIDENT_ATTR_IS_INDEXED;
 	else
 		a->resident_flags = 0;
@@ -3861,8 +3861,8 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		}
 	}
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
-	    ? type == AT_INDEX_ROOT && name == NTFS_INDEX_I30
-	    : type == AT_DATA && name == AT_UNNAMED) {
+	    ? le32_eq(type, AT_INDEX_ROOT) && name == NTFS_INDEX_I30
+	    : le32_eq(type, AT_DATA) && name == AT_UNNAMED) {
 		ni->data_size = size;
 		ni->allocated_size = (size + 7) & ~7;
 		set_nino_flag(ni,KnownSize);
@@ -4079,7 +4079,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 	}
 
 	/* Post $ATTRIBUTE_LIST delete setup. */
-	if (type == AT_ATTRIBUTE_LIST) {
+	if (le32_eq(type, AT_ATTRIBUTE_LIST)) {
 		if (NInoAttrList(base_ni) && base_ni->attr_list)
 			free(base_ni->attr_list);
 		base_ni->attr_list = NULL;
@@ -4101,7 +4101,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			return 0;
 	}
 
-	if (type == AT_ATTRIBUTE_LIST || !NInoAttrList(base_ni))
+	if (le32_eq(type, AT_ATTRIBUTE_LIST) || !NInoAttrList(base_ni))
 		return 0;
 
 	/* Remove attribute list if we don't need it any more. */
@@ -4188,7 +4188,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_attr *na;
 	ATTR_FLAGS data_flags;
 
-	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
+	if (!ni || size < 0 || le32_eq(type, AT_ATTRIBUTE_LIST)) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: ni=%p  size=%lld", __FUNCTION__, ni,
 				(long long)size);
@@ -4300,8 +4300,8 @@ add_attr_record:
 	    && (ni->vol->major_ver >= 3)
 	    && NVolCompression(ni->vol)
 	    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
-	    && ((type == AT_DATA)
-	       || ((type == AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
+	    && (le32_eq(type, AT_DATA)
+	       || (le32_eq(type, AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
 		data_flags = ATTR_IS_COMPRESSED;
 	else
 		data_flags = const_cpu_to_le16(0);
@@ -4499,7 +4499,7 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 			return -1;
 		}
 
-		if (a->type == AT_INDEX_ROOT && new_size > attr_size &&
+		if (le32_eq(a->type, AT_INDEX_ROOT) && new_size > attr_size &&
 		    new_muse + 120 > alloc_size && old_size + 120 <= alloc_size) {
 			errno = ENOSPC;
 			ntfs_log_trace("Too big INDEX_ROOT (%u > %u)\n",
@@ -5001,8 +5001,8 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			    || NAttrSparse(na))
 				na->compressed_size = na->allocated_size;
 			if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
-			    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
-			    : na->type == AT_DATA && na->name == AT_UNNAMED) {
+			    ? le32_eq(na->type, AT_INDEX_ROOT) && na->name == NTFS_INDEX_I30
+			    : le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 				na->ni->data_size = na->data_size;
 				if (((na->data_flags & ATTR_COMPRESSION_MASK)
 					|| NAttrSparse(na))
@@ -5013,7 +5013,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 					na->ni->allocated_size
 						= na->allocated_size;
 				set_nino_flag(na->ni,KnownSize);
-				if (na->type == AT_DATA)
+				if (le32_eq(na->type, AT_DATA))
 					NInoFileNameSetDirty(na->ni);
 			}
 			goto resize_done;
@@ -5083,7 +5083,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			ntfs_attr_close(tna);
 			continue;
 		}
-		if ((tna->type == AT_DATA) && !tna->name_len) {
+		if (le32_eq(tna->type, AT_DATA) && !tna->name_len) {
 			/*
 			 * If we had to make the unnamed data attribute
 			 * non-resident, propagate its new allocated size
@@ -5115,7 +5115,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 	 * The standard information and attribute list attributes can't be
 	 * moved out from the base MFT record, so try to move out others. 
 	 */
-	if (na->type==AT_STANDARD_INFORMATION || na->type==AT_ATTRIBUTE_LIST) {
+	if (le32_eq(na->type, AT_STANDARD_INFORMATION) || le32_eq(na->type, AT_ATTRIBUTE_LIST)) {
 		ntfs_attr_put_search_ctx(ctx);
 		if (ntfs_inode_free_space(na->ni, offsetof(ATTR_RECORD,
 				non_resident_end) + 8)) {
@@ -5282,7 +5282,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	}
 
 	/* Make sure this is not $MFT/$BITMAP or Windows will not boot! */
-	if (na->type == AT_BITMAP && na->ni->mft_no == FILE_MFT) {
+	if (le32_eq(na->type, AT_BITMAP) && na->ni->mft_no == FILE_MFT) {
 		errno = EPERM;
 		return -1;
 	}
@@ -5345,7 +5345,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 *  to current state of compression flag
 	 */
 	if (!na->data_size
-	    && (na->type == AT_DATA)
+	    && le32_eq(na->type, AT_DATA)
 	    && (na->ni->vol->major_ver >= 3)
 	    && NVolCompression(na->ni->vol)
 	    && (na->ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
@@ -5358,7 +5358,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 * but at least it serves as a reminder that there may be attributes
 	 * for which we do need to set this flag. (AIA)
 	 */
-	if (a->type == AT_FILE_NAME)
+	if (le32_eq(a->type, AT_FILE_NAME))
 		a->resident_flags = RESIDENT_ATTR_IS_INDEXED;
 	else
 		a->resident_flags = 0;
@@ -5529,7 +5529,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	 * Set FILE_NAME dirty flag, to update sparse bit and
 	 * allocated size in the index.
 	 */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 		if (sparse || (na->data_flags & ATTR_COMPRESSION_MASK))
 			na->ni->allocated_size = na->compressed_size;
 		else
@@ -5731,7 +5731,7 @@ retry:
 			 * in the base mft record. Try to move out other
 			 * attributes and try again.
 			 */
-			if (na->type == AT_ATTRIBUTE_LIST) {
+			if (le32_eq(na->type, AT_ATTRIBUTE_LIST)) {
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_free_space(na->ni, mp_size -
 							cur_max_mp_size)) {
@@ -5821,7 +5821,7 @@ retry:
 				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 			if (spcomp)
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
-			if ((na->type == AT_DATA) && (na->name == AT_UNNAMED)) {
+			if (le32_eq(na->type, AT_DATA) && (na->name == AT_UNNAMED)) {
 				na->ni->allocated_size
 					= (spcomp
 						? na->compressed_size
@@ -5873,7 +5873,7 @@ retry:
 		/* Allocate new mft record, with special case for mft itself */
 		if (!na->ni->mft_no)
 			ni = ntfs_mft_rec_alloc(na->ni->vol,
-				na->type == AT_DATA);
+				le32_eq(na->type, AT_DATA));
 		else
 			ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
 		if (!ni) {
@@ -6095,13 +6095,13 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	}
 	/* Update data size in the index. */
 	if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
-		if (na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30) {
+		if (le32_eq(na->type, AT_INDEX_ROOT) && na->name == NTFS_INDEX_I30) {
 			na->ni->data_size = na->data_size;
 			na->ni->allocated_size = na->allocated_size;
 			set_nino_flag(na->ni,KnownSize);
 		}
 	} else {
-		if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
 			NInoFileNameSetDirty(na->ni);
 		}
@@ -6171,7 +6171,7 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 		return -1;
 	}
 
-	if (na->type == AT_DATA)
+	if (le32_eq(na->type, AT_DATA))
 		NAttrSetDataAppending(na);
 	/* Save for future use. */
 	org_alloc_size = na->allocated_size;
@@ -6208,7 +6208,7 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
 		 * sparse runs instead of real allocation of clusters.
 		 */
-		if ((na->type == AT_DATA) && (vol->major_ver >= 3)
+		if (le32_eq(na->type, AT_DATA) && (vol->major_ver >= 3)
 					 && (holes != HOLES_NO)) {
 			rl = ntfs_malloc(0x1000);
 			if (!rl)
@@ -6327,13 +6327,13 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 	ctx->attr->data_size = cpu_to_sle64(newsize);
 	/* Update data size in the index. */
 	if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
-		if (na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30) {
+		if (le32_eq(na->type, AT_INDEX_ROOT) && na->name == NTFS_INDEX_I30) {
 			na->ni->data_size = na->data_size;
 			na->ni->allocated_size = na->allocated_size;
 			set_nino_flag(na->ni,KnownSize);
 		}
 	} else {
-		if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
 			NInoFileNameSetDirty(na->ni);
 		}
@@ -6419,7 +6419,7 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
 	BOOL compressed;
 
 	if (!na || newsize < 0 ||
-			(na->ni->mft_no == FILE_MFT && na->type == AT_DATA)) {
+			(na->ni->mft_no == FILE_MFT && le32_eq(na->type, AT_DATA))) {
 		ntfs_log_trace("Invalid arguments passed.\n");
 		errno = EINVAL;
 		return STATUS_ERROR;

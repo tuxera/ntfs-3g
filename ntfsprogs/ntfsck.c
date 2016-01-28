@@ -281,7 +281,7 @@ static runlist *load_runlist(ntfs_volume *rawvol, s64 offset_to_file_record, u32
 
 		//printf("Attr type: 0x%x.\n", attr_rec->type);
 		// Check attribute record. (Only what is in the buffer)
-		if (attr_rec->type==AT_END) {
+		if (le32_eq(attr_rec->type, AT_END)) {
 			check_failed("Attribute 0x%x not found in file record at offset %lld (0x%llx).\n", (int)le32_to_cpu(attr_rec->type),
 					(long long)offset_to_file_record,
 					(long long)offset_to_file_record);
@@ -307,7 +307,7 @@ static runlist *load_runlist(ntfs_volume *rawvol, s64 offset_to_file_record, u32
 		}
 		// todo: what ATTRIBUTE_LIST (0x20)?
 
-		if (attr_rec->type==attr_type) {
+		if (le32_eq(attr_rec->type, attr_type)) {
 			// Eurika!
 
 			// ntfs_mapping_pairs_decompress only use two values from vol. Just fake it.
@@ -629,7 +629,7 @@ static BOOL check_file_record(u8 *buffer, u16 buflen)
 	while ((u8*)attr_rec<=buffer+buflen-4) {
 
 		// Check attribute record. (Only what is in the buffer)
-		if (attr_rec->type==AT_END) {
+		if (le32_eq(attr_rec->type, AT_END)) {
 			// Done.
 			return 0;
 		}

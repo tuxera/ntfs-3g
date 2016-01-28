@@ -630,13 +630,13 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 	if (inode <= LAST_METADATA_INODE) {
 
 		/* Don't save bad sectors (both $Bad and unnamed are ignored */
-		if (inode == FILE_BadClus && image->ctx->attr->type == AT_DATA)
+		if (inode == FILE_BadClus && le32_eq(image->ctx->attr->type, AT_DATA))
 			return 0;
 
 		if (inode != FILE_LogFile)
 			return rl->length;
 
-		if (image->ctx->attr->type == AT_DATA) {
+		if (le32_eq(image->ctx->attr->type, AT_DATA)) {
 
 			/* Save at least the first 16 KiB of FILE_LogFile */
 			s64 s = (s64)16384 - rl->vcn * vol->cluster_size;
@@ -1204,7 +1204,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, le64 timestamp)
 
 	while (!(entry->ie_flags & INDEX_ENTRY_END)) {
 
-		if (iroot->type == AT_FILE_NAME) {
+		if (le32_eq(iroot->type, AT_FILE_NAME)) {
 
 			entry->key.file_name.creation_time = timestamp;
 			entry->key.file_name.last_access_time = timestamp;
@@ -1258,13 +1258,13 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 	ATTR_RECORD *a = image->ctx->attr;
 	le64 timestamp = timespec2ntfs(zero_time);
 
-	if (a->type == AT_FILE_NAME)
+	if (le32_eq(a->type, AT_FILE_NAME))
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);
 
-	else if (a->type == AT_STANDARD_INFORMATION)
+	else if (le32_eq(a->type, AT_STANDARD_INFORMATION))
 		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a, timestamp);
 
-	else if (a->type == AT_INDEX_ROOT)
+	else if (le32_eq(a->type, AT_INDEX_ROOT))
 		wipe_index_root_timestamps(a, timestamp);
 }
 
@@ -1394,7 +1394,7 @@ static void wipe_mft(char *mrec, u32 mrecsz, u64 mft_no)
 
 		while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE, 0,
 						NULL, 0, ctx)) {
-			if (ctx->attr->type == AT_END)
+			if (le32_eq(ctx->attr->type, AT_END))
 				break;
 
 			image.ctx = ctx;
@@ -1431,7 +1431,7 @@ static void wipe_indx(char *mrec, u32 mrecsz)
 		 * The index bitmap is not checked, obsoleted records are
 		 * wiped if they pass the safety checks
 		 */
-	if ((indexa->magic == magic_INDX)
+	if (le32_eq(indexa->magic, magic_INDX)
 	    && (le32_to_cpu(indexa->index.entries_offset) >= sizeof(INDEX_HEADER))
 	    && (le32_to_cpu(indexa->index.allocated_size) <= mrecsz)) {
 		entry = (INDEX_ENTRY *)((u8 *)mrec + le32_to_cpu(
@@ -1670,7 +1670,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 	if (wipe
 	    && !opt.preserve_timestamps
-	    && walk->image->ctx->attr->type == AT_INDEX_ALLOCATION)
+	    && le32_eq(walk->image->ctx->attr->type, AT_INDEX_ALLOCATION))
 		wipe_index_allocation_timestamps(walk->image->ni, a);
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
@@ -1679,8 +1679,8 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		/* special wipings for MFT records and directory indexes */
 	mft_data = ((walk->image->ni->mft_no == FILE_MFT)
 			|| (walk->image->ni->mft_no == FILE_MFTMirr))
-		    && (a->type == AT_DATA);
-	index_i30 = (walk->image->ctx->attr->type == AT_INDEX_ALLOCATION)
+		    && le32_eq(a->type, AT_DATA);
+	index_i30 = le32_eq(walk->image->ctx->attr->type, AT_INDEX_ALLOCATION)
 		    && (a->name_length == 4)
 		    && !memcmp((char*)a + le16_to_cpu(a->name_offset),
 					NTFS_INDEX_I30,8);
@@ -1720,7 +1720,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 			 */
 		if (!wipe && opt.metadata_image) {
 			if ((walk->image->ni->mft_no == FILE_LogFile)
-			    && (walk->image->ctx->attr->type == AT_DATA)) {
+			    && le32_eq(walk->image->ctx->attr->type, AT_DATA)) {
 					/* 16 KiB of FILE_LogFile */
 				walk->image->inuse
 				   += is_critical_metadata(walk->image,rl);
@@ -1775,7 +1775,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 	if (opt.metadata
 	    && (opt.metadata_image || !wipe)
 	    && (walk->image->ni->mft_no == FILE_LogFile)
-	    && (walk->image->ctx->attr->type == AT_DATA))
+	    && le32_eq(walk->image->ctx->attr->type, AT_DATA))
 		clone_logfile_parts(walk->image, rl);
 
 	free(rl);
@@ -1790,7 +1790,7 @@ static void walk_attributes(struct ntfs_walk_cluster *walk)
 		perr_exit("ntfs_get_attr_search_ctx");
 
 	while (!ntfs_attrs_walk(ctx)) {
-		if (ctx->attr->type == AT_END)
+		if (le32_eq(ctx->attr->type, AT_END))
 			break;
 
 		walk->image->ctx = ctx;

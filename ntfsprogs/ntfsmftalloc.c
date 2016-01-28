@@ -256,7 +256,7 @@ static void dump_mft_record(MFT_RECORD *m)
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	ntfs_log_info("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
-		if (a->type == AT_END)
+		if (le32_eq(a->type, AT_END))
 			break;
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
 	};

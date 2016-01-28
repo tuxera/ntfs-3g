@@ -615,7 +615,7 @@ static int set_sizes(struct ALLOC_CONTEXT *alctx, ntfs_attr_search_ctx *ctx)
 	if (na->data_flags & ATTR_IS_SPARSE)
 		attr->compressed_size = cpu_to_le64(na->compressed_size);
 		/* Copy the unnamed data attribute sizes to inode */
-	if ((opts.attribute == AT_DATA) && !na->name_len) {
+	if (le32_eq(opts.attribute, AT_DATA) && !na->name_len) {
 		ni = na->ni;
 		ni->data_size = na->data_size;
 		if (na->data_flags & ATTR_IS_SPARSE) {

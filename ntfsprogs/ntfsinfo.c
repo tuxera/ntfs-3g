@@ -572,7 +572,7 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 	}
 	/* We know that FILE_ATTR_I30_INDEX_PRESENT only exists on $FILE_NAME,
 	   and in case we are wrong, let it appear as UNKNOWN */
-	if (type == AT_FILE_NAME) {
+	if (le32_eq(type, AT_FILE_NAME)) {
 		if (flags & FILE_ATTR_I30_INDEX_PRESENT) {
 			printf(" I30_INDEX");
 			flags &= ~FILE_ATTR_I30_INDEX_PRESENT;
@@ -1690,7 +1690,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 		return INDEX_ATTR_UNKNOWN;
 
 	if (index_root->type) {
-		if (index_root->type == AT_FILE_NAME)
+		if (le32_eq(index_root->type, AT_FILE_NAME))
 			return INDEX_ATTR_DIRECTORY_I30;
 		else
 			/* weird, this should be illegal */
@@ -2254,7 +2254,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE,
 			0, NULL, 0, ctx)) {
-		if (ctx->attr->type == AT_END || ctx->attr->type == AT_UNUSED) {
+		if (le32_eq(ctx->attr->type, AT_END) || le32_eq(ctx->attr->type, AT_UNUSED)) {
 			printf("Weird: %s attribute type was found, please "
 					"report this.\n",
 					get_attribute_type_name(

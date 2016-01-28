@@ -1138,7 +1138,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		
 		int ale_size;
 		
-		if (ctx->attr->type == AT_ATTRIBUTE_LIST) {
+		if (le32_eq(ctx->attr->type, AT_ATTRIBUTE_LIST)) {
 			err = EIO;
 			ntfs_log_perror("Attribute list already present");
 			goto put_err_out;
@@ -1332,10 +1332,10 @@ retry:
 		}
 
 		if (ntfs_inode_base(ctx->ntfs_ino)->mft_no == FILE_MFT && 
-		    ctx->attr->type == AT_DATA)
+		    le32_eq(ctx->attr->type, AT_DATA))
 			goto retry;
 
-		if (ctx->attr->type == AT_INDEX_ROOT)
+		if (le32_eq(ctx->attr->type, AT_INDEX_ROOT))
 			goto retry;
 
 		record_size = le32_to_cpu(ctx->attr->length);

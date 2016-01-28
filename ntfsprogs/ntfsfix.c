@@ -869,7 +869,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			}
 			if ((length > 0)
 			    && al->length
-			    && (al->type == AT_DATA)
+			    && le32_eq(al->type, AT_DATA)
 			    && !al->name_length
 			    && ((leVCN)al->lowest_vcn == levcn)
 			    && (MREF_LE(al->mft_reference) >= SELFLOC_LIMIT)) {
