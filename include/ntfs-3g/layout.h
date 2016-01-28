@@ -902,7 +902,7 @@ typedef enum {
 	FILE_ATTR_READONLY		= const_cpu_to_le32(0x00000001),
 	FILE_ATTR_HIDDEN		= const_cpu_to_le32(0x00000002),
 	FILE_ATTR_SYSTEM		= const_cpu_to_le32(0x00000004),
-	/* Old DOS volid. Unused in NT.	= cpu_to_le32(0x00000008), */
+	/* Old DOS volid. Unused in NT.	= const_cpu_to_le32(0x00000008), */
 
 	FILE_ATTR_DIRECTORY		= const_cpu_to_le32(0x00000010),
 	/* FILE_ATTR_DIRECTORY is not considered valid in NT. It is reserved

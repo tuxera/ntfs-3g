@@ -183,7 +183,7 @@ static int parse_options(int argc, char **argv)
 	opterr = 0; /* We'll handle the errors, thank you. */
 
 	opts.inode = -1;
-	opts.attr = cpu_to_le32(-1);
+	opts.attr = const_cpu_to_le32(-1);
 	opts.attr_name = NULL;
 	opts.attr_name_len = 0;
 
@@ -201,7 +201,7 @@ static int parse_options(int argc, char **argv)
 			}
 			break;
 		case 'a':
-			if (!le32_eq(opts.attr, cpu_to_le32(-1))) {
+			if (!le32_eq(opts.attr, const_cpu_to_le32(-1))) {
 				ntfs_log_error("You must specify exactly one "
 						"attribute.\n");
 			} else if (parse_attribute(optarg, &attr) > 0) {
@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
 	}
 
 	attr = AT_DATA;
-	if (!le32_eq(opts.attr, cpu_to_le32(-1)))
+	if (!le32_eq(opts.attr, const_cpu_to_le32(-1)))
 		attr = opts.attr;
 
 	result = cat(vol, inode, attr, opts.attr_name, opts.attr_name_len);

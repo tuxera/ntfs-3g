@@ -1059,7 +1059,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 	gcry_error_t err;
 	ntfs_desx_ctx *ctx;
 
-	key_size = le32_to_cpup(fek_buf);
+	key_size = le32_to_cpup((le32*) fek_buf);
 	ntfs_log_debug("key_size 0x%x\n", key_size);
 	if (key_size + 16 > fek_size) {
 		ntfs_log_debug("Invalid FEK.  It was probably decrypted with "

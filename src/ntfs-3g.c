@@ -232,10 +232,10 @@ static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
 	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
-			(le64_to_cpu(ni->last_access_time)
-				>= le64_to_cpu(ni->last_data_change_time)) &&
-			(le64_to_cpu(ni->last_access_time)
-				>= le64_to_cpu(ni->last_mft_change_time)))
+			(sle64_to_cpu(ni->last_access_time)
+				>= sle64_to_cpu(ni->last_data_change_time)) &&
+			(sle64_to_cpu(ni->last_access_time)
+				>= sle64_to_cpu(ni->last_mft_change_time)))
 		return;
 	ntfs_inode_update_times(ni, mask);
 }
@@ -568,7 +568,7 @@ static int ntfs_macfuse_getxtimes(const char *org_path,
 	}
 	
 	/* We have no backup timestamp in NTFS. */
-	crtime->tv_sec = ni->creation_time;
+	crtime->tv_sec = sle64_to_cpu(ni->creation_time);
 exit:
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -590,7 +590,7 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 		return -errno;
 	
 	if (tv) {
-		ni->creation_time = tv->tv_sec;
+		ni->creation_time = cpu_to_sle64(tv->tv_sec);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	}
 
@@ -632,7 +632,7 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 		return -errno;
 
 	if (tv) {
-		ni->last_mft_change_time = tv->tv_sec;
+		ni->last_mft_change_time = cpu_to_sle64(tv->tv_sec);
 		ntfs_fuse_update_times(ni, 0);
 	}
 
@@ -1339,8 +1339,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	res = total;
 	if ((res > 0)
 	    && (!ctx->dmtime
-		|| (le64_to_cpu(ntfs_current_time())
-		     - le64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
+		|| (sle64_to_cpu(ntfs_current_time())
+		     - sle64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
@@ -1709,7 +1709,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			 * have to build a security attribute later.
 			 */
 		if (!ctx->security.mapping[MAPUSERS])
-			securid = 0;
+			securid = const_cpu_to_le32(0);
 		else
 			if (ctx->inherit)
 				securid = ntfs_inherited_id(&security,

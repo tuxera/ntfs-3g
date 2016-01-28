@@ -195,7 +195,7 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 						uname[i] = found->file_name[i];
 				} else {
 					for (i=0; i<found->file_name_length; i++)
-						uname[i] = vol->locase[found->file_name[i]];
+						uname[i] = vol->locase[le16_to_cpu(found->file_name[i])];
 				}
 			}
 		}

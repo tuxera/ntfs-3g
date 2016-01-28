@@ -306,8 +306,8 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 					"size.  Cannot handle this yet.\n");
 	}
 	/* Abort if the version number is not 1.1. */
-	if (sle16_to_cpu(rstr->major_ver != 1) ||
-			sle16_to_cpu(rstr->minor_ver != 1))
+	if (sle16_to_cpu(rstr->major_ver) != 1 ||
+			sle16_to_cpu(rstr->minor_ver) != 1)
 		log_err_exit(buf, "Unknown $LogFile version %i.%i.  Only know "
 				"how to handle version 1.1.\n",
 				sle16_to_cpu(rstr->major_ver),
@@ -542,11 +542,11 @@ static void dump_log_record(LOG_RECORD *lr)
 {
 	unsigned int i;
 	ntfs_log_info("this lsn = 0x%llx\n",
-			(unsigned long long)le64_to_cpu(lr->this_lsn));
+			(unsigned long long)sle64_to_cpu(lr->this_lsn));
 	ntfs_log_info("client previous lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(lr->client_previous_lsn));
+			sle64_to_cpu(lr->client_previous_lsn));
 	ntfs_log_info("client undo next lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(lr->client_undo_next_lsn));
+			sle64_to_cpu(lr->client_undo_next_lsn));
 	ntfs_log_info("client data length = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->client_data_length));
 	ntfs_log_info("client_id.seq_number = 0x%x\n",
@@ -557,7 +557,7 @@ static void dump_log_record(LOG_RECORD *lr)
 			(unsigned int)le32_to_cpu(lr->record_type));
 	ntfs_log_info("transaction_id = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->transaction_id));
-	ntfs_log_info("flags = 0x%x:", lr->flags);
+	ntfs_log_info("flags = 0x%x:", le16_to_cpu(lr->flags));
 	if (le16_cmpz(lr->flags))
 		ntfs_log_info(" NONE\n");
 	else {
@@ -628,14 +628,14 @@ rcrd_pass_loc:
 			"CHKD");
 // TODO: I am here... (AIA)
 	ntfs_log_info("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->copy.last_lsn));
+			sle64_to_cpu(rcrd->copy.last_lsn));
 	ntfs_log_info("flags = 0x%x\n", (unsigned int)le32_to_cpu(rcrd->flags));
 	ntfs_log_info("page count = %i\n", le16_to_cpu(rcrd->page_count));
 	ntfs_log_info("page position = %i\n", le16_to_cpu(rcrd->page_position));
 	ntfs_log_info("header.next_record_offset = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->header.packed.next_record_offset));
+			le16_to_cpu(rcrd->header.packed.next_record_offset));
 	ntfs_log_info("header.last_end_lsn = 0x%llx\n", (unsigned long long)
-			le64_to_cpu(rcrd->header.packed.last_end_lsn));
+			sle64_to_cpu(rcrd->header.packed.last_end_lsn));
 	/*
 	 * Where does the 0x40 come from? Is it just usa_offset +
 	 * usa_client * 2 + 7 & ~7 or is it derived from somewhere?
@@ -648,7 +648,7 @@ rcrd_pass_loc:
 		client++;
 		lr = (LOG_RECORD*)((u8*)lr + 0x70);
 	} while (((u8*)lr + 0x70 <= (u8*)rcrd +
-			le64_to_cpu(rcrd->header.packed.next_record_offset)));
+			le16_to_cpu(rcrd->header.packed.next_record_offset)));
 
 	pass++;
 	goto rcrd_pass_loc;

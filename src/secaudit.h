@@ -216,8 +216,8 @@ typedef DWORD *LPDWORD;
 #define SE_SACL_PROTECTED   const_cpu_to_le16(0x2000)
 #define SE_DACL_AUTO_INHERITED   const_cpu_to_le16(0x400)
 #define SE_SACL_AUTO_INHERITED   const_cpu_to_le16(0x800)
-#define SE_DACL_AUTO_INHERIT_REQ   cpu_to_le16(0x100)
-#define SE_SACL_AUTO_INHERIT_REQ   cpu_to_le16(0x200)
+#define SE_DACL_AUTO_INHERIT_REQ   const_cpu_to_le16(0x100)
+#define SE_SACL_AUTO_INHERIT_REQ   const_cpu_to_le16(0x200)
 
 typedef le16 ntfschar;
 
@@ -326,10 +326,10 @@ typedef enum {
 	OWNER_SECURITY_INFORMATION = 1, // The owner identifier of the object is being referenced.
 } SECURITY_INFORMATION;
 
-#define STANDARD_RIGHTS_READ	  cpu_to_le32(0x20000)
-#define STANDARD_RIGHTS_WRITE	  cpu_to_le32(0x20000)
-#define STANDARD_RIGHTS_EXECUTE   cpu_to_le32(0x20000)
-#define STANDARD_RIGHTS_REQUIRED  cpu_to_le32(0xf0000)
+#define STANDARD_RIGHTS_READ	  const_cpu_to_le32(0x20000)
+#define STANDARD_RIGHTS_WRITE	  const_cpu_to_le32(0x20000)
+#define STANDARD_RIGHTS_EXECUTE   const_cpu_to_le32(0x20000)
+#define STANDARD_RIGHTS_REQUIRED  const_cpu_to_le32(0xf0000)
 
 #endif
 
@@ -452,39 +452,39 @@ enum {
 
 #ifndef WIN32
 
-#define DELETE				 cpu_to_le32(0x00010000L)
-#define READ_CONTROL			 cpu_to_le32(0x00020000L)
-#define WRITE_DAC			 cpu_to_le32(0x00040000L)
-#define WRITE_OWNER			 cpu_to_le32(0x00080000L)
-#define SYNCHRONIZE			 cpu_to_le32(0x00100000L)
+#define DELETE				 const_cpu_to_le32(0x00010000L)
+#define READ_CONTROL			 const_cpu_to_le32(0x00020000L)
+#define WRITE_DAC			 const_cpu_to_le32(0x00040000L)
+#define WRITE_OWNER			 const_cpu_to_le32(0x00080000L)
+#define SYNCHRONIZE			 const_cpu_to_le32(0x00100000L)
 
 
-#define FILE_READ_DATA		  cpu_to_le32( 0x0001 )    // file & pipe
-#define FILE_LIST_DIRECTORY	  cpu_to_le32( 0x0001 )    // directory
+#define FILE_READ_DATA		  const_cpu_to_le32(0x0001) // file & pipe
+#define FILE_LIST_DIRECTORY	  const_cpu_to_le32(0x0001) // directory
 
-#define FILE_WRITE_DATA 	  cpu_to_le32( 0x0002 )    // file & pipe
-#define FILE_ADD_FILE		  cpu_to_le32( 0x0002 )    // directory
+#define FILE_WRITE_DATA 	  const_cpu_to_le32(0x0002) // file & pipe
+#define FILE_ADD_FILE		  const_cpu_to_le32(0x0002) // directory
 
-#define FILE_APPEND_DATA	  cpu_to_le32( 0x0004 )    // file
-#define FILE_ADD_SUBDIRECTORY	  cpu_to_le32( 0x0004 )    // directory
-#define FILE_CREATE_PIPE_INSTANCE cpu_to_le32( 0x0004 )    // named pipe
+#define FILE_APPEND_DATA	  const_cpu_to_le32(0x0004) // file
+#define FILE_ADD_SUBDIRECTORY	  const_cpu_to_le32(0x0004) // directory
+#define FILE_CREATE_PIPE_INSTANCE const_cpu_to_le32(0x0004) // named pipe
 
 
-#define FILE_READ_EA		  cpu_to_le32( 0x0008 )    // file & directory
+#define FILE_READ_EA		  const_cpu_to_le32(0x0008) // file & directory
 
-#define FILE_WRITE_EA		  cpu_to_le32( 0x0010 )    // file & directory
+#define FILE_WRITE_EA		  const_cpu_to_le32(0x0010) // file & directory
 
-#define FILE_EXECUTE		  cpu_to_le32( 0x0020 )    // file
-#define FILE_TRAVERSE		  cpu_to_le32( 0x0020 )    // directory
+#define FILE_EXECUTE		  const_cpu_to_le32(0x0020) // file
+#define FILE_TRAVERSE		  const_cpu_to_le32(0x0020) // directory
 
-#define FILE_DELETE_CHILD	  cpu_to_le32( 0x0040 )    // directory
+#define FILE_DELETE_CHILD	  const_cpu_to_le32(0x0040) // directory
 
-#define FILE_READ_ATTRIBUTES	  cpu_to_le32( 0x0080 )    // all
+#define FILE_READ_ATTRIBUTES	  const_cpu_to_le32(0x0080) // all
 
-#define FILE_WRITE_ATTRIBUTES	  cpu_to_le32( 0x0100 )    // all
+#define FILE_WRITE_ATTRIBUTES	  const_cpu_to_le32(0x0100) // all
 
 #define FILE_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | \
-				 cpu_to_le32(0x1FF))
+				 const_cpu_to_le32(0x1FF))
 
 #define FILE_GENERIC_READ	  (STANDARD_RIGHTS_READ     |\
 				   FILE_READ_DATA	    |\
