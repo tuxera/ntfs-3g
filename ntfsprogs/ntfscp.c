@@ -194,7 +194,7 @@ static int parse_options(int argc, char **argv)
 			}
 			break;
 		case 'a':
-			if (opts.attribute != AT_DATA) {
+			if (!le32_eq(opts.attribute, AT_DATA)) {
 				ntfs_log_error("You can specify only one "
 						"attribute.\n");
 				err++;

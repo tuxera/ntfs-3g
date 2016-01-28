@@ -1178,7 +1178,7 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 			(u8*)df_header + le32_to_cpu(df_header->df_length))) {
 		df_cred = (EFS_DF_CREDENTIAL_HEADER*)((u8*)df_header +
 				le32_to_cpu(df_header->cred_header_offset));
-		if (df_cred->type != NTFS_CRED_TYPE_CERT_THUMBPRINT) {
+		if (!le32_eq(df_cred->type, NTFS_CRED_TYPE_CERT_THUMBPRINT)) {
 			ntfs_log_debug("Credential type is not certificate "
 					"thumbprint, skipping DF entry.\n");
 			continue;

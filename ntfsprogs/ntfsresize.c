@@ -1877,7 +1877,7 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 
 		/* Do not free the relocated MFT start */
 	if ((resize->mref != FILE_MFT)
-	    || (resize->ctx->attr->type != AT_DATA)
+	    || !le32_eq(resize->ctx->attr->type, AT_DATA)
 	    || run
 	    || !resize->new_mft_start)
 		free(relocate_rl);
@@ -1933,7 +1933,7 @@ static int is_mftdata(ntfs_resize_t *resize)
 	 * the other files.
 	 */
 
-	if (resize->ctx->attr->type != AT_DATA)
+	if (!le32_eq(resize->ctx->attr->type, AT_DATA))
 		return 0;
 
 	if (resize->mref == 0)
@@ -2101,7 +2101,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 			err_exit("Could not read the base record of MFT\n");
 		}
 		while (!ntfs_attrs_walk(resize->ctx)
-		   && (resize->ctx->attr->type != AT_DATA)) { }
+		   && !le32_eq(resize->ctx->attr->type, AT_DATA)) { }
 		if (le32_eq(resize->ctx->attr->type, AT_DATA)) {
 			le64 high_le;
 
@@ -2962,8 +2962,8 @@ static ATTR_RECORD *find_attr(MFT_RECORD *mrec, ATTR_TYPES type,
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
 	attrname = (ntfschar*)((char*)a + le16_to_cpu(a->name_offset));
-	while ((a->type != AT_END)
-	    && ((a->type != type)
+	while (!le32_eq(a->type, AT_END)
+	    && (!le32_eq(a->type, type)
 		|| (a->name_length != namelen)
 		|| (namelen && memcmp(attrname,name,2*namelen)))
 	    && (offset < le32_to_cpu(mrec->bytes_in_use))) {
@@ -2973,7 +2973,7 @@ static ATTR_RECORD *find_attr(MFT_RECORD *mrec, ATTR_TYPES type,
 			attrname = (ntfschar*)((char*)a
 				+ le16_to_cpu(a->name_offset));
 	}
-	if ((a->type != type)
+	if (!le32_eq(a->type, type)
 	    || (a->name_length != namelen)
 	    || (namelen && memcmp(attrname,name,2*namelen)))
 		a = (ATTR_RECORD*)NULL;
@@ -3009,7 +3009,7 @@ static ATTR_RECORD *get_unnamed_attr(expand_t *expand, ATTR_TYPES type,
 		found = a && le32_eq(a->type, type) && !a->name_length;
 	}
 		/* not finding the attribute list is not an error */
-	if (!found && (type != AT_ATTRIBUTE_LIST)) {
+	if (!found && !le32_eq(type, AT_ATTRIBUTE_LIST)) {
 		err_printf("Could not find attribute 0x%lx in inode %lld\n",
 				(long)le32_to_cpu(type), (long long)inum);
 		a = (ATTR_RECORD*)NULL;
@@ -3869,7 +3869,7 @@ static int rebase_runlists(expand_t *expand, s64 inum)
 	mrec = expand->mrec;
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while (!res && (a->type != AT_END)
+	while (!res && !le32_eq(a->type, AT_END)
 			&& (offset < le32_to_cpu(mrec->bytes_in_use))) {
 		if (a->non_resident) {
 			rl = ntfs_mapping_pairs_decompress(expand->vol, a,
@@ -3954,7 +3954,7 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 	allocated_size = lth << vol->cluster_size_bits;
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while (!res && (a->type != AT_END)
+	while (!res && !le32_eq(a->type, AT_END)
 			&& (offset < le32_to_cpu(mrec->bytes_in_use))) {
 		if (a->non_resident) {
 			keeprl = FALSE;
@@ -3965,7 +3965,7 @@ static runlist_element *rebase_runlists_meta(expand_t *expand, s64 inum)
 				for (prl=rl; prl->length; prl++)
 					if (prl->lcn >= 0) {
 						prl->lcn += expand->cluster_increment;
-						if ((a->type != AT_DATA)
+						if (!le32_eq(a->type, AT_DATA)
 						    && set_bitmap(expand,prl))
 							res = -1;
 					}

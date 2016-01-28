@@ -1233,7 +1233,7 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
 		ctx->attr = a;
-		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
+		if ((!le32_eq(type, AT_UNUSED) && (le32_to_cpu(a->type) >
 				le32_to_cpu(type))) ||
 				le32_eq(a->type, AT_END)) {
 			errno = ENOENT;
@@ -1244,7 +1244,7 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		/* If this is an enumeration return this attribute. */
 		if (le32_eq(type, AT_UNUSED))
 			return 0;
-		if (a->type != type)
+		if (!le32_eq(a->type, type))
 			continue;
 		/*
 		 * If @name is AT_UNNAMED we want an unnamed attribute.
@@ -1930,7 +1930,7 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
 	si.version_number = cpu_to_le32(0);
 	si.class_id = cpu_to_le32(0);
 	si.security_id = security_id;
-	if (si.security_id != const_cpu_to_le32(0))
+	if (!le32_eq(si.security_id, const_cpu_to_le32(0)))
 		sd_size = 72;
 	/* FIXME: $Quota support... */
 	si.owner_id = cpu_to_le32(0);
@@ -2279,7 +2279,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 	r->type = le32_eq(indexed_attr_type, AT_FILE_NAME)
 				? AT_FILE_NAME : const_cpu_to_le32(0);
 	if (le32_eq(indexed_attr_type, AT_FILE_NAME) &&
-			collation_rule != COLLATION_FILE_NAME) {
+			!le32_eq(collation_rule, COLLATION_FILE_NAME)) {
 		free(r);
 		ntfs_log_error("add_attr_index_root: indexed attribute is $FILE_NAME "
 			"but collation rule is not COLLATION_FILE_NAME.\n");

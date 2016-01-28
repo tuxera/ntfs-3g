@@ -650,7 +650,7 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 		}
 	}
 
-	if (image->ctx->attr->type != AT_DATA)
+	if (!le32_eq(image->ctx->attr->type, AT_DATA))
 		return rl->length;
 
 	return 0;
@@ -1117,7 +1117,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		return;
 	}
 
-	if (indexr->type != AT_FILE_NAME)
+	if (!le32_eq(indexr->type, AT_FILE_NAME))
 		goto out_indexr;
 
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
@@ -1281,7 +1281,7 @@ static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 	if (image->ni->mft_no <= LAST_METADATA_INODE)
 		return;
 
-	if (a->type != AT_DATA)
+	if (!le32_eq(a->type, AT_DATA))
 		return;
 
 	for (i = 0; i < le32_to_cpu(a->value_length); i++) {
@@ -1727,7 +1727,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 			} else {
 				if ((walk->image->ni->mft_no
 						<= LAST_METADATA_INODE)
-				   || (walk->image->ctx->attr->type != AT_DATA))
+				   || !le32_eq(walk->image->ctx->attr->type, AT_DATA))
 					walk->image->inuse += lcn_length;
 			}
 		}

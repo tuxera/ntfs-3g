@@ -163,7 +163,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	 * attribute.  Windows does not complain about invalid flags and chkdsk
 	 * does not detect or fix them so we need to cope with it, too.
 	 */
-	if (a->type != AT_ATTRIBUTE_LIST && a->flags) {
+	if (!le32_eq(a->type, AT_ATTRIBUTE_LIST) && a->flags) {
 		ntfs_log_error("Non-zero (%04x) attribute flags. Cannot handle "
 			       "this yet.\n", le16_to_cpu(a->flags));
 		errno = EOPNOTSUPP;
@@ -1838,7 +1838,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		 * only ATTR_IS_COMPRESSED compression mode is supported.
                  */
 	if (compressed
-	    && ((na->type != AT_DATA)
+	    && (!le32_eq(na->type, AT_DATA)
 		|| (!le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
 			 ATTR_IS_COMPRESSED)))) {
 		errno = EOPNOTSUPP;
@@ -2773,7 +2773,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
 		ctx->attr = a;
-		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
+		if ((!le32_eq(type, AT_UNUSED) && (le32_to_cpu(a->type) >
 				le32_to_cpu(type))) ||
 				le32_eq(a->type, AT_END)) {
 			errno = ENOENT;
@@ -2784,7 +2784,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		/* If this is an enumeration return this attribute. */
 		if (le32_eq(type, AT_UNUSED))
 			return 0;
-		if (a->type != type)
+		if (!le32_eq(a->type, type))
 			continue;
 		/*
 		 * If @name is AT_UNNAMED we want an unnamed attribute.
@@ -3072,10 +3072,10 @@ find_attr_list_attr:
 			break;
 		next_al_entry = (ATTR_LIST_ENTRY*)((u8*)al_entry +
 				le16_to_cpu(al_entry->length));
-		if (type != AT_UNUSED) {
+		if (!le32_eq(type, AT_UNUSED)) {
 			if (le32_to_cpu(al_entry->type) > le32_to_cpu(type))
 				goto not_found;
-			if (type != al_entry->type)
+			if (!le32_eq(type, al_entry->type))
 				continue;
 		}
 		al_name_len = al_entry->name_length;
@@ -3191,7 +3191,7 @@ do_next_attr_loop:
 		 * attribute list entry and the attribute record, there is
 		 * corruption so we break and return error EIO.
 		 */
-		if (al_entry->type != a->type)
+		if (!le32_eq(al_entry->type, a->type))
 			break;
 		if (!ntfs_names_are_equal((ntfschar*)((char*)a +
 				le16_to_cpu(a->name_offset)),
@@ -3683,7 +3683,7 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 		errno = EINVAL;
 		return -1;
 	}
-	if (type != AT_INDEX_ALLOCATION)
+	if (!le32_eq(type, AT_INDEX_ALLOCATION))
 		return 0;
 	
 	ntfs_log_trace("Attribute can't be resident\n");
@@ -3851,7 +3851,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		base_ni = ni->base_ni;
 	else
 		base_ni = ni;
-	if (type != AT_ATTRIBUTE_LIST && NInoAttrList(base_ni)) {
+	if (!le32_eq(type, AT_ATTRIBUTE_LIST) && NInoAttrList(base_ni)) {
 		if (ntfs_attrlist_entry_add(ni, a)) {
 			err = errno;
 			ntfs_attr_record_resize(m, a, 0);
@@ -3990,7 +3990,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		base_ni = ni->base_ni;
 	else
 		base_ni = ni;
-	if (type != AT_ATTRIBUTE_LIST && NInoAttrList(base_ni)) {
+	if (!le32_eq(type, AT_ATTRIBUTE_LIST) && NInoAttrList(base_ni)) {
 		if (ntfs_attrlist_entry_add(ni, a)) {
 			err = errno;
 			ntfs_log_perror("Failed add attr entry to attrlist");
@@ -4057,7 +4057,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 	if (ntfs_attr_record_resize(ctx->mrec, ctx->attr, 0)) {
 		ntfs_log_trace("Couldn't remove attribute record. Bug or damaged MFT "
 				"record.\n");
-		if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST)
+		if (NInoAttrList(base_ni) && !le32_eq(type, AT_ATTRIBUTE_LIST))
 			if (ntfs_attrlist_entry_add(ni, ctx->attr))
 				ntfs_log_trace("Rollback failed. Leaving inconstant "
 						"metadata.\n");
@@ -4070,7 +4070,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 	 * Remove record from $ATTRIBUTE_LIST if present and we don't want
 	 * delete $ATTRIBUTE_LIST itself.
 	 */
-	if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST) {
+	if (NInoAttrList(base_ni) && !le32_eq(type, AT_ATTRIBUTE_LIST)) {
 		if (ntfs_attrlist_entry_rm(ctx)) {
 			ntfs_log_trace("Couldn't delete record from "
 					"$ATTRIBUTE_LIST.\n");
@@ -5777,7 +5777,7 @@ retry:
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		if ((ctx->ntfs_ino->nr_extents == -1 ||
 					NInoAttrList(ctx->ntfs_ino)) &&
-					ctx->attr->type != AT_ATTRIBUTE_LIST) {
+					!le32_eq(ctx->attr->type, AT_ATTRIBUTE_LIST)) {
 			ctx->al_entry->lowest_vcn = cpu_to_sle64(stop_vcn);
 			ntfs_attrlist_mark_dirty(ctx->ntfs_ino);
 		}
@@ -6809,7 +6809,7 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
 			/* do not log removal of non-existent stream */
-		if (type != AT_DATA) {
+		if (!le32_eq(type, AT_DATA)) {
 			ntfs_log_perror("Failed to open attribute 0x%02x of inode "
 				"0x%llx", type, (unsigned long long)ni->mft_no);
 		}

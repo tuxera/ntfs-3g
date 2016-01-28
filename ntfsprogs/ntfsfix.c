@@ -739,13 +739,13 @@ static ATTR_RECORD *find_unnamed_attr(MFT_RECORD *mrec, ATTR_TYPES type)
 			/* fetch the requested attribute */
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while ((a->type != AT_END)
-	    && ((a->type != type) || a->name_length)
+	while (!le32_eq(a->type, AT_END)
+	    && (!le32_eq(a->type, type) || a->name_length)
 	    && (offset < le32_to_cpu(mrec->bytes_in_use))) {
 		offset += le32_to_cpu(a->length);
 		a = (ATTR_RECORD*)((char*)mrec + offset);
 	}
-	if ((a->type != type)
+	if (!le32_eq(a->type, type)
 	    || a->name_length)
 		a = (ATTR_RECORD*)NULL;
 	return (a);
@@ -861,7 +861,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			levcn = cpu_to_le64(vcn);
 			while ((length > 0)
 			    && al->length
-			    && ((al->type != AT_DATA)
+			    && (!le32_eq(al->type, AT_DATA)
 				|| ((leVCN)al->lowest_vcn != levcn))) {
 				length -= le16_to_cpu(al->length);
 				al = (ATTR_LIST_ENTRY*)

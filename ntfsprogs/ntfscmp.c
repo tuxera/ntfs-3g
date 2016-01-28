@@ -770,7 +770,7 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 	if (!ctx->attr->non_resident)
 		return 1;
 
-	if (prev_atype != ctx->attr->type)
+	if (!le32_eq(prev_atype, ctx->attr->type))
 		return 1;
 
 	if (new_name(ctx, prev_name))

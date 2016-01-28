@@ -1428,7 +1428,7 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
 	if (mft_no != FILE_BadClus)
 	       	return 0;
 
-	if (attr->type != AT_DATA)
+	if (!le32_eq(attr->type, AT_DATA))
 	       	return 0;
 
 	if ((ustr = ntfs_str2ucs("$Bad", &len)) == NULL) {
