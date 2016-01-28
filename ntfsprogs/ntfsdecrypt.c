@@ -1071,23 +1071,23 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 	fek->des_gcry_cipher_hd_ptr = NULL;
 	*(gcry_cipher_hd_t***)(fek->key_data + ((key_size + 7) & ~7)) =
 			&fek->des_gcry_cipher_hd_ptr;
-	switch (fek->alg_id) {
-	case CALG_DESX:
+	/* switch (fek->alg_id) { */
+	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		wanted_key_size = 16;
 		gcry_algo = GCRY_CIPHER_DES;
 		gcry_mode = GCRY_CIPHER_MODE_ECB;
-		break;
-	case CALG_3DES:
+	}
+	else if (le32_eq(fek->alg_id, CALG_3DES)) {
 		wanted_key_size = 24;
 		gcry_algo = GCRY_CIPHER_3DES;
 		gcry_mode = GCRY_CIPHER_MODE_CBC;
-		break;
-	case CALG_AES_256:
+	}
+	else if (le32_eq(fek->alg_id, CALG_AES_256)) {
 		wanted_key_size = 32;
 		gcry_algo = GCRY_CIPHER_AES256;
 		gcry_mode = GCRY_CIPHER_MODE_CBC;
-		break;
-	default:
+	}
+	else {
 		wanted_key_size = 8;
 		gcry_algo = GCRY_CIPHER_DES;
 		gcry_mode = GCRY_CIPHER_MODE_CBC;

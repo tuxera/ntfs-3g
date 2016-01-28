@@ -443,8 +443,8 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 		&& (((size_t)le16_to_cpu(reparse_attr->reparse_data_length)
 				 + sizeof(REPARSE_POINT)) == size);
 	if (ok) {
-		switch (reparse_attr->reparse_tag) {
-		case IO_REPARSE_TAG_MOUNT_POINT :
+		/* switch (reparse_attr->reparse_tag) { */
+		if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_MOUNT_POINT)) {
 			mount_point_data = (const struct MOUNT_POINT_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
@@ -455,8 +455,8 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 				 + sizeof(struct MOUNT_POINT_REPARSE_DATA)
 				 + offs + lth)) > size))
 				ok = FALSE;
-			break;
-		case IO_REPARSE_TAG_SYMLINK :
+		}
+		else if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_SYMLINK)) {
 			symlink_data = (const struct SYMLINK_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(symlink_data->subst_name_offset);
@@ -465,9 +465,9 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 				 + sizeof(struct SYMLINK_REPARSE_DATA)
 				 + offs + lth)) > size)
 				ok = FALSE;
-			break;
-		default :
-			break;
+		}
+		else {
+			/* break; */
 		}
 	}
 	if (!ok)
@@ -738,8 +738,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 	if (reparse_attr && attr_size
 			&& valid_reparse_data(ni, reparse_attr, attr_size)) {
-		switch (reparse_attr->reparse_tag) {
-		case IO_REPARSE_TAG_MOUNT_POINT :
+		/* switch (reparse_attr->reparse_tag) { */
+		if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_MOUNT_POINT)) {
 			mount_point_data = (struct MOUNT_POINT_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
@@ -750,8 +750,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				lth/2, mnt_point, isdir);
 			if (target)
 				bad = FALSE;
-			break;
-		case IO_REPARSE_TAG_SYMLINK :
+		}
+		else if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_SYMLINK)) {
 			symlink_data = (struct SYMLINK_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(symlink_data->subst_name_offset);
@@ -805,7 +805,7 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 				}
 				break;
 			}
-			break;
+		} else {
 		}
 		free(reparse_attr);
 	}
@@ -833,11 +833,11 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 	if (reparse_attr && attr_size) {
-		switch (reparse_attr->reparse_tag) {
-		case IO_REPARSE_TAG_MOUNT_POINT :
-		case IO_REPARSE_TAG_SYMLINK :
+		/* switch (reparse_attr->reparse_tag) { */
+		if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_MOUNT_POINT) ||
+			le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_SYMLINK)) {
 			possible = TRUE;
-		default : ;
+		} else {
 		}
 		free(reparse_attr);
 	}

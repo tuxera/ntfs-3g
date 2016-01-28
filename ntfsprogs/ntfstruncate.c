@@ -316,28 +316,28 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	int i, j;
 	u32 u;
 
-	switch (type) {
-	case AT_STANDARD_INFORMATION:
+	/* switch (type) { */
+	if (le32_eq(type, AT_STANDARD_INFORMATION)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_ATTRIBUTE_LIST:
+	} else if (le32_eq(type, AT_ATTRIBUTE_LIST)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_FILE_NAME:
+	} else if (le32_eq(type, AT_FILE_NAME)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_OBJECT_ID:
+	} else if (le32_eq(type, AT_OBJECT_ID)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_SECURITY_DESCRIPTOR:
+	} else if (le32_eq(type, AT_SECURITY_DESCRIPTOR)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_VOLUME_NAME:
+	} else if (le32_eq(type, AT_VOLUME_NAME)) {
 		printf("Volume name length = %u\n", (unsigned int)val_len);
 		if (val_len) {
 			buf = calloc(1, val_len);
@@ -352,7 +352,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			free(buf);
 		}
 		return;
-	case AT_VOLUME_INFORMATION:
+	} else if (le32_eq(type, AT_VOLUME_INFORMATION)) {
 #define VOL_INF(x) ((VOLUME_INFORMATION *)(x))
 		printf("NTFS version %i.%i\n", VOL_INF(val)->major_ver,
 				VOL_INF(val)->minor_ver);
@@ -412,37 +412,37 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		}
 		printf("\n");
 		return;
-	case AT_DATA:
+	} else if (le32_eq(type, AT_DATA)) {
 		printf(skip, "DATA");
 		return;
-	case AT_INDEX_ROOT:
+	} else if (le32_eq(type, AT_INDEX_ROOT)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_INDEX_ALLOCATION:
+	} else if (le32_eq(type, AT_INDEX_ALLOCATION)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_BITMAP:
+	} else if (le32_eq(type, AT_BITMAP)) {
 		printf(skip, "BITMAP");
 		return;
-	case AT_REPARSE_POINT:
+	} else if (le32_eq(type, AT_REPARSE_POINT)) {
 		// TODO
 		printf("%s\n", todo);
 		return;
-	case AT_EA_INFORMATION:
+	} else if (le32_eq(type, AT_EA_INFORMATION)) {
 		// TODO
 		printf("%s\n", don_t_know);
 		return;
-	case AT_EA:
+	} else if (le32_eq(type, AT_EA)) {
 		// TODO
 		printf("%s\n", don_t_know);
 		return;
-	case AT_LOGGED_UTILITY_STREAM:
+	} else if (le32_eq(type, AT_LOGGED_UTILITY_STREAM)) {
 		// TODO
 		printf("%s\n", don_t_know);
 		return;
-	default:
+	} else {
 		u = le32_to_cpu(type);
 		printf("Cannot display unknown %s defined attribute type 0x%x"
 				".\n", u >=

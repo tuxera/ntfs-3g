@@ -1231,25 +1231,25 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 
 static const char *get_attribute_type_name(le32 type)
 {
-	switch (type) {
-	case AT_UNUSED:			return "$UNUSED";
-	case AT_STANDARD_INFORMATION:   return "$STANDARD_INFORMATION";
-	case AT_ATTRIBUTE_LIST:         return "$ATTRIBUTE_LIST";
-	case AT_FILE_NAME:              return "$FILE_NAME";
-	case AT_OBJECT_ID:              return "$OBJECT_ID";
-	case AT_SECURITY_DESCRIPTOR:    return "$SECURITY_DESCRIPTOR";
-	case AT_VOLUME_NAME:            return "$VOLUME_NAME";
-	case AT_VOLUME_INFORMATION:     return "$VOLUME_INFORMATION";
-	case AT_DATA:                   return "$DATA";
-	case AT_INDEX_ROOT:             return "$INDEX_ROOT";
-	case AT_INDEX_ALLOCATION:       return "$INDEX_ALLOCATION";
-	case AT_BITMAP:                 return "$BITMAP";
-	case AT_REPARSE_POINT:          return "$REPARSE_POINT";
-	case AT_EA_INFORMATION:         return "$EA_INFORMATION";
-	case AT_EA:                     return "$EA";
-	case AT_PROPERTY_SET:           return "$PROPERTY_SET";
-	case AT_LOGGED_UTILITY_STREAM:  return "$LOGGED_UTILITY_STREAM";
-	case AT_END:                    return "$END";
+	/* switch(type) */ {
+	if (le32_eq(type, AT_UNUSED)) return "$UNUSED";
+	else if (le32_eq(type, AT_STANDARD_INFORMATION)) return "$STANDARD_INFORMATION";
+	else if (le32_eq(type, AT_ATTRIBUTE_LIST)) return "$ATTRIBUTE_LIST";
+	else if (le32_eq(type, AT_FILE_NAME)) return "$FILE_NAME";
+	else if (le32_eq(type, AT_OBJECT_ID)) return "$OBJECT_ID";
+	else if (le32_eq(type, AT_SECURITY_DESCRIPTOR)) return "$SECURITY_DESCRIPTOR";
+	else if (le32_eq(type, AT_VOLUME_NAME)) return "$VOLUME_NAME";
+	else if (le32_eq(type, AT_VOLUME_INFORMATION)) return "$VOLUME_INFORMATION";
+	else if (le32_eq(type, AT_DATA)) return "$DATA";
+	else if (le32_eq(type, AT_INDEX_ROOT)) return "$INDEX_ROOT";
+	else if (le32_eq(type, AT_INDEX_ALLOCATION)) return "$INDEX_ALLOCATION";
+	else if (le32_eq(type, AT_BITMAP)) return "$BITMAP";
+	else if (le32_eq(type, AT_REPARSE_POINT)) return "$REPARSE_POINT";
+	else if (le32_eq(type, AT_EA_INFORMATION)) return "$EA_INFORMATION";
+	else if (le32_eq(type, AT_EA)) return "$EA";
+	else if (le32_eq(type, AT_PROPERTY_SET)) return "$PROPERTY_SET";
+	else if (le32_eq(type, AT_LOGGED_UTILITY_STREAM)) return "$LOGGED_UTILITY_STREAM";
+	else if (le32_eq(type, AT_END)) return "$END";
 	}
 
 	return "$UNKNOWN";
@@ -2264,57 +2264,57 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 
 		ntfs_dump_attribute_header(ctx, inode->vol, &runcount);
 
-		switch (ctx->attr->type) {
-		case AT_STANDARD_INFORMATION:
+
+		if (le32_eq(ctx->attr->type, AT_STANDARD_INFORMATION)) {
 			ntfs_dump_attr_standard_information(ctx->attr);
-			break;
-		case AT_ATTRIBUTE_LIST:
+		}
+		else if (le32_eq(ctx->attr->type, AT_ATTRIBUTE_LIST)) {
 			ntfs_dump_attr_list(ctx->attr, inode->vol);
-			break;
-		case AT_FILE_NAME:
+		}
+		else if (le32_eq(ctx->attr->type, AT_FILE_NAME)) {
 			ntfs_dump_attr_file_name(ctx->attr);
-			break;
-		case AT_OBJECT_ID:
+		}
+		else if (le32_eq(ctx->attr->type, AT_OBJECT_ID)) {
 			ntfs_dump_attr_object_id(ctx->attr, inode->vol);
-			break;
-		case AT_SECURITY_DESCRIPTOR:
+		}
+		else if (le32_eq(ctx->attr->type, AT_SECURITY_DESCRIPTOR)) {
 			ntfs_dump_attr_security_descriptor(ctx->attr,
 					inode->vol);
-			break;
-		case AT_VOLUME_NAME:
+		}
+		else if (le32_eq(ctx->attr->type, AT_VOLUME_NAME)) {
 			ntfs_dump_attr_volume_name(ctx->attr);
-			break;
-		case AT_VOLUME_INFORMATION:
+		}
+		else if (le32_eq(ctx->attr->type, AT_VOLUME_INFORMATION)) {
 			ntfs_dump_attr_volume_information(ctx->attr);
-			break;
-		case AT_DATA:
+		}
+		else if (le32_eq(ctx->attr->type, AT_DATA)) {
 			ntfs_dump_attr_data(ctx->attr, inode);
-			break;
-		case AT_INDEX_ROOT:
+		}
+		else if (le32_eq(ctx->attr->type, AT_INDEX_ROOT)) {
 			ntfs_dump_attr_index_root(ctx->attr, inode);
-			break;
-		case AT_INDEX_ALLOCATION:
+		}
+		else if (le32_eq(ctx->attr->type, AT_INDEX_ALLOCATION)) {
 			ntfs_dump_attr_index_allocation(ctx->attr, inode);
-			break;
-		case AT_BITMAP:
+		}
+		else if (le32_eq(ctx->attr->type, AT_BITMAP)) {
 			ntfs_dump_attr_bitmap(ctx->attr);
-			break;
-		case AT_REPARSE_POINT:
+		}
+		else if (le32_eq(ctx->attr->type, AT_REPARSE_POINT)) {
 			ntfs_dump_attr_reparse_point(ctx->attr);
-			break;
-		case AT_EA_INFORMATION:
+		}
+		else if (le32_eq(ctx->attr->type, AT_EA_INFORMATION)) {
 			ntfs_dump_attr_ea_information(ctx->attr);
-			break;
-		case AT_EA:
+		}
+		else if (le32_eq(ctx->attr->type, AT_EA)) {
 			ntfs_dump_attr_ea(ctx->attr, inode->vol);
-			break;
-		case AT_PROPERTY_SET:
+		}
+		else if (le32_eq(ctx->attr->type, AT_PROPERTY_SET)) {
 			ntfs_dump_attr_property_set(ctx->attr);
-			break;
-		case AT_LOGGED_UTILITY_STREAM:
+		}
+		else if (le32_eq(ctx->attr->type, AT_LOGGED_UTILITY_STREAM)) {
 			ntfs_dump_attr_logged_utility_stream(ctx->attr, inode);
-			break;
-		default:
+		}
+		else {
 			ntfs_dump_attr_unknown(ctx->attr);
 		}
 	}
