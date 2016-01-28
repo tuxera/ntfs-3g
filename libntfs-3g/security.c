@@ -2325,8 +2325,8 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			gid = cached->gid;
 		} else {
 			perm = 0;	/* default to no permission */
-			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				!= const_cpu_to_le16(0);
+			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+				const_cpu_to_le16(0));
 			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
 				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
@@ -2470,8 +2470,8 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			stbuf->st_mode = (stbuf->st_mode & ~07777) + perm;
 		} else {
 			perm = -1;	/* default to error */
-			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				!= const_cpu_to_le16(0);
+			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+				const_cpu_to_le16(0));
 			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
 				phead =
@@ -2892,7 +2892,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 
 		/* check whether target securid is known in cache */
 
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
+	isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY, const_cpu_to_le16(0));
 	wanted.uid = uid;
 	wanted.gid = gid;
 	wanted.dmode = mode & 07777;
@@ -3660,8 +3660,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		mode = 0;
 		oldattr = getsecurityattr(scx->vol, ni);
 		if (oldattr) {
-			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				!= const_cpu_to_le16(0);
+			isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+				const_cpu_to_le16(0));
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 				oldattr;
 			gsid = (const SID*)

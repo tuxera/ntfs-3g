@@ -1502,7 +1502,7 @@ BOOL ntfs_collapsible_chars(ntfs_volume *vol,
 		if ((cs != ch)
 		    && ((ch >= vol->upcase_len)
 			|| (cs >= vol->upcase_len)
-			|| (vol->upcase[cs] != vol->upcase[ch])))
+			|| !le16_eq(vol->upcase[cs], vol->upcase[ch])))
 				collapsible = FALSE;
 	}
 	return (collapsible);

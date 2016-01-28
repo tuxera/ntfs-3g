@@ -239,7 +239,7 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 		do {
 			len = 0;
 			while (((start + len) < count)
-			    && (path[start + len] != const_cpu_to_le16('\\')))
+			    && !le16_eq(path[start + len], const_cpu_to_le16('\\')))
 				len++;
 			inum = ntfs_fix_file_name(ni, &path[start], len);
 			ntfs_inode_close(ni);
@@ -331,7 +331,7 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 			} else {
 				lth = 0;
 				while (((pos + lth) < count)
-				    && (path[pos + lth] != const_cpu_to_le16('\\')))
+				    && !le16_eq(path[pos + lth], const_cpu_to_le16('\\')))
 					lth++;
 				if (lth > 0)
 					inum = ntfs_fix_file_name(curni,&path[pos],lth);
@@ -731,8 +731,8 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 
 	target = (char*)NULL;
 	bad = TRUE;
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-			 != const_cpu_to_le16(0);
+	isdir = !le16_eq(ni->mrec->flags & MFT_RECORD_IS_DIRECTORY,
+			const_cpu_to_le16(0));
 	vol = ni->vol;
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);

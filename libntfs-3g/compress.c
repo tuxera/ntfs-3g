@@ -724,8 +724,8 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	data_flags = na->data_flags;
 	compression = na->ni->flags & FILE_ATTR_COMPRESSED;
 	if (!na || !na->ni || !na->ni->vol || !b
-			|| ((data_flags & ATTR_COMPRESSION_MASK)
-				!= ATTR_IS_COMPRESSED)
+			|| !le16_eq(data_flags & ATTR_COMPRESSION_MASK,
+				ATTR_IS_COMPRESSED)
 			|| pos < 0 || count < 0) {
 		errno = EINVAL;
 		return -1;

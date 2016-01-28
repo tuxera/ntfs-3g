@@ -1809,8 +1809,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		goto errno_set;
 	}
 	vol = na->ni->vol;
-	compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
-			 != const_cpu_to_le16(0);
+	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+			 const_cpu_to_le16(0));
 	na->unused_runs = 0; /* prepare overflow checks */
 	/*
 	 * Encrypted attributes are only supported in raw mode.  We return
@@ -1839,8 +1839,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
                  */
 	if (compressed
 	    && ((na->type != AT_DATA)
-		|| ((na->data_flags & ATTR_COMPRESSION_MASK)
-			 != ATTR_IS_COMPRESSED))) {
+		|| (!le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+			 ATTR_IS_COMPRESSED)))) {
 		errno = EOPNOTSUPP;
 		goto errno_set;
 	}
@@ -1885,8 +1885,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		}
 #endif
 			/* resizing may change the compression mode */
-		compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
-				!= const_cpu_to_le16(0);
+		compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+				const_cpu_to_le16(0));
 		need_to.undo_data_size = 1;
 	}
 		/*
@@ -2358,8 +2358,8 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	}
 	vol = na->ni->vol;
 	na->unused_runs = 0;
-	compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
-			 != const_cpu_to_le16(0);
+	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+			 const_cpu_to_le16(0));
 	/*
 	 * Encrypted non-resident attributes are not supported.  We return
 	 * access denied, which is what Windows NT4 does, too.
@@ -3184,7 +3184,7 @@ do_next_attr_loop:
 			continue;
 		if (!a->length)
 			break;
-		if (al_entry->instance != a->instance)
+		if (!le16_eq(al_entry->instance, a->instance))
 			goto do_next_attr;
 		/*
 		 * If the type and/or the name are/is mismatched between the
@@ -5434,7 +5434,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 
 	/* Update sparse bit, unless this is an intermediate state */
 	if (holes == HOLES_DELAY)
-		sparse = (a->flags & ATTR_IS_SPARSE) != const_cpu_to_le16(0);
+		sparse = !le16_eq(a->flags & ATTR_IS_SPARSE, const_cpu_to_le16(0));
 	else {
 		sparse = ntfs_rl_sparse(na->rl);
 		if (sparse == -1) {
@@ -6450,11 +6450,11 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
 	 * for resident attributes when there is no open fuse context
 	 * (important case : $INDEX_ROOT:$I30)
 	 */
-	compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
-			 != const_cpu_to_le16(0);
+	compressed = !le16_eq(na->data_flags & ATTR_COMPRESSION_MASK,
+			 const_cpu_to_le16(0));
 	if (compressed
 	   && NAttrNonResident(na)
-	   && ((na->data_flags & ATTR_COMPRESSION_MASK) != ATTR_IS_COMPRESSED)) {
+	   && (!le16_eq(na->data_flags & ATTR_COMPRESSION_MASK, ATTR_IS_COMPRESSED))) {
 		errno = EOPNOTSUPP;
 		ntfs_log_perror("Failed to truncate compressed attribute");
 		goto out;

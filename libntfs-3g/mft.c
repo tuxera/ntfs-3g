@@ -1460,7 +1460,7 @@ found_free_rec:
 	if (seq_no)
 		m->sequence_number = seq_no;
 	seq_no = usn;
-	if (seq_no && seq_no != const_cpu_to_le16(0xffff))
+	if (seq_no && !le16_eq(seq_no, const_cpu_to_le16(0xffff)))
 		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
 	m->flags |= MFT_RECORD_IN_USE;
@@ -1763,7 +1763,7 @@ found_free_rec:
 	if (seq_no)
 		m->sequence_number = seq_no;
 	seq_no = usn;
-	if (seq_no && seq_no != const_cpu_to_le16(0xffff))
+	if (seq_no && !le16_eq(seq_no, const_cpu_to_le16(0xffff)))
 		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
 	m->flags |= MFT_RECORD_IN_USE;

@@ -224,10 +224,10 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	 * LOGFILE_NO_CLIENT or less than ra->log_clients or they are
 	 * overflowing the client array.
 	 */
-	if ((ra->client_free_list != LOGFILE_NO_CLIENT &&
+	if ((!le16_eq(ra->client_free_list, LOGFILE_NO_CLIENT) &&
 			le16_to_cpu(ra->client_free_list) >=
 			le16_to_cpu(ra->log_clients)) ||
-			(ra->client_in_use_list != LOGFILE_NO_CLIENT &&
+			(!le16_eq(ra->client_in_use_list, LOGFILE_NO_CLIENT) &&
 			le16_to_cpu(ra->client_in_use_list) >=
 			le16_to_cpu(ra->log_clients))) {
 		ntfs_log_error("$LogFile restart area specifies "
@@ -312,7 +312,7 @@ check_list:
 		cr = ca + idx;
 		/* The first log client record must not have a prev_client. */
 		if (idx_is_first) {
-			if (cr->prev_client != LOGFILE_NO_CLIENT)
+			if (!le16_eq(cr->prev_client, LOGFILE_NO_CLIENT))
 				goto err_out;
 			idx_is_first = FALSE;
 		}
@@ -429,7 +429,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 	 */
 	err = 0;
 	if (ntfs_is_rstr_record(rp->magic) &&
-			ra->client_in_use_list != LOGFILE_NO_CLIENT) {
+			!le16_eq(ra->client_in_use_list, LOGFILE_NO_CLIENT)) {
 		if (!ntfs_check_log_client_array(trp)) {
 			err = EINVAL;
 			goto err_out;
@@ -681,7 +681,7 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 	 * have the RESTART_VOLUME_IS_CLEAN bit set in the restart area flags,
 	 * we assume there was an unclean shutdown.
 	 */
-	if (ra->client_in_use_list != LOGFILE_NO_CLIENT &&
+	if (!le16_eq(ra->client_in_use_list, LOGFILE_NO_CLIENT) &&
 			!(ra->flags & RESTART_VOLUME_IS_CLEAN)) {
 		ntfs_log_error("The disk contains an unclean file system (%d, "
 			       "%d).\n", le16_to_cpu(ra->client_in_use_list),

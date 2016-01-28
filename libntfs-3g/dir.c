@@ -1545,7 +1545,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	if (NVolHideDotFiles(dir_ni->vol)
 	    && (name_len > 1)
 	    && (le16_eq(name[0], const_cpu_to_le16('.')))
-	    && (name[1] != const_cpu_to_le16('.')))
+	    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
 		ni->flags |= FILE_ATTR_HIDDEN;
 		/*
 		 * Set compression flag according to parent directory
@@ -2166,7 +2166,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		/* Set hidden flag according to the latest name */
 		if ((name_len > 1)
 		    && (le16_eq(name[0], const_cpu_to_le16('.')))
-		    && (name[1] != const_cpu_to_le16('.')))
+		    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
 			ni->flags |= FILE_ATTR_HIDDEN;
 		else
 			ni->flags &= ~FILE_ATTR_HIDDEN;
