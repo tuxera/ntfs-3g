@@ -363,7 +363,7 @@ static int inode_open(ntfs_volume *vol, MFT_REF mref, ntfs_inode **ni)
 		return NTFSCMP_INODE_OPEN_ERROR;
 	}
 
-	if ((*ni)->mrec->base_mft_record) {
+	if (!le64_cmpz((*ni)->mrec->base_mft_record)) {
 
 		if (inode_close(*ni) != 0)
 			return NTFSCMP_INODE_CLOSE_ERROR;

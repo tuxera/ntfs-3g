@@ -885,7 +885,7 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 			continue;
 		}
 
-		if (ni->mrec->base_mft_record) {
+		if (!le64_cmpz(ni->mrec->base_mft_record)) {
 			ntfs_log_verbose("Not base mft record. Skipping\n");
 			goto close_inode;
 		}
@@ -1247,7 +1247,7 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 			continue;
 		}
 
-		if (ni->mrec->base_mft_record) {
+		if (!le64_cmpz(ni->mrec->base_mft_record)) {
 			if (opts.verbose > 2)
 				ntfs_log_verbose("Not base mft record. Skipping\n");
 			else

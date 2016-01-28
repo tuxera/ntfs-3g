@@ -1083,7 +1083,7 @@ static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 			return -1;
 		}
 
-		if (ni->mrec->base_mft_record)
+		if (!le64_cmpz(ni->mrec->base_mft_record))
 			goto close_inode;
 
 		fsck->ni = ni;
@@ -1157,7 +1157,7 @@ static void set_resize_constraints(ntfs_resize_t *resize)
 					(long long)inode);
 		}
 
-		if (ni->mrec->base_mft_record)
+		if (!le64_cmpz(ni->mrec->base_mft_record))
 			goto close_inode;
 
 		resize->ni = ni;
@@ -1404,7 +1404,7 @@ static void replace_later(ntfs_resize_t *resize, runlist *rl, runlist *head_rl)
 	delayed = (struct DELAYED*)ntfs_malloc(sizeof(struct DELAYED));
 	if (delayed && (attr_name || !name_len)) {
 		lemref = resize->ctx->mrec->base_mft_record;
-		if (lemref)
+		if (!le64_cmpz(lemref))
 			mref = le64_to_cpu(lemref);
 		else
 			mref = resize->mref;

@@ -2221,7 +2221,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 			(unsigned)le32_to_cpu(mrec->bytes_allocated),
 			(unsigned)le32_to_cpu(mrec->bytes_allocated));
 
-	if (mrec->base_mft_record) {
+	if (!le64_cmpz(mrec->base_mft_record)) {
 		printf("Base MFT Record:\t %llu (0x%llx)\n",
 				(unsigned long long)
 				MREF_LE(mrec->base_mft_record),

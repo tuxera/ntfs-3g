@@ -1985,7 +1985,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 		if (wipe)
 			nr_used_mft_records++;
 
-		if (ni->mrec->base_mft_record)
+		if (!le64_cmpz(ni->mrec->base_mft_record))
 			goto out;
 
 		walk->image->ni = ni;

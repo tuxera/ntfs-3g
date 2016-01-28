@@ -867,7 +867,7 @@ int utils_is_metadata(ntfs_inode *inode)
 		return 1;
 
 	file = inode->mrec;
-	if (file && (file->base_mft_record != 0)) {
+	if (file && !le64_cmpz(file->base_mft_record)) {
 		num = MREF_LE(file->base_mft_record);
 		if (__metadata(vol, num) == 1)
 			return 1;
