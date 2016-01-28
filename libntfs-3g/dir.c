@@ -1516,7 +1516,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	 * JPA Depending on available inherited security descriptor,
 	 * Write STANDARD_INFORMATION v1.2 (no inheritance) or v3
 	 */
-	if (securid)
+	if (!le32_cmpz(securid))
 		si_len = sizeof(STANDARD_INFORMATION);
 	else
 		si_len = offsetof(STANDARD_INFORMATION, v1_end);
@@ -1529,7 +1529,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	si->last_data_change_time = ni->last_data_change_time;
 	si->last_mft_change_time = ni->last_mft_change_time;
 	si->last_access_time = ni->last_access_time;
-	if (securid) {
+	if (!le32_cmpz(securid)) {
 		set_nino_flag(ni, v3_Extensions);
 		ni->owner_id = si->owner_id = 0;
 		ni->security_id = si->security_id = securid;

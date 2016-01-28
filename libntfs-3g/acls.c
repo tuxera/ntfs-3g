@@ -2532,7 +2532,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			}
 		}
 		denials &= ~grants;
-		if (denials) {
+		if (!le32_cmpz(denials)) {
 			pdace->type = ACCESS_DENIED_ACE_TYPE;
 			pdace->size = cpu_to_le16(usidsz + 8);
 			pdace->mask = denials;
@@ -2619,7 +2619,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 					denials |= FILE_READ;
 			}
 			denials &= ~(grants | OWNER_RIGHTS);
-			if (denials) {
+			if (!le32_cmpz(denials)) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
 				pdace->mask = denials;
@@ -2935,7 +2935,7 @@ static int merge_permissions(BOOL isdir,
 
 	perm = 0;
 	/* build owner permission */
-	if (owner) {
+	if (!le32_cmpz(owner)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
 			if (owner & DIR_GEXEC)
@@ -2959,7 +2959,7 @@ static int merge_permissions(BOOL isdir,
 		}
 	}
 	/* build group permission */
-	if (group) {
+	if (!le32_cmpz(group)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
 			if (group & DIR_GEXEC)
@@ -2983,7 +2983,7 @@ static int merge_permissions(BOOL isdir,
 		}
 	}
 	/* build world permission */
-	if (world) {
+	if (!le32_cmpz(world)) {
 		if (isdir) {
 			/* exec if any of list, traverse */
 			if (world & DIR_GEXEC)
@@ -3007,7 +3007,7 @@ static int merge_permissions(BOOL isdir,
 		}
 	}
 	/* build special permission flags */
-	if (special) {
+	if (!le32_cmpz(special)) {
 		if (special & FILE_APPEND_DATA)
 			perm |= S_ISUID;
 		if (special & FILE_WRITE_DATA)

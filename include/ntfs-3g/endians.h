@@ -312,4 +312,6 @@
 
 #define le16_cmpz(a) (!(a))
 
+#define le32_cmpz(a) (!(a))
+
 #endif /* defined _NTFS_ENDIANS_H */

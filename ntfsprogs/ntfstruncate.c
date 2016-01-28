@@ -542,10 +542,10 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 		return;
 	}
 	u = le32_to_cpu(a->type);
-	for (i = 0; attr_defs[i].type; i++)
+	for (i = 0; !le32_cmpz(attr_defs[i].type); i++)
 		if (le32_to_cpu(attr_defs[i].type) >= u)
 			break;
-	if (attr_defs[i].type) {
+	if (!le32_cmpz(attr_defs[i].type)) {
 //		printf("type = 0x%x\n", le32_to_cpu(attr_defs[i].type));
 //		{ char *p = (char*)attr_defs[i].name;
 //		printf("name = %c%c%c%c%c\n", *p, p[1], p[2], p[3], p[4]);

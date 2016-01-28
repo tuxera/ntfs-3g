@@ -1246,14 +1246,14 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	 * iterate through the DDF or DRF array, respectively.
 	 */
 	if (df_type == DF_TYPE_DDF) {
-		if (efs->offset_to_ddf_array)
+		if (!le32_cmpz(efs->offset_to_ddf_array))
 			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
 					le32_to_cpu(efs->offset_to_ddf_array));
 		else
 			ntfs_log_error("There are no entries in the DDF "
 					"array.\n");
 	} else if (df_type == DF_TYPE_DRF) {
-		if (efs->offset_to_drf_array)
+		if (!le32_cmpz(efs->offset_to_drf_array))
 			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
 					le32_to_cpu(efs->offset_to_drf_array));
 		else

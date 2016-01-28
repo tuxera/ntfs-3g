@@ -582,7 +582,7 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 		printf(" VIEW_INDEX");
 		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
 	}
-	if (flags)
+	if (!le32_cmpz(flags))
 		printf(" UNKNOWN: 0x%08x", (unsigned int)le32_to_cpu(flags));
 	/* Print all the flags in hex. */
 	printf(" (0x%08x)\n", (unsigned)le32_to_cpu(original_flags));
@@ -813,10 +813,10 @@ static void ntfs_dump_filename(const char *indent,
 			(unsigned)file_name_attr->file_name_length);
 	ntfs_dump_flags(indent, AT_FILE_NAME, file_name_attr->file_attributes);
 	if (file_name_attr->file_attributes & FILE_ATTR_REPARSE_POINT &&
-			file_name_attr->reparse_point_tag)
+			!le32_cmpz(file_name_attr->reparse_point_tag))
 		printf("%sReparse point tag:\t 0x%x\n", indent, (unsigned)
 				le32_to_cpu(file_name_attr->reparse_point_tag));
-	else if (file_name_attr->reparse_point_tag) {
+	else if (!le32_cmpz(file_name_attr->reparse_point_tag)) {
 		printf("%sEA Length:\t\t %d (0x%x)\n", indent, (unsigned)
 				le16_to_cpu(file_name_attr->packed_ea_size),
 				(unsigned)
@@ -994,7 +994,7 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 		return;
 	}
 
-	if (sec_desc->owner) {
+	if (!le32_cmpz(sec_desc->owner)) {
 		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
 			le32_to_cpu(sec_desc->owner)), NULL, 0);
 		printf("%s\tOwner SID:\t\t %s\n", indent, sid);
@@ -1002,7 +1002,7 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	} else
 		printf("%s\tOwner SID:\t\t missing\n", indent);
 
-	if (sec_desc->group) {
+	if (!le32_cmpz(sec_desc->group)) {
 		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
 			le32_to_cpu(sec_desc->group)), NULL, 0);
 		printf("%s\tGroup SID:\t\t %s\n", indent, sid);
@@ -1217,7 +1217,7 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	 * FIXME: The right way is based on the indexes, so we couldn't
 	 * miss real entries. For now, dump until it makes sense.
 	 */
-	while (sd->length && sd->hash &&
+	while (!le32_cmpz(sd->length) && !le32_cmpz(sd->hash) &&
 	       le64_to_cpu(sd->offset) < (u64)data_size &&
 	       le32_to_cpu(sd->length) < (u64)data_size &&
 	       le64_to_cpu(sd->offset) +
@@ -1689,7 +1689,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 	if (!attr->name_length)
 		return INDEX_ATTR_UNKNOWN;
 
-	if (index_root->type) {
+	if (!le32_cmpz(index_root->type)) {
 		if (le32_eq(index_root->type, AT_FILE_NAME))
 			return INDEX_ATTR_DIRECTORY_I30;
 		else
@@ -2063,7 +2063,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			else
 				printf("\n");
 		}
-		if (ea->next_entry_offset) {
+		if (!le32_cmpz(ea->next_entry_offset)) {
 			offset += le32_to_cpu(ea->next_entry_offset);
 			ea = (const EA_ATTR*)((const u8*)ea
 					+ le32_to_cpu(ea->next_entry_offset));

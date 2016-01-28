@@ -772,7 +772,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	 * the last byte overflows on a wrong block.
 	 */
 
-	if (securid) {
+	if (!le32_cmpz(securid)) {
 		gap = (-size) & (ALIGN_SDS_ENTRY - 1);
 		offs += gap + size;
 		if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
@@ -1012,7 +1012,7 @@ static int update_secur_descr(ntfs_volume *vol,
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
 			(s64)newattrsz);
-		if (securid) {
+		if (!le32_cmpz(securid)) {
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
 				AT_UNNAMED, 0);
 			if (na) {
@@ -1088,7 +1088,7 @@ static int upgrade_secur_desc(ntfs_volume *vol,
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
 			(s64)attrsz);
-		if (securid) {
+		if (!le32_cmpz(securid)) {
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
 				AT_UNNAMED, 0);
 			if (na) {
@@ -1595,7 +1595,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 
 	/* cacheing is only possible if a security_id has been defined */
 	if (test_nino_flag(ni, v3_Extensions)
-	   && ni->security_id) {
+	   && !le32_cmpz(ni->security_id)) {
 		/*
 		 *  Immediately test the most frequent situation
 		 *  where the entry exists
@@ -1747,7 +1747,7 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 	/* cacheing is only possible if a security_id has been defined */
 	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	if (test_nino_flag(ni, v3_Extensions)
-	   && (ni->security_id)) {
+	   && !le32_cmpz(ni->security_id)) {
 		securindex = le32_to_cpu(ni->security_id);
 		index1 = securindex >> CACHE_PERMISSIONS_BITS;
 		index2 = securindex & ((1 << CACHE_PERMISSIONS_BITS) - 1);
@@ -1882,7 +1882,7 @@ static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
 		 * attribute
 		 */
 	if (test_nino_flag(ni, v3_Extensions)
-	    && vol->secure_ni && ni->security_id) {
+	    && vol->secure_ni && !le32_cmpz(ni->security_id)) {
 			/* get v3.x descriptor in $Secure */
 		securid.security_id = ni->security_id;
 		securattr = retrievesecurityattr(vol,securid);
@@ -2841,7 +2841,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 			securid = setsecurityattr(scx->vol,
 				(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
 				newattrsz);
-			if (securid) {
+			if (!le32_cmpz(securid)) {
 				/* update cache, for subsequent use */
 				wanted.securid = securid;
 				ntfs_enter_cache(scx->vol->securid_cache,
@@ -3957,7 +3957,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			 * do not test SE_DACL_PRESENT (wrong for "DR Watson")
 			 */
 		pnhead->dacl = const_cpu_to_le32(0);
-		if (pphead->dacl) {
+		if (!le32_cmpz(pphead->dacl)) {
 			offpacl = le32_to_cpu(pphead->dacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
@@ -3974,7 +3974,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			 * locate and inherit SACL
 			 */
 		pnhead->sacl = const_cpu_to_le32(0);
-		if (pphead->sacl) {
+		if (!le32_cmpz(pphead->sacl)) {
 			offpacl = le32_to_cpu(pphead->sacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
@@ -4037,7 +4037,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * the current process owns the parent directory
 		 */
 	if (test_nino_flag(dir_ni, v3_Extensions)
-			&& dir_ni->security_id) {
+			&& !le32_cmpz(dir_ni->security_id)) {
 		cached = fetch_cache(scx, dir_ni);
 		if (cached
 		    && (cached->uid == scx->uid) && (cached->gid == scx->gid))
@@ -4058,7 +4058,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 			 * Store the result into cache for further use
 			 * if the current process owns the parent directory
 			 */
-			if (securid) {
+			if (!le32_cmpz(securid)) {
 				cached = fetch_cache(scx, dir_ni);
 				if (cached
 				    && (cached->uid == scx->uid)
@@ -4558,7 +4558,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 	size = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* locate DACL if requested and available */
-	if (phead->dacl && (selection & DACL_SECURITY_INFORMATION)) {
+	if (!le32_cmpz(phead->dacl) && (selection & DACL_SECURITY_INFORMATION)) {
 		offdacl = le32_to_cpu(phead->dacl);
 		pdacl = (const ACL*)&attr[offdacl];
 		daclsz = le16_to_cpu(pdacl->size);
@@ -4590,7 +4590,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offgroup = gsidsz = 0;
 
 		/* locate SACL if requested and available */
-	if (phead->sacl && (selection & SACL_SECURITY_INFORMATION)) {
+	if (!le32_cmpz(phead->sacl) && (selection & SACL_SECURITY_INFORMATION)) {
 			/* find end of SACL */
 		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
@@ -4717,8 +4717,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			 * copy new DACL if selected
 			 * or keep old DACL if any
 			 */
-		if ((selection & DACL_SECURITY_INFORMATION) ?
-				newhead->dacl : oldhead->dacl) {
+		if (!le32_cmpz((selection & DACL_SECURITY_INFORMATION) ?
+				newhead->dacl : oldhead->dacl)) {
 			if (selection & DACL_SECURITY_INFORMATION) {
 				offdacl = le32_to_cpu(newhead->dacl);
 				pdacl = (const ACL*)&newattr[offdacl];
@@ -4749,8 +4749,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			 * copy new SACL if selected
 			 * or keep old SACL if any
 			 */
-		if ((selection & SACL_SECURITY_INFORMATION) ?
-				newhead->sacl : oldhead->sacl) {
+		if (!le32_cmpz((selection & SACL_SECURITY_INFORMATION) ?
+				newhead->sacl : oldhead->sacl)) {
 			if (selection & SACL_SECURITY_INFORMATION) {
 				offsacl = le32_to_cpu(newhead->sacl);
 				psacl = (const ACL*)&newattr[offsacl];
@@ -4781,8 +4781,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			 * copy new OWNER if selected
 			 * or keep old OWNER if any
 			 */
-		if ((selection & OWNER_SECURITY_INFORMATION) ?
-				newhead->owner : oldhead->owner) {
+		if (!le32_cmpz((selection & OWNER_SECURITY_INFORMATION) ?
+				newhead->owner : oldhead->owner)) {
 			if (selection & OWNER_SECURITY_INFORMATION) {
 				offowner = le32_to_cpu(newhead->owner);
 				powner = (const SID*)&newattr[offowner];
@@ -4804,8 +4804,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			 * copy new GROUP if selected
 			 * or keep old GROUP if any
 			 */
-		if ((selection & GROUP_SECURITY_INFORMATION) ?
-				newhead->group : oldhead->group) {
+		if (!le32_cmpz((selection & GROUP_SECURITY_INFORMATION) ?
+				newhead->group : oldhead->group)) {
 			if (selection & GROUP_SECURITY_INFORMATION) {
 				offgroup = le32_to_cpu(newhead->group);
 				pgroup = (const SID*)&newattr[offgroup];
@@ -4874,7 +4874,7 @@ int ntfs_get_file_security(struct SECURITY_API *scapi,
 				if (feedsecurityattr(attr,selection,
 						buf,buflen,psize)) {
 					if (test_nino_flag(ni, v3_Extensions)
-					    && ni->security_id)
+					    && !le32_cmpz(ni->security_id))
 						res = le32_to_cpu(
 							ni->security_id);
 					else

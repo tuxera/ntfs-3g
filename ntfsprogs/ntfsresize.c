@@ -3622,7 +3622,7 @@ static int copy_boot(expand_t *expand)
 			/* the hidden sectors are needed to boot into windows */
 		memcpy(&hidden_sectors_le,&bs->bpb.hidden_sectors,4);
 				/* alignment messed up on the Sparc */
-		if (hidden_sectors_le) {
+		if (!le32_cmpz(hidden_sectors_le)) {
 			hidden_sectors = le32_to_cpu(hidden_sectors_le);
 			if (hidden_sectors >= expand->sector_increment)
 				hidden_sectors -= expand->sector_increment;
