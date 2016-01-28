@@ -822,7 +822,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 			mask = const_cpu_to_le64(~0x0ffffffffULL);
 			bs->volume_serial_number
 			    = le64_or(le64_and(volume_serial_number, mask),
-				le64_and(bs->volume_serial_number, ~mask));
+				le64_and(bs->volume_serial_number, le64_not(mask)));
 		}
 			/* Show the new full serial after merging */
 		if (!lcn)

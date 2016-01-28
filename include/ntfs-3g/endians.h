@@ -346,4 +346,6 @@
 
 #define le32_not(a) (~(a))
 
+#define le64_not(a) (~(a))
+
 #endif /* defined _NTFS_ENDIANS_H */

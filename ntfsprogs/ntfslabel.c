@@ -259,7 +259,7 @@ static int change_serial(ntfs_volume *vol, u64 sector, le64 serial_number,
 				mask = const_cpu_to_le64(~0x0ffffffffULL);
 				bs->volume_serial_number
 				    = le64_or(le64_and(serial_number, mask),
-					le64_and(bs->volume_serial_number, ~mask));
+					le64_and(bs->volume_serial_number, le64_not(mask)));
 			}
 			if (opts.noaction
 			    || (ntfs_pwrite(vol->dev,
