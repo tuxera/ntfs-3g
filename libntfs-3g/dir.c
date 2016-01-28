@@ -894,11 +894,11 @@ static u32 ntfs_interix_types(ntfs_inode *ni)
 			if ((na->data_size >= (s64)sizeof(magic))
 			    && (ntfs_attr_pread(na, 0, sizeof(magic), &magic)
 				== sizeof(magic))) {
-				if (magic == INTX_SYMBOLIC_LINK)
+				if (le64_eq(magic, INTX_SYMBOLIC_LINK))
 					dt_type = NTFS_DT_LNK;
-				else if (magic == INTX_BLOCK_DEVICE)
+				else if (le64_eq(magic, INTX_BLOCK_DEVICE))
 					dt_type = NTFS_DT_BLK;
-				else if (magic == INTX_CHARACTER_DEVICE)
+				else if (le64_eq(magic, INTX_CHARACTER_DEVICE))
 					dt_type = NTFS_DT_CHR;
 			}
 		}

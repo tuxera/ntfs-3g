@@ -711,7 +711,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 					ntfs_attr_close(na);
 					goto exit;
 				}
-				if (intx_file->magic == INTX_BLOCK_DEVICE &&
+				if (le64_eq(intx_file->magic, INTX_BLOCK_DEVICE) &&
 						na->data_size == (s64)offsetof(
 						INTX_FILE, device_end)) {
 					stbuf->st_mode = S_IFBLK;
@@ -720,7 +720,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 							le64_to_cpu(
 							intx_file->minor));
 				}
-				if (intx_file->magic == INTX_CHARACTER_DEVICE &&
+				if (le64_eq(intx_file->magic, INTX_CHARACTER_DEVICE) &&
 						na->data_size == (s64)offsetof(
 						INTX_FILE, device_end)) {
 					stbuf->st_mode = S_IFCHR;
@@ -729,7 +729,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 							le64_to_cpu(
 							intx_file->minor));
 				}
-				if (intx_file->magic == INTX_SYMBOLIC_LINK)
+				if (le64_eq(intx_file->magic, INTX_SYMBOLIC_LINK))
 					stbuf->st_mode = S_IFLNK;
 				free(intx_file);
 			}
