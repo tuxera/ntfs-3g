@@ -3114,7 +3114,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, leMFT_REF file_ref,
 do_next:
 #ifdef DEBUG
 		/* Next entry. */
-		if (!ie->length) {
+		if (le16_cmpz(ie->length)) {
 			ntfs_log_debug("BUG: ie->length is zero, breaking out "
 					"of loop.\n");
 			break;

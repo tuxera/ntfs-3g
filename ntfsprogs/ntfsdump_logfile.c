@@ -558,7 +558,7 @@ static void dump_log_record(LOG_RECORD *lr)
 	ntfs_log_info("transaction_id = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->transaction_id));
 	ntfs_log_info("flags = 0x%x:", lr->flags);
-	if (!lr->flags)
+	if (le16_cmpz(lr->flags))
 		ntfs_log_info(" NONE\n");
 	else {
 		int _b = 0;

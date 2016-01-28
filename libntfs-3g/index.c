@@ -222,7 +222,7 @@ static u8 *ntfs_ie_get_end(INDEX_HEADER *ih)
 
 static int ntfs_ie_end(INDEX_ENTRY *ie)
 {
-	return ie->ie_flags & INDEX_ENTRY_END || !ie->length;
+	return ie->ie_flags & INDEX_ENTRY_END || le16_cmpz(ie->length);
 }
 
 /** 

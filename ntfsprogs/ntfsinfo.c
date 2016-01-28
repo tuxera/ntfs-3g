@@ -1662,7 +1662,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			ntfs_dump_index_data(entry, type);
 			break;
 		}
-		if (!entry->length) {
+		if (le16_cmpz(entry->length)) {
 			ntfs_log_verbose("\tWARNING: Corrupt index entry, "
 					"skipping the remainder of this index "
 					"block.\n");

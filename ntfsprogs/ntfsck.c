@@ -791,7 +791,7 @@ static int reset_dirty(ntfs_volume *vol)
 {
 	u16 flags;
 
-	if (!(vol->flags | VOLUME_IS_DIRTY))
+	if (le16_cmpz(vol->flags | VOLUME_IS_DIRTY))
 		return 0;
 
 	ntfs_log_verbose("Resetting dirty flag.\n");

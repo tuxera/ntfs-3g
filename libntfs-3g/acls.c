@@ -853,7 +853,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			 * Inheritance for access, specific to
 			 * creator-owner (and creator-group)
 			 */
-		if (fordir || !inherited
+		if (fordir || le16_cmpz(inherited)
 		   || (poldace->flags
 			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE))) {
 			pnewace = (ACCESS_ALLOWED_ACE*)

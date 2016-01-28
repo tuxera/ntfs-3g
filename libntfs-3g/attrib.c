@@ -3065,7 +3065,7 @@ find_attr_list_attr:
 		/* Catch the end of the attribute list. */
 		if ((u8*)al_entry == al_end)
 			goto not_found;
-		if (!al_entry->length)
+		if (le16_cmpz(al_entry->length))
 			break;
 		if ((u8*)al_entry + 6 > al_end || (u8*)al_entry +
 				le16_to_cpu(al_entry->length) > al_end)

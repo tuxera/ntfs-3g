@@ -359,7 +359,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		i = VOL_INF(val)->flags;
 #undef VOL_INF
 		printf("Volume flags = 0x%x: ", i);
-		if (!i) {
+		if (le16_cmpz(i)) {
 			printf("NONE\n");
 			return;
 		}
@@ -580,7 +580,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 		printf("Name = %s\n", s);
 	}
 	printf("Attribute flags = 0x%x: ", le16_to_cpu(u));
-	if (!u)
+	if (le16_cmpz(u))
 		printf("NONE");
 	else {
 		int first = TRUE;
