@@ -1138,8 +1138,8 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
 							AT_UNNAMED,0,&dummy,
 							(s64)0);
 						if (!res) {
-						    ni->flags |=
-							FILE_ATTR_REPARSE_POINT;
+						    ni->flags = le32_or(ni->flags,
+							FILE_ATTR_REPARSE_POINT);
 						    NInoFileNameSetDirty(ni);
 						}
 						NInoSetDirty(ni);

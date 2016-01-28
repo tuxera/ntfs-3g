@@ -719,7 +719,7 @@ static int ntfs_full_allocation(ntfs_attr *na, ntfs_attr_search_ctx *ctx,
 				if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 					ni->allocated_size
 						= na->compressed_size;
-					ni->flags |= FILE_ATTR_SPARSE_FILE;
+					ni->flags = le32_or(ni->flags, FILE_ATTR_SPARSE_FILE);
 				} else
 					ni->allocated_size
 						= na->allocated_size;

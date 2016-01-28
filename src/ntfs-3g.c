@@ -127,7 +127,7 @@
 	    ? 1 : ntfs_allowed_access(scx, ni, type))
 #endif
 
-#define set_archive(ni) (ni)->flags |= FILE_ATTR_ARCHIVE
+#define set_archive(ni) (ni)->flags = le32_or((ni)->flags, FILE_ATTR_ARCHIVE)
 
 typedef enum {
 	FSTYPE_NONE,
@@ -2689,7 +2689,7 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
-	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+	if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT)))
 		goto exit;
 		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2891,7 +2891,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
-	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+	if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT))) {
 		res = -ENODATA;
 		goto exit;
 	}
@@ -3080,7 +3080,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT)))) {
 		res = -EPERM;
 		goto exit;
 	}
@@ -3317,7 +3317,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT)))) {
 		res = -EPERM;
 		goto exit;
 	}

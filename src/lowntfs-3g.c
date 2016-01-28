@@ -150,7 +150,7 @@
 	    ? 1 : ntfs_allowed_access(scx, ni, type))
 #endif
 
-#define set_archive(ni) (ni)->flags |= FILE_ATTR_ARCHIVE
+#define set_archive(ni) (ni)->flags = le32_or((ni)->flags, FILE_ATTR_ARCHIVE)
 #define INODE(ino) ((ino) == 1 ? (MFT_REF)FILE_root : (MFT_REF)(ino))
 
 typedef enum {
@@ -2891,7 +2891,7 @@ static void ntfs_fuse_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		goto out;
 	}
 		/* Return with no result for symlinks, fifo, etc. */
-	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+	if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT)))
 		goto exit;
 		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -3040,7 +3040,7 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto out;
 	}
 		/* Return with no result for symlinks, fifo, etc. */
-	if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+	if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT))) {
 		res = -ENODATA;
 		goto exit;
 	}
@@ -3237,7 +3237,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		break;
 	default :
 		/* User xattr not allowed for symlinks, fifo, etc. */
-		if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+		if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT))) {
 			res = -EPERM;
 			goto exit;
 		}
@@ -3482,7 +3482,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 		break;
 	default :
 		/* User xattr not allowed for symlinks, fifo, etc. */
-		if (!le32_andz(ni->flags, FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+		if (!le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT))) {
 			res = -EPERM;
 			goto exit;
 		}

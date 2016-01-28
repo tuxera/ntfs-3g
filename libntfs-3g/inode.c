@@ -870,8 +870,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 		/* Update flags and file size. */
 		fnx = (FILE_NAME_ATTR *)ictx->data;
 		fnx->file_attributes =
-				le32_and(fnx->file_attributes, ~FILE_ATTR_VALID_FLAGS) |
-				le32_and(ni->flags, FILE_ATTR_VALID_FLAGS);
+				le32_or(le32_and(fnx->file_attributes, ~FILE_ATTR_VALID_FLAGS),
+				le32_and(ni->flags, FILE_ATTR_VALID_FLAGS));
 		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
 			fnx->data_size = fnx->allocated_size
 				= const_cpu_to_le64(0);

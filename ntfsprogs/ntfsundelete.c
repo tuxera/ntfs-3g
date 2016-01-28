@@ -1590,9 +1590,9 @@ static void dump_record(struct ufile *file)
 			ntfs_log_quiet("Compressed ");
 		if (!le32_andz(f->flags, FILE_ATTR_ENCRYPTED))
 			ntfs_log_quiet("Encrypted ");
-		if (le32_andz(f->flags, (FILE_ATTR_SYSTEM | FILE_ATTR_DIRECTORY |
-		    FILE_ATTR_SPARSE_FILE | FILE_ATTR_REPARSE_POINT |
-		    FILE_ATTR_COMPRESSED | FILE_ATTR_ENCRYPTED))) {
+		if (le32_andz(f->flags, le32_or(FILE_ATTR_SYSTEM, le32_or(FILE_ATTR_DIRECTORY,
+		    le32_or(FILE_ATTR_SPARSE_FILE, le32_or(FILE_ATTR_REPARSE_POINT,
+		    le32_or(FILE_ATTR_COMPRESSED, FILE_ATTR_ENCRYPTED))))))) {
 			ntfs_log_quiet("%s", NONE);
 		}
 

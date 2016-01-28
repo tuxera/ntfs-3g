@@ -988,7 +988,7 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 	if (MREF_LE(ie->indexed_file) == FILE_root)
 		return 0;
 	if (!le32_andz(ie->key.file_name.file_attributes,
-		     FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYSTEM)
+		     le32_or(FILE_ATTR_REPARSE_POINT, FILE_ATTR_SYSTEM))
 	    && !metadata)
 		dt_type = ntfs_dir_entry_type(dir_ni, mref,
 					ie->key.file_name.file_attributes);
@@ -1541,12 +1541,12 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
-	ni->flags |= FILE_ATTR_ARCHIVE;
+	ni->flags = le32_or(ni->flags, FILE_ATTR_ARCHIVE);
 	if (NVolHideDotFiles(dir_ni->vol)
 	    && (name_len > 1)
 	    && (le16_eq(name[0], const_cpu_to_le16('.')))
 	    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
-		ni->flags |= FILE_ATTR_HIDDEN;
+		ni->flags = le32_or(ni->flags, FILE_ATTR_HIDDEN);
 		/*
 		 * Set compression flag according to parent directory
 		 * unless NTFS version < 3.0 or cluster size > 4K
@@ -1557,7 +1557,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	   && NVolCompression(dir_ni->vol)
 	   && (dir_ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	   && (S_ISREG(type) || S_ISDIR(type)))
-		ni->flags |= FILE_ATTR_COMPRESSED;
+		ni->flags = le32_or(ni->flags, FILE_ATTR_COMPRESSED);
 	/* Add STANDARD_INFORMATION to inode. */
 	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
 			(u8*)si, si_len)) {
@@ -1683,9 +1683,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	if (!S_ISREG(type) && !S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	else
-		fn->file_attributes |= le32_and(ni->flags, FILE_ATTR_COMPRESSED);
-	fn->file_attributes |= FILE_ATTR_ARCHIVE;
-	fn->file_attributes |= le32_and(ni->flags, FILE_ATTR_HIDDEN);
+		fn->file_attributes = le32_or(fn->file_attributes, le32_and(ni->flags, FILE_ATTR_COMPRESSED));
+	fn->file_attributes = le32_or(fn->file_attributes, FILE_ATTR_ARCHIVE);
+	fn->file_attributes = le32_or(fn->file_attributes, le32_and(ni->flags, FILE_ATTR_HIDDEN));
 	fn->creation_time = ni->creation_time;
 	fn->last_data_change_time = ni->last_data_change_time;
 	fn->last_mft_change_time = ni->last_mft_change_time;
@@ -2167,7 +2167,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		if ((name_len > 1)
 		    && (le16_eq(name[0], const_cpu_to_le16('.')))
 		    && (!le16_eq(name[1], const_cpu_to_le16('.'))))
-			ni->flags |= FILE_ATTR_HIDDEN;
+			ni->flags = le32_or(ni->flags, FILE_ATTR_HIDDEN);
 		else
 			ni->flags = le32_and(ni->flags, ~FILE_ATTR_HIDDEN);
 	}
@@ -2185,7 +2185,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 	fn->file_name_type = nametype;
 	fn->file_attributes = ni->flags;
 	if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)) {
-		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
+		fn->file_attributes = le32_or(fn->file_attributes, FILE_ATTR_I30_INDEX_PRESENT);
 		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
 	} else {
 		fn->allocated_size = cpu_to_sle64(ni->allocated_size);

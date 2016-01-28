@@ -380,7 +380,7 @@ static int clear_badclus(ntfs_volume *vol)
 						<< vol->cluster_size_bits)) {
 					na->data_size = 0;
 					na->initialized_size = 0;
-					ni->flags |= FILE_ATTR_SPARSE_FILE;
+					ni->flags = le32_or(ni->flags, FILE_ATTR_SPARSE_FILE);
 					NInoFileNameSetDirty(ni);
 					ok = TRUE;
 				} else {

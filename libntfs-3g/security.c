@@ -76,13 +76,13 @@
 #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
 
 	/* Mask for attributes which can be forced */
-#define FILE_ATTR_SETTABLE ( FILE_ATTR_READONLY		\
-				| FILE_ATTR_HIDDEN	\
-				| FILE_ATTR_SYSTEM	\
-				| FILE_ATTR_ARCHIVE	\
-				| FILE_ATTR_TEMPORARY	\
-				| FILE_ATTR_OFFLINE	\
-				| FILE_ATTR_NOT_CONTENT_INDEXED )
+#define FILE_ATTR_SETTABLE le32_or(FILE_ATTR_READONLY,		\
+				le32_or(FILE_ATTR_HIDDEN,	\
+				le32_or(FILE_ATTR_SYSTEM,	\
+				le32_or(FILE_ATTR_ARCHIVE,	\
+				le32_or(FILE_ATTR_TEMPORARY,	\
+				le32_or(FILE_ATTR_OFFLINE,	\
+				FILE_ATTR_NOT_CONTENT_INDEXED))))))
 
 struct SII {		/* this is an image of an $SII index entry */
 	le16 offs;
@@ -2951,7 +2951,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 					if (mode & S_IWUSR)
 						ni->flags = le32_and(ni->flags, ~FILE_ATTR_READONLY);
 					else
-						ni->flags |= FILE_ATTR_READONLY;
+						ni->flags = le32_or(ni->flags, FILE_ATTR_READONLY);
 					NInoFileNameSetDirty(ni);
 				}
 				/* update cache, for subsequent use */
@@ -4434,7 +4434,7 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 				 * Accept changing compression for a directory
 				 * and set index root accordingly
 				 */
-				settable |= FILE_ATTR_COMPRESSED;
+				settable = le32_or(settable, FILE_ATTR_COMPRESSED);
 				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
 				             FILE_ATTR_COMPRESSED)) {
 					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
@@ -4449,8 +4449,8 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 				}
 			}
 			if (!res) {
-				ni->flags = le32_and(ni->flags, ~settable) |
-					 le32_and(cpu_to_le32(attrib), settable);
+				ni->flags = le32_or(le32_and(ni->flags, ~settable),
+					 le32_and(cpu_to_le32(attrib), settable));
 				NInoFileNameSetDirty(ni);
 				NInoSetDirty(ni);
 			}
@@ -5039,7 +5039,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				 * Accept changing compression for a directory
 				 * and set index root accordingly
 				 */
-				settable |= FILE_ATTR_COMPRESSED;
+				settable = le32_or(settable, FILE_ATTR_COMPRESSED);
 				if (!le32_andz(ni->flags ^ cpu_to_le32(attrib),
 				             FILE_ATTR_COMPRESSED)) {
 					if (!le32_andz(ni->flags, FILE_ATTR_COMPRESSED))
@@ -5054,8 +5054,8 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				}
 			}
 			if (!res) {
-				ni->flags = le32_and(ni->flags, ~settable)
-					 | le32_and(cpu_to_le32(attrib), settable);
+				ni->flags = le32_or(le32_and(ni->flags, ~settable),
+					 le32_and(cpu_to_le32(attrib), settable));
 				NInoSetDirty(ni);
 				NInoFileNameSetDirty(ni);
 			}

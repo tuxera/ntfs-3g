@@ -856,7 +856,7 @@ do_next_cb:
 				err = errno;
 				na->data_size = tdata_size;
 				na->initialized_size = tinitialized_size;
-				na->ni->flags |= compression;
+				na->ni->flags = le32_or(na->ni->flags, compression);
 				na->data_flags = data_flags;
 				free(cb);
 				free(dest);
@@ -873,7 +873,7 @@ do_next_cb:
 		} while (to_read > 0);
 		na->data_size = tdata_size;
 		na->initialized_size = tinitialized_size;
-		na->ni->flags |= compression;
+		na->ni->flags = le32_or(na->ni->flags, compression);
 		na->data_flags = data_flags;
 		ofs = 0;
 	} else {
@@ -916,7 +916,7 @@ do_next_cb:
 				err = errno;
 				na->data_size = tdata_size;
 				na->initialized_size = tinitialized_size;
-				na->ni->flags |= compression;
+				na->ni->flags = le32_or(na->ni->flags, compression);
 				na->data_flags = data_flags;
 				free(cb);
 				free(dest);
@@ -930,7 +930,7 @@ do_next_cb:
 		} while (to_read > 0);
 		na->data_size = tdata_size;
 		na->initialized_size = tinitialized_size;
-		na->ni->flags |= compression;
+		na->ni->flags = le32_or(na->ni->flags, compression);
 		na->data_flags = data_flags;
 		/* Just a precaution. */
 		if (cb_pos + 2 <= cb_end)

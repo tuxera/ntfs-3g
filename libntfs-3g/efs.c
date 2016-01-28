@@ -222,7 +222,7 @@ int ntfs_set_efs_info(ntfs_inode *ni, const char *value, size_t size,
 
 	res = 0;
 	if (ni && value && size) {
-		if (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
+		if (!le32_andz(ni->flags, le32_or(FILE_ATTR_ENCRYPTED, FILE_ATTR_COMPRESSED))) {
 			if (!le32_andz(ni->flags, FILE_ATTR_ENCRYPTED)) {
 				ntfs_log_trace("Inode %lld already encrypted\n",
 						(long long)ni->mft_no);
@@ -297,7 +297,7 @@ int ntfs_set_efs_info(ntfs_inode *ni, const char *value, size_t size,
 			if (fixup_loop(ni))
 				return -1;
 			}
-			ni->flags |= FILE_ATTR_ENCRYPTED;
+			ni->flags = le32_or(ni->flags, FILE_ATTR_ENCRYPTED);
 			NInoSetDirty(ni);
 			NInoFileNameSetDirty(ni);
 		}

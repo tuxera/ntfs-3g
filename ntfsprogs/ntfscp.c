@@ -620,7 +620,7 @@ static int set_sizes(struct ALLOC_CONTEXT *alctx, ntfs_attr_search_ctx *ctx)
 		ni->data_size = na->data_size;
 		if (!le16_andz(na->data_flags, ATTR_IS_SPARSE)) {
 			ni->allocated_size = na->compressed_size;
-			ni->flags |= FILE_ATTR_SPARSE_FILE;
+			ni->flags = le32_or(ni->flags, FILE_ATTR_SPARSE_FILE);
 		} else
 			ni->allocated_size = na->allocated_size;
 	}

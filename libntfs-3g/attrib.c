@@ -93,7 +93,7 @@ static int NAttrFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
 {
 	if (le32_eq(na->type, AT_DATA) && na->name == AT_UNNAMED)
-		na->ni->flags |= flag;
+		na->ni->flags = le32_or(na->ni->flags, flag);
 	else
 		ntfs_log_trace("Denied setting flag %d for not unnamed data "
 			       "attribute\n", flag);

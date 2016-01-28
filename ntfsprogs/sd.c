@@ -64,14 +64,14 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	switch (sys_file_no) {
 	case FILE_AttrDef:
 	case FILE_Boot:
-		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
-			FILE_READ_ATTRIBUTES | FILE_READ_EA | FILE_READ_DATA;
+		aa_ace->mask = le32_or(SYNCHRONIZE, le32_or(STANDARD_RIGHTS_READ,
+			le32_or(FILE_READ_ATTRIBUTES, le32_or(FILE_READ_EA, FILE_READ_DATA))));
 		break;
 	default:
-		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_WRITE |
-			FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES |
-			FILE_WRITE_EA | FILE_READ_EA | FILE_APPEND_DATA |
-			FILE_WRITE_DATA | FILE_READ_DATA;
+		aa_ace->mask = le32_or(SYNCHRONIZE, le32_or(STANDARD_RIGHTS_WRITE,
+			le32_or(FILE_WRITE_ATTRIBUTES, le32_or(FILE_READ_ATTRIBUTES,
+			le32_or(FILE_WRITE_EA, le32_or(FILE_READ_EA, le32_or(FILE_APPEND_DATA,
+			le32_or(FILE_WRITE_DATA, FILE_READ_DATA))))))));
 		break;
 	}
 	aa_ace->sid.revision = 1;
@@ -100,16 +100,16 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	switch (sys_file_no) {
 	case FILE_AttrDef:
 	case FILE_Boot:
-		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
-				FILE_READ_ATTRIBUTES | FILE_READ_EA |
-				FILE_READ_DATA;
+		aa_ace->mask = le32_or(SYNCHRONIZE, le32_or(STANDARD_RIGHTS_READ,
+				le32_or(FILE_READ_ATTRIBUTES, le32_or(FILE_READ_EA,
+				FILE_READ_DATA))));
 		break;
 	default:
-		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
-				FILE_WRITE_ATTRIBUTES |
-				FILE_READ_ATTRIBUTES | FILE_WRITE_EA |
-				FILE_READ_EA | FILE_APPEND_DATA |
-				FILE_WRITE_DATA | FILE_READ_DATA;
+		aa_ace->mask = le32_or(SYNCHRONIZE, le32_or(STANDARD_RIGHTS_READ,
+				le32_or(FILE_WRITE_ATTRIBUTES,
+				le32_or(FILE_READ_ATTRIBUTES, le32_or(FILE_WRITE_EA,
+				le32_or(FILE_READ_EA, le32_or(FILE_APPEND_DATA,
+				le32_or(FILE_WRITE_DATA, FILE_READ_DATA))))))));
 		break;
 	}
 	aa_ace->sid.revision = 1;
@@ -203,11 +203,11 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = STANDARD_RIGHTS_ALL | FILE_WRITE_ATTRIBUTES |
-			 FILE_LIST_DIRECTORY | FILE_WRITE_DATA |
-			 FILE_ADD_SUBDIRECTORY | FILE_READ_EA | FILE_WRITE_EA |
-			 FILE_TRAVERSE | FILE_DELETE_CHILD |
-			 FILE_READ_ATTRIBUTES;
+	ace->mask = le32_or(STANDARD_RIGHTS_ALL, le32_or(FILE_WRITE_ATTRIBUTES,
+			le32_or(FILE_LIST_DIRECTORY, le32_or(FILE_WRITE_DATA,
+			le32_or(FILE_ADD_SUBDIRECTORY, le32_or(FILE_READ_EA, le32_or(FILE_WRITE_EA,
+			le32_or(FILE_TRAVERSE, le32_or(FILE_DELETE_CHILD,
+			FILE_READ_ATTRIBUTES)))))))));
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
@@ -248,11 +248,11 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x14);
-	ace->mask = STANDARD_RIGHTS_ALL | FILE_WRITE_ATTRIBUTES |
-			 FILE_LIST_DIRECTORY | FILE_WRITE_DATA |
-			 FILE_ADD_SUBDIRECTORY | FILE_READ_EA | FILE_WRITE_EA |
-			 FILE_TRAVERSE | FILE_DELETE_CHILD |
-			 FILE_READ_ATTRIBUTES;
+	ace->mask = le32_or(STANDARD_RIGHTS_ALL, le32_or(FILE_WRITE_ATTRIBUTES,
+			le32_or(FILE_LIST_DIRECTORY, le32_or(FILE_WRITE_DATA,
+			le32_or(FILE_ADD_SUBDIRECTORY, le32_or(FILE_READ_EA, le32_or(FILE_WRITE_EA,
+			le32_or(FILE_TRAVERSE, le32_or(FILE_DELETE_CHILD,
+			FILE_READ_ATTRIBUTES)))))))));
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
@@ -289,11 +289,11 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x14);
-	ace->mask = SYNCHRONIZE | READ_CONTROL | DELETE |
-			FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES |
-			FILE_TRAVERSE | FILE_WRITE_EA | FILE_READ_EA |
-			FILE_ADD_SUBDIRECTORY | FILE_ADD_FILE |
-			FILE_LIST_DIRECTORY;
+	ace->mask = le32_or(SYNCHRONIZE, le32_or(READ_CONTROL, le32_or(DELETE,
+			le32_or(FILE_WRITE_ATTRIBUTES, le32_or(FILE_READ_ATTRIBUTES,
+			le32_or(FILE_TRAVERSE, le32_or(FILE_WRITE_EA, le32_or(FILE_READ_EA,
+			le32_or(FILE_ADD_SUBDIRECTORY, le32_or(FILE_ADD_FILE,
+			FILE_LIST_DIRECTORY))))))))));
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
@@ -312,7 +312,7 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
 			INHERIT_ONLY_ACE;
 	ace->size = const_cpu_to_le16(0x14);
-	ace->mask = GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE | DELETE;
+	ace->mask = le32_or(GENERIC_READ, le32_or(GENERIC_WRITE, le32_or(GENERIC_EXECUTE, DELETE)));
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
@@ -330,8 +330,8 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = SYNCHRONIZE | READ_CONTROL | FILE_READ_ATTRIBUTES |
-			FILE_TRAVERSE | FILE_READ_EA | FILE_LIST_DIRECTORY;
+	ace->mask = le32_or(SYNCHRONIZE, le32_or(READ_CONTROL, le32_or(FILE_READ_ATTRIBUTES,
+			le32_or(FILE_TRAVERSE, le32_or(FILE_READ_EA, FILE_LIST_DIRECTORY)))));
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
@@ -352,7 +352,7 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
 			INHERIT_ONLY_ACE;
 	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = GENERIC_READ | GENERIC_EXECUTE;
+	ace->mask = le32_or(GENERIC_READ, GENERIC_EXECUTE);
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */

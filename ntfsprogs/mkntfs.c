@@ -4288,7 +4288,7 @@ static BOOL create_file_volume(MFT_RECORD *m, leMFT_REF root_ref,
 	m = (MFT_RECORD*)(g_buf + 3 * g_vol->mft_record_size);
 	err = create_hardlink(g_index_block, root_ref, m,
 			MK_LE_MREF(FILE_Volume, FILE_Volume), 0LL, 0LL,
-			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+			le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 			"$Volume", FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
 		init_system_file_sd(FILE_Volume, &sd, &i);
@@ -4440,13 +4440,13 @@ static BOOL mkntfs_create_root_structures(void)
 			m->flags = le16_or(m->flags, MFT_RECORD_IN_USE);
 			ntfs_bit_set(g_mft_bitmap, 0LL + i, 1);
 		}
-		file_attrs = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM;
+		file_attrs = le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM);
 		if (i == FILE_root) {
-			file_attrs |= FILE_ATTR_ARCHIVE;
+			file_attrs = le32_or(file_attrs, FILE_ATTR_ARCHIVE);
 			if (opts.disable_indexing)
-				file_attrs |= FILE_ATTR_NOT_CONTENT_INDEXED;
+				file_attrs = le32_or(file_attrs, FILE_ATTR_NOT_CONTENT_INDEXED);
 			if (opts.enable_compression)
-				file_attrs |= FILE_ATTR_COMPRESSED;
+				file_attrs = le32_or(file_attrs, FILE_ATTR_COMPRESSED);
 		}
 		/* setting specific security_id flag and */
 		/* file permissions for ntfs 3.x */
@@ -4455,15 +4455,15 @@ static BOOL mkntfs_create_root_structures(void)
 			add_attr_std_info(m, file_attrs,
 				cpu_to_le32(0x0100));
 		} else if (i == 9) {
-			file_attrs |= FILE_ATTR_VIEW_INDEX_PRESENT;
+			file_attrs = le32_or(file_attrs, FILE_ATTR_VIEW_INDEX_PRESENT);
 			add_attr_std_info(m, file_attrs,
 				cpu_to_le32(0x0101));
 		} else if (i == 11) {
 			add_attr_std_info(m, file_attrs,
 				cpu_to_le32(0x0101));
 		} else if (i == 24 || i == 25 || i == 26) {
-			file_attrs |= FILE_ATTR_ARCHIVE;
-			file_attrs |= FILE_ATTR_VIEW_INDEX_PRESENT;
+			file_attrs = le32_or(file_attrs, FILE_ATTR_ARCHIVE);
+			file_attrs = le32_or(file_attrs, FILE_ATTR_VIEW_INDEX_PRESENT);
 			add_attr_std_info(m, file_attrs,
 				cpu_to_le32(0x0101));
 		} else {
@@ -4479,8 +4479,8 @@ static BOOL mkntfs_create_root_structures(void)
 	m->flags = le16_or(m->flags, MFT_RECORD_IS_DIRECTORY);
 	m->link_count = cpu_to_le16(le16_to_cpu(m->link_count) + 1);
 	err = add_attr_file_name(m, root_ref, 0LL, 0LL,
-			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-			FILE_ATTR_I30_INDEX_PRESENT, 0, 0, ".",
+			le32_or(FILE_ATTR_HIDDEN, le32_or(FILE_ATTR_SYSTEM,
+			FILE_ATTR_I30_INDEX_PRESENT)), 0, 0, ".",
 			FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
 		init_root_sd(&sd, &i);
@@ -4534,8 +4534,8 @@ static BOOL mkntfs_create_root_structures(void)
 				MK_LE_MREF(FILE_MFT, 1),
 				((g_mft_size - 1)
 					| (g_vol->cluster_size - 1)) + 1,
-				g_mft_size, FILE_ATTR_HIDDEN |
-				FILE_ATTR_SYSTEM, 0, 0, "$MFT",
+				g_mft_size, le32_or(FILE_ATTR_HIDDEN,
+				FILE_ATTR_SYSTEM), 0, 0, "$MFT",
 				FILE_NAME_WIN32_AND_DOS);
 	/* mft_bitmap is not modified in mkntfs; no need to sync it later. */
 	if (!err)
@@ -4556,7 +4556,7 @@ static BOOL mkntfs_create_root_structures(void)
 				MK_LE_MREF(FILE_MFTMirr, FILE_MFTMirr),
 				g_rl_mftmirr[0].length * g_vol->cluster_size,
 				g_rl_mftmirr[0].length * g_vol->cluster_size,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$MFTMirr", FILE_NAME_WIN32_AND_DOS);
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $MFTMirr: %s\n",
@@ -4572,7 +4572,7 @@ static BOOL mkntfs_create_root_structures(void)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_LogFile, FILE_LogFile),
 				g_logfile_size, g_logfile_size,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$LogFile", FILE_NAME_WIN32_AND_DOS);
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $LogFile: %s\n",
@@ -4588,7 +4588,7 @@ static BOOL mkntfs_create_root_structures(void)
 				MK_LE_MREF(FILE_AttrDef, FILE_AttrDef),
 				(g_vol->attrdef_len + g_vol->cluster_size - 1) &
 				~(g_vol->cluster_size - 1), g_vol->attrdef_len,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$AttrDef", FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
 		init_system_file_sd(FILE_AttrDef, &sd, &i);
@@ -4616,7 +4616,7 @@ static BOOL mkntfs_create_root_structures(void)
 				(g_lcn_bitmap_byte_size + g_vol->cluster_size -
 				1) & ~(g_vol->cluster_size - 1),
 				g_lcn_bitmap_byte_size,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$Bitmap", FILE_NAME_WIN32_AND_DOS);
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $Bitmap: %s\n", strerror(-err));
@@ -4707,7 +4707,7 @@ static BOOL mkntfs_create_root_structures(void)
 				MK_LE_MREF(FILE_Boot, FILE_Boot),
 				(8192 + g_vol->cluster_size - 1) &
 				~(g_vol->cluster_size - 1), 8192,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$Boot", FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
 		init_system_file_sd(FILE_Boot, &sd, &i);
@@ -4757,7 +4757,7 @@ static BOOL mkntfs_create_root_structures(void)
 	if (!err) {
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_BadClus, FILE_BadClus),
-				0LL, 0LL, FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM,
+				0LL, 0LL, le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM),
 				0, 0, "$BadClus", FILE_NAME_WIN32_AND_DOS);
 	}
 	if (err < 0) {
@@ -4772,8 +4772,8 @@ static BOOL mkntfs_create_root_structures(void)
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(9, 9), 0LL, 0LL,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-				FILE_ATTR_VIEW_INDEX_PRESENT, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, le32_or(FILE_ATTR_SYSTEM,
+				FILE_ATTR_VIEW_INDEX_PRESENT)), 0, 0,
 				"$Secure", FILE_NAME_WIN32_AND_DOS);
 	buf_sds = NULL;
 	buf_sds_first_size = 0;
@@ -4828,7 +4828,7 @@ static BOOL mkntfs_create_root_structures(void)
 				g_vol->cluster_size - 1) &
 				~(g_vol->cluster_size - 1),
 				g_vol->upcase_len << 1,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, FILE_ATTR_SYSTEM), 0, 0,
 				"$UpCase", FILE_NAME_WIN32_AND_DOS);
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $UpCase: %s\n", strerror(-err));
@@ -4844,8 +4844,8 @@ static BOOL mkntfs_create_root_structures(void)
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(11, 11), 0LL, 0LL,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-				FILE_ATTR_I30_INDEX_PRESENT, 0, 0,
+				le32_or(FILE_ATTR_HIDDEN, le32_or(FILE_ATTR_SYSTEM,
+				FILE_ATTR_I30_INDEX_PRESENT)), 0, 0,
 				"$Extend", FILE_NAME_WIN32_AND_DOS);
 	/* FIXME: This should be IGNORE_CASE */
 	if (!err)
@@ -4875,8 +4875,8 @@ static BOOL mkntfs_create_root_structures(void)
 	}
 	/* create systemfiles for ntfs volumes (3.1) */
 	/* starting with file 24 (ignoring file 16-23) */
-	extend_flags = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-		FILE_ATTR_ARCHIVE | FILE_ATTR_VIEW_INDEX_PRESENT;
+	extend_flags = le32_or(FILE_ATTR_HIDDEN, le32_or(FILE_ATTR_SYSTEM,
+		le32_or(FILE_ATTR_ARCHIVE, FILE_ATTR_VIEW_INDEX_PRESENT)));
 	ntfs_log_verbose("Creating $Quota (mft record 24)\n");
 	m = (MFT_RECORD*)(g_buf + 24 * g_vol->mft_record_size);
 	m->flags = le16_or(m->flags, MFT_RECORD_IS_4);

@@ -766,8 +766,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 		if ((poldace->flags & selection)
 		    && (!fordir
 			|| (poldace->flags & NO_PROPAGATE_INHERIT_ACE)
-			|| !le32_andz(poldace->mask, GENERIC_ALL | GENERIC_READ
-					| GENERIC_WRITE | GENERIC_EXECUTE))
+			|| !le32_andz(poldace->mask, le32_or(GENERIC_ALL, le32_or(GENERIC_READ,
+					le32_or(GENERIC_WRITE, GENERIC_EXECUTE)))))
 		    && !ntfs_same_sid(&poldace->sid, ownersid)
 		    && !ntfs_same_sid(&poldace->sid, groupsid)) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
@@ -777,50 +777,50 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			if (!le32_andz(pnewace->mask, GENERIC_ALL)) {
 				pnewace->mask = le32_and(pnewace->mask, ~GENERIC_ALL);
 				if (fordir)
-					pnewace->mask |= OWNER_RIGHTS
-							| DIR_READ
-							| DIR_WRITE
-							| DIR_EXEC;
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							le32_or(DIR_READ,
+							le32_or(DIR_WRITE,
+							DIR_EXEC))));
 				else
 			/*
 			 * The last flag is not defined for a file,
 			 * however Windows sets it, so do the same
 			 */
-					pnewace->mask |= OWNER_RIGHTS
-							| FILE_READ
-							| FILE_WRITE
-							| FILE_EXEC
-							| const_cpu_to_le32(0x40);
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							le32_or(FILE_READ,
+							le32_or(FILE_WRITE,
+							le32_or(FILE_EXEC,
+							const_cpu_to_le32(0x40))))));
 			}
 				/* reencode GENERIC_READ (+ EXECUTE) */
 			if (!le32_andz(pnewace->mask, GENERIC_READ)) {
 				if (fordir)
-					pnewace->mask |= OWNER_RIGHTS
-							| DIR_READ
-							| DIR_EXEC;
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							le32_or(DIR_READ,
+							DIR_EXEC)));
 				else
-					pnewace->mask |= OWNER_RIGHTS
-							| FILE_READ
-							| FILE_EXEC;
-				pnewace->mask = le32_and(pnewace->mask, ~(GENERIC_READ
-						| GENERIC_EXECUTE
-						| WRITE_DAC
-						| WRITE_OWNER
-						| DELETE | FILE_WRITE_EA
-						| FILE_WRITE_ATTRIBUTES));
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							le32_or(FILE_READ,
+							FILE_EXEC)));
+				pnewace->mask = le32_and(pnewace->mask, ~(le32_or(GENERIC_READ,
+						le32_or(GENERIC_EXECUTE,
+						le32_or(WRITE_DAC,
+						le32_or(WRITE_OWNER,
+						le32_or(DELETE, le32_or(FILE_WRITE_EA,
+						FILE_WRITE_ATTRIBUTES))))))));
 			}
 				/* reencode GENERIC_WRITE */
 			if (!le32_andz(pnewace->mask, GENERIC_WRITE)) {
 				if (fordir)
-					pnewace->mask |= OWNER_RIGHTS
-							| DIR_WRITE;
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							DIR_WRITE));
 				else
-					pnewace->mask |= OWNER_RIGHTS
-							| FILE_WRITE;
-				pnewace->mask = le32_and(pnewace->mask, ~(GENERIC_WRITE
-							| WRITE_DAC
-							| WRITE_OWNER
-							| FILE_DELETE_CHILD));
+					pnewace->mask = le32_or(pnewace->mask, le32_or(OWNER_RIGHTS,
+							FILE_WRITE));
+				pnewace->mask = le32_and(pnewace->mask, ~(le32_or(GENERIC_WRITE,
+							le32_or(WRITE_DAC,
+							le32_or(WRITE_OWNER,
+							FILE_DELETE_CHILD)))));
 			}
 				/* remove inheritance flags */
 			pnewace->flags &= ~(OBJECT_INHERIT_ACE
@@ -834,7 +834,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			    && ntfs_same_sid(&poldace->sid, authsid)) {
 				if (pauthace) {
 					pauthace->flags |= pnewace->flags;
-					pauthace->mask |= pnewace->mask;
+					pauthace->mask = le32_or(pauthace->mask, pnewace->mask);
 				} else {
 					pauthace = pnewace;
 					if (!le16_cmpz(inherited))
@@ -876,7 +876,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				if ((pnewace->type == ACCESS_ALLOWED_ACE_TYPE)
 				    && pownerace
 				    && !(pnewace->flags & ~pownerace->flags)) {
-					pownerace->mask |= pnewace->mask;
+					pownerace->mask = le32_or(pownerace->mask, pnewace->mask);
 				} else {
 					dst += usidsz + 8;
 					newcnt++;
@@ -916,8 +916,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			    && !(poldace->flags & NO_PROPAGATE_INHERIT_ACE)
 			    && !ntfs_same_sid(&poldace->sid, ownersid)
 			    && !ntfs_same_sid(&poldace->sid, groupsid)) {
-				if (!le32_andz(poldace->mask, GENERIC_ALL | GENERIC_READ
-					| GENERIC_WRITE | GENERIC_EXECUTE))
+				if (!le32_andz(poldace->mask, le32_or(GENERIC_ALL, le32_or(GENERIC_READ,
+					le32_or(GENERIC_WRITE, GENERIC_EXECUTE)))))
 					pnewace->flags |= INHERIT_ONLY_ACE;
 				else
 					pnewace->flags &= ~INHERIT_ONLY_ACE;
@@ -2472,19 +2472,19 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	if (isdir) {
 		gflags = DIR_INHERITANCE;
 		if (mode & S_IXUSR)
-			grants |= DIR_EXEC;
+			grants = le32_or(grants, DIR_EXEC);
 		if (mode & S_IWUSR)
-			grants |= DIR_WRITE;
+			grants = le32_or(grants, DIR_WRITE);
 		if (mode & S_IRUSR)
-			grants |= DIR_READ;
+			grants = le32_or(grants, DIR_READ);
 	} else {
 		gflags = FILE_INHERITANCE;
 		if (mode & S_IXUSR)
-			grants |= FILE_EXEC;
+			grants = le32_or(grants, FILE_EXEC);
 		if (mode & S_IWUSR)
-			grants |= FILE_WRITE;
+			grants = le32_or(grants, FILE_WRITE);
 		if (mode & S_IRUSR)
-			grants |= FILE_READ;
+			grants = le32_or(grants, FILE_READ);
 	}
 
 	/* a possible ACE to deny owner what he/she would */
@@ -2498,37 +2498,37 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			if (isdir) {
 				pdace->flags = DIR_INHERITANCE;
 				if (mode & (S_IXGRP | S_IXOTH))
-					denials |= DIR_EXEC;
+					denials = le32_or(denials, DIR_EXEC);
 				if (mode & (S_IWGRP | S_IWOTH))
-					denials |= DIR_WRITE;
+					denials = le32_or(denials, DIR_WRITE);
 				if (mode & (S_IRGRP | S_IROTH))
-					denials |= DIR_READ;
+					denials = le32_or(denials, DIR_READ);
 			} else {
 				pdace->flags = FILE_INHERITANCE;
 				if (mode & (S_IXGRP | S_IXOTH))
-					denials |= FILE_EXEC;
+					denials = le32_or(denials, FILE_EXEC);
 				if (mode & (S_IWGRP | S_IWOTH))
-					denials |= FILE_WRITE;
+					denials = le32_or(denials, FILE_WRITE);
 				if (mode & (S_IRGRP | S_IROTH))
-					denials |= FILE_READ;
+					denials = le32_or(denials, FILE_READ);
 			}
 		} else {
 			if (isdir) {
 				pdace->flags = DIR_INHERITANCE;
 				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
-					denials |= DIR_EXEC;
+					denials = le32_or(denials, DIR_EXEC);
 				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
-					denials |= DIR_WRITE;
+					denials = le32_or(denials, DIR_WRITE);
 				if ((mode & S_IROTH) && !(mode & S_IRGRP))
-					denials |= DIR_READ;
+					denials = le32_or(denials, DIR_READ);
 			} else {
 				pdace->flags = FILE_INHERITANCE;
 				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
-					denials |= FILE_EXEC;
+					denials = le32_or(denials, FILE_EXEC);
 				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
-					denials |= FILE_WRITE;
+					denials = le32_or(denials, FILE_WRITE);
 				if ((mode & S_IROTH) && !(mode & S_IRGRP))
-					denials |= FILE_READ;
+					denials = le32_or(denials, FILE_READ);
 			}
 		}
 		denials = le32_and(denials, ~grants);
@@ -2580,19 +2580,19 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		if (isdir) {
 			gflags = DIR_INHERITANCE;
 			if (mode & S_IXGRP)
-				grants |= DIR_EXEC;
+				grants = le32_or(grants, DIR_EXEC);
 			if (mode & S_IWGRP)
-				grants |= DIR_WRITE;
+				grants = le32_or(grants, DIR_WRITE);
 			if (mode & S_IRGRP)
-				grants |= DIR_READ;
+				grants = le32_or(grants, DIR_READ);
 		} else {
 			gflags = FILE_INHERITANCE;
 			if (mode & S_IXGRP)
-				grants |= FILE_EXEC;
+				grants = le32_or(grants, FILE_EXEC);
 			if (mode & S_IWGRP)
-				grants |= FILE_WRITE;
+				grants = le32_or(grants, FILE_WRITE);
 			if (mode & S_IRGRP)
-				grants |= FILE_READ;
+				grants = le32_or(grants, FILE_READ);
 		}
 
 		/* a possible ACE to deny group what it would get from world */
@@ -2604,21 +2604,21 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			if (isdir) {
 				pdace->flags = DIR_INHERITANCE;
 				if (mode & S_IXOTH)
-					denials |= DIR_EXEC;
+					denials = le32_or(denials, DIR_EXEC);
 				if (mode & S_IWOTH)
-					denials |= DIR_WRITE;
+					denials = le32_or(denials, DIR_WRITE);
 				if (mode & S_IROTH)
-					denials |= DIR_READ;
+					denials = le32_or(denials, DIR_READ);
 			} else {
 				pdace->flags = FILE_INHERITANCE;
 				if (mode & S_IXOTH)
-					denials |= FILE_EXEC;
+					denials = le32_or(denials, FILE_EXEC);
 				if (mode & S_IWOTH)
-					denials |= FILE_WRITE;
+					denials = le32_or(denials, FILE_WRITE);
 				if (mode & S_IROTH)
-					denials |= FILE_READ;
+					denials = le32_or(denials, FILE_READ);
 			}
-			denials = le32_and(denials, ~(grants | OWNER_RIGHTS));
+			denials = le32_and(denials, ~(le32_or(grants, OWNER_RIGHTS)));
 			if (!le32_cmpz(denials)) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
@@ -2653,19 +2653,19 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	if (isdir) {
 		pgace->flags = DIR_INHERITANCE;
 		if (mode & S_IXOTH)
-			grants |= DIR_EXEC;
+			grants = le32_or(grants, DIR_EXEC);
 		if (mode & S_IWOTH)
-			grants |= DIR_WRITE;
+			grants = le32_or(grants, DIR_WRITE);
 		if (mode & S_IROTH)
-			grants |= DIR_READ;
+			grants = le32_or(grants, DIR_READ);
 	} else {
 		pgace->flags = FILE_INHERITANCE;
 		if (mode & S_IXOTH)
-			grants |= FILE_EXEC;
+			grants = le32_or(grants, FILE_EXEC);
 		if (mode & S_IWOTH)
-			grants |= FILE_WRITE;
+			grants = le32_or(grants, FILE_WRITE);
 		if (mode & S_IROTH)
-			grants |= FILE_READ;
+			grants = le32_or(grants, FILE_READ);
 	}
 	pgace->size = cpu_to_le16(wsidsz + 8);
 	pgace->mask = grants;
@@ -2683,7 +2683,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	else
 		pgace->flags = FILE_INHERITANCE;
 	pgace->size = cpu_to_le16(asidsz + 8);
-	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
+	grants = le32_or(OWNER_RIGHTS, le32_or(FILE_READ, le32_or(FILE_WRITE, FILE_EXEC)));
 	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, adminsid, asidsz);
 	pos += asidsz + 8;
@@ -2699,7 +2699,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	else
 		pgace->flags = FILE_INHERITANCE;
 	pgace->size = cpu_to_le16(ssidsz + 8);
-	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
+	grants = le32_or(OWNER_RIGHTS, le32_or(FILE_READ, le32_or(FILE_WRITE, FILE_EXEC)));
 	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, systemsid, ssidsz);
 	pos += ssidsz + 8;
@@ -2716,11 +2716,11 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		pgace->size = cpu_to_le16(nsidsz + 8);
 		grants = const_cpu_to_le32(0);
 		if (mode & S_ISUID)
-			grants |= FILE_APPEND_DATA;
+			grants = le32_or(grants, FILE_APPEND_DATA);
 		if (mode & S_ISGID)
-			grants |= FILE_WRITE_DATA;
+			grants = le32_or(grants, FILE_WRITE_DATA);
 		if (mode & S_ISVTX)
-			grants |= FILE_READ_DATA;
+			grants = le32_or(grants, FILE_READ_DATA);
 		pgace->mask = grants;
 		memcpy((char*)&pgace->sid, nullsid, nsidsz);
 		pos += nsidsz + 8;
@@ -3218,27 +3218,27 @@ static int build_std_permissions(const char *securattr,
 			  || ntfs_same_sid(ownersid, &pace->sid)) {
 				noown = FALSE;
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-					allowown |= pace->mask;
+					allowown = le32_or(allowown, pace->mask);
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
-					denyown |= pace->mask;
+					denyown = le32_or(denyown, pace->mask);
 				} else
 				if (ntfs_same_sid(gsid, &pace->sid)
 				    && le32_andz(pace->mask, WRITE_OWNER)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-						allowgrp |= pace->mask;
+						allowgrp = le32_or(allowgrp, pace->mask);
 					else if (pace->type == ACCESS_DENIED_ACE_TYPE)
-						denygrp |= pace->mask;
+						denygrp = le32_or(denygrp, pace->mask);
 				} else
 					if (is_world_sid((const SID*)&pace->sid)) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-							allowall |= pace->mask;
+							allowall = le32_or(allowall, pace->mask);
 						else
 							if (pace->type == ACCESS_DENIED_ACE_TYPE)
-								denyall |= pace->mask;
+								denyall = le32_or(denyall, pace->mask);
 					} else
 					if ((ntfs_same_sid((const SID*)&pace->sid,nullsid))
 					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-						special |= pace->mask;
+						special = le32_or(special, pace->mask);
 			}
 			offace += le16_to_cpu(pace->size);
 		}
@@ -3249,17 +3249,17 @@ static int build_std_permissions(const char *securattr,
 		 * merges the admin ACEs
 		 */
 	if (noown)
-		allowown = (FILE_READ_DATA | FILE_WRITE_DATA | FILE_EXECUTE);
+		allowown = le32_or(FILE_READ_DATA, le32_or(FILE_WRITE_DATA, FILE_EXECUTE));
 		/*
 		 *  Add to owner rights granted to group or world
 		 * unless denied personaly, and add to group rights
 		 * granted to world unless denied specifically
 		 */
-	allowown |= (allowgrp | allowall);
-	allowgrp |= allowall;
+	allowown = le32_or(allowown, le32_or(allowgrp, allowall));
+	allowgrp = le32_or(allowgrp, allowall);
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(denyown | denyall)),
-				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowown, ~(le32_or(denyown, denyall))),
+				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
 				le32_and(allowall, ~denyall),
 				special));
 }
@@ -3308,27 +3308,27 @@ static int build_owngrp_permissions(const char *securattr,
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			    && !le32_andz(pace->mask, WRITE_OWNER)) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
-					allowown |= pace->mask;
+					allowown = le32_or(allowown, pace->mask);
 					ownpresent = TRUE;
 				}
 			} else
 				if (ntfs_same_sid(usid, &pace->sid)
 				   && le32_andz(pace->mask, WRITE_OWNER)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
-						allowgrp |= pace->mask;
+						allowgrp = le32_or(allowgrp, pace->mask);
 						grppresent = TRUE;
 					}
 				} else
 					if (is_world_sid((const SID*)&pace->sid)) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-							allowall |= pace->mask;
+							allowall = le32_or(allowall, pace->mask);
 						else
 							if (pace->type == ACCESS_DENIED_ACE_TYPE)
-								denyall |= pace->mask;
+								denyall = le32_or(denyall, pace->mask);
 					} else
 					if ((ntfs_same_sid((const SID*)&pace->sid,nullsid))
 					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-						special |= pace->mask;
+						special = le32_or(special, pace->mask);
 			}
 			offace += le16_to_cpu(pace->size);
 		}
@@ -3337,8 +3337,8 @@ static int build_owngrp_permissions(const char *securattr,
 	if (!grppresent)
 		allowgrp = allowall;
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(denyown | denyall)),
-				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowown, ~(le32_or(denyown, denyall))),
+				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
 				le32_and(allowall, ~denyall),
 				special));
 }
@@ -3494,47 +3494,47 @@ static int build_ownadmin_permissions(const char *securattr,
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)
-		   && le32_andz(~pace->mask, ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK)) {
+		   && le32_andz(~pace->mask, le32_or(ROOT_OWNER_UNMARK, ROOT_GROUP_UNMARK))) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			     && ((!le32_andz(pace->mask, WRITE_OWNER) && firstapply))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
-					allowown |= pace->mask;
+					allowown = le32_or(allowown, pace->mask);
 					isforeign &= ~1;
 				} else
 					if (pace->type == ACCESS_DENIED_ACE_TYPE)
-						denyown |= pace->mask;
+						denyown = le32_or(denyown, pace->mask);
 				} else
 				    if (ntfs_same_sid(gsid, &pace->sid)
 				    && (le32_andz(pace->mask, WRITE_OWNER))) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
-							allowgrp |= pace->mask;
+							allowgrp = le32_or(allowgrp, pace->mask);
 							isforeign &= ~2;
 						} else
 							if (pace->type == ACCESS_DENIED_ACE_TYPE)
-								denygrp |= pace->mask;
+								denygrp = le32_or(denygrp, pace->mask);
 					} else if (is_world_sid((const SID*)&pace->sid)) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-							allowall |= pace->mask;
+							allowall = le32_or(allowall, pace->mask);
 						else
 							if (pace->type == ACCESS_DENIED_ACE_TYPE)
-								denyall |= pace->mask;
+								denyall = le32_or(denyall, pace->mask);
 					}
 			firstapply = FALSE;
 			} else
 				if (!(pace->flags & INHERIT_ONLY_ACE))
 					if ((ntfs_same_sid((const SID*)&pace->sid,nullsid))
 					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-						special |= pace->mask;
+						special = le32_or(special, pace->mask);
 			offace += le16_to_cpu(pace->size);
 		}
 	if (isforeign) {
-		allowown |= (allowgrp | allowall);
-		allowgrp |= allowall;
+		allowown = le32_or(allowown, le32_or(allowgrp, allowall));
+		allowgrp = le32_or(allowgrp, allowall);
 	}
 	return (merge_permissions(isdir,
-				le32_and(allowown, ~(denyown | denyall)),
-				le32_and(allowgrp, ~(denygrp | denyall)),
+				le32_and(allowown, ~(le32_or(denyown, denyall))),
+				le32_and(allowgrp, ~(le32_or(denygrp, denyall))),
 				le32_and(allowall, ~denyall),
 				special));
 }
