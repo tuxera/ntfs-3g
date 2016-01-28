@@ -244,7 +244,7 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
  */
 int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 {
-	ntfschar c1, c2;
+	u16 c1, c2;
 	size_t i;
 
 #ifdef DEBUG
@@ -360,7 +360,7 @@ ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
 	dst = ntfs_malloc((len + 1) * sizeof(ntfschar));
 	if (dst) {
 		memcpy(dst, s, len * sizeof(ntfschar));
-		dst[len] = cpu_to_le16(L'\0');
+		dst[len] = const_cpu_to_le16(L'\0');
 	}
 	return dst;
 }
@@ -1050,7 +1050,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 	}
 #endif
 	/* Now write the NULL character. */
-	ucs[o] = cpu_to_le16(L'\0');
+	ucs[o] = const_cpu_to_le16(L'\0');
 	*outs = ucs;
 	return o;
 err_out:

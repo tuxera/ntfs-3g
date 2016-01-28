@@ -436,7 +436,7 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	printf("\tDevice state: %lu\n", vol->dev->d_state);
 	printf("\tVolume Name: %s\n", vol->vol_name);
 	printf("\tVolume State: %lu\n", vol->state);
-	printf("\tVolume Flags: 0x%04x", (int)vol->flags);
+	printf("\tVolume Flags: 0x%04x", (int)le16_to_cpu(vol->flags));
 	if (vol->flags & VOLUME_IS_DIRTY)
 		printf(" DIRTY");
 	if (vol->flags & VOLUME_MODIFIED_BY_CHKDSK)
@@ -1718,7 +1718,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 		else
 			/* weird, this should be illegal */
 			ntfs_log_error("Unknown index attribute type: 0x%0X\n",
-				       index_root->type);
+				       le32_to_cpu(index_root->type));
 		return INDEX_ATTR_UNKNOWN;
 	}
 

@@ -420,8 +420,8 @@ int ntfs_efs_fixup_attribute(ntfs_attr_search_ctx *ctx, ntfs_attr *na)
 	NInoSetDirty(ni);
 	NInoFileNameSetDirty(ni);
 
-	ctx->attr->data_size = cpu_to_le64(newsize);
-	if (le64_to_cpu(ctx->attr->initialized_size) > newsize)
+	ctx->attr->data_size = cpu_to_sle64(newsize);
+	if (sle64_to_cpu(ctx->attr->initialized_size) > newsize)
 		ctx->attr->initialized_size = ctx->attr->data_size;
 	ctx->attr->flags |= ATTR_IS_ENCRYPTED;
 	if (close_ctx)

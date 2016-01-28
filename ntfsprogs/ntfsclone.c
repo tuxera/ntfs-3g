@@ -898,7 +898,7 @@ static void gap_to_cluster(s64 gap)
 static void image_skip_clusters(s64 count)
 {
 	if (opt.save_image && count > 0) {
-		s64 count_buf;
+		sle64 count_buf;
 		char buff[1 + sizeof(count)];
 
 		buff[0] = CMD_GAP;
@@ -1012,7 +1012,7 @@ static void restore_image(void)
 
 	progress_init(&progress, p_counter, opt.std_out ?
 		      sle64_to_cpu(image_hdr.nr_clusters) + 1 :
-		      sle64_to_cpu(image_hdr.inuse) + 1,
+		      le64_to_cpu(image_hdr.inuse) + 1,
 		      100);
 
 	if (opt.new_serial)
@@ -1032,7 +1032,7 @@ static void restore_image(void)
 
 		if (cmd == CMD_GAP) {
 			if (!image_is_host_endian) {
-				le64 lecount;
+				sle64 lecount;
 
 				/* little endian image, on any computer */
 				if (read_all(&fd_in, &lecount,
@@ -1083,7 +1083,7 @@ static void restore_image(void)
 static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
 	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
-	le64 timestamp = timespec2ntfs(zero_time);
+	sle64 timestamp = timespec2ntfs(zero_time);
 
 	/* FIXME: can fall into infinite loop if corrupted */
 	while (!(e->ie_flags & INDEX_ENTRY_END)) {
@@ -1193,7 +1193,7 @@ out_indexr:
 	free(indexr);
 }
 
-static void wipe_index_root_timestamps(ATTR_RECORD *attr, le64 timestamp)
+static void wipe_index_root_timestamps(ATTR_RECORD *attr, sle64 timestamp)
 {
 	INDEX_ENTRY *entry;
 	INDEX_ROOT *iroot;
@@ -1256,7 +1256,7 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
 	ATTR_RECORD *a = image->ctx->attr;
-	le64 timestamp = timespec2ntfs(zero_time);
+	sle64 timestamp = timespec2ntfs(zero_time);
 
 	if (a->type == AT_FILE_NAME)
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);
@@ -2097,10 +2097,10 @@ static void print_image_info(void)
 			sle64_to_cpu(image_hdr.nr_clusters) *
 			le32_to_cpu(image_hdr.cluster_size));
 	Printf("Image device size      : %lld bytes\n",
-			(long long)sle64_to_cpu(image_hdr.device_size));
+			(long long)le64_to_cpu(image_hdr.device_size));
 	print_disk_usage("    ", le32_to_cpu(image_hdr.cluster_size),
 			sle64_to_cpu(image_hdr.nr_clusters),
-			sle64_to_cpu(image_hdr.inuse));
+			le64_to_cpu(image_hdr.inuse));
 	Printf("Offset to image data   : %u (0x%x) bytes\n",
 			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data),
 			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data));
@@ -2402,7 +2402,7 @@ static s64 open_image(void)
 			free(dummy_buf);
 		}
 	}
-	return sle64_to_cpu(image_hdr.device_size);
+	return le64_to_cpu(image_hdr.device_size);
 }
 
 static s64 open_volume(void)
@@ -2432,9 +2432,9 @@ static void initialise_image_hdr(s64 device_size, s64 inuse)
 	image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
 	image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
 	image_hdr.cluster_size = cpu_to_le32(vol->cluster_size);
-	image_hdr.device_size = cpu_to_sle64(device_size);
+	image_hdr.device_size = cpu_to_le64(device_size);
 	image_hdr.nr_clusters = cpu_to_sle64(vol->nr_clusters);
-	image_hdr.inuse = cpu_to_sle64(inuse);
+	image_hdr.inuse = cpu_to_le64(inuse);
 	image_hdr.offset_to_image_data = cpu_to_le32((sizeof(image_hdr)
 			 + IMAGE_HDR_ALIGN - 1) & -IMAGE_HDR_ALIGN);
 }

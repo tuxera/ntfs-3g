@@ -792,7 +792,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 							| FILE_READ
 							| FILE_WRITE
 							| FILE_EXEC
-							| cpu_to_le32(0x40);
+							| const_cpu_to_le32(0x40);
 			}
 				/* reencode GENERIC_READ (+ EXECUTE) */
 			if (pnewace->mask & GENERIC_READ) {

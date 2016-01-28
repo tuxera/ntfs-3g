@@ -964,13 +964,13 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
 		if (mrec->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec)) {
+			if (ntfs_is_baad_recordp(&mrec->magic)) {
 				ntfs_log_error("$MFT error: Incomplete multi "
 					       "sector transfer detected in "
 					       "'%s'.\n", s);
 				goto io_error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec)) {
+			if (!ntfs_is_mft_recordp(&mrec->magic)) {
 				ntfs_log_error("$MFT error: Invalid mft "
 						"record for '%s'.\n", s);
 				goto io_error_exit;
@@ -978,13 +978,13 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
 		if (mrec2->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec2)) {
+			if (ntfs_is_baad_recordp(&mrec2->magic)) {
 				ntfs_log_error("$MFTMirr error: Incomplete "
 						"multi sector transfer "
 						"detected in '%s'.\n", s);
 				goto io_error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec2)) {
+			if (!ntfs_is_mft_recordp(&mrec2->magic)) {
 				ntfs_log_error("$MFTMirr error: Invalid mft "
 						"record for '%s'.\n", s);
 				goto io_error_exit;

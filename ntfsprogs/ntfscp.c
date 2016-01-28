@@ -609,11 +609,11 @@ static int set_sizes(struct ALLOC_CONTEXT *alctx, ntfs_attr_search_ctx *ctx)
 		/* Feed the sizes into the attribute */
 	attr = ctx->attr;
 	attr->non_resident = 1;
-	attr->data_size = cpu_to_le64(na->data_size);
-	attr->initialized_size = cpu_to_le64(na->initialized_size);
-	attr->allocated_size = cpu_to_le64(na->allocated_size);
+	attr->data_size = cpu_to_sle64(na->data_size);
+	attr->initialized_size = cpu_to_sle64(na->initialized_size);
+	attr->allocated_size = cpu_to_sle64(na->allocated_size);
 	if (na->data_flags & ATTR_IS_SPARSE)
-		attr->compressed_size = cpu_to_le64(na->compressed_size);
+		attr->compressed_size = cpu_to_sle64(na->compressed_size);
 		/* Copy the unnamed data attribute sizes to inode */
 	if ((opts.attribute == AT_DATA) && !na->name_len) {
 		ni = na->ni;
@@ -806,7 +806,7 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 					filename);
 		return NULL;
 	}
-	ni = ntfs_create(dir_ni, 0, ufilename, ufilename_len, S_IFREG);
+	ni = ntfs_create(dir_ni, const_cpu_to_le32(0), ufilename, ufilename_len, S_IFREG);
 	free(ufilename);
 	return ni;
 }

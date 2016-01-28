@@ -782,7 +782,7 @@ static BOOL short_mft_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 		a = find_unnamed_attr(mft0,AT_DATA);
 		if (a
 		    && a->non_resident
-		    && (((le64_to_cpu(a->highest_vcn) + 1)
+		    && (((sle64_to_cpu(a->highest_vcn) + 1)
 					<< vol->cluster_size_bits)
 				== (SELFLOC_LIMIT*vol->mft_record_size))) {
 			rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
@@ -842,13 +842,13 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 			if (rl
 			    && (rl->lcn >= 0)
-			    && (le64_to_cpu(a->data_size) < vol->cluster_size)
+			    && (sle64_to_cpu(a->data_size) < vol->cluster_size)
 			    && (ntfs_pread(vol->dev,
 					rl->lcn << vol->cluster_size_bits,
 					vol->cluster_size, attrlist) == vol->cluster_size)) {
 				selfloc->attrlist_lcn = rl->lcn;
 				al = attrlist;
-				length = le64_to_cpu(a->data_size);
+				length = sle64_to_cpu(a->data_size);
 			}
 		} else {
 			al = (ATTR_LIST_ENTRY*)
@@ -859,7 +859,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			/* search for a data attribute defining entry 16 */
 			vcn = (SELFLOC_LIMIT*vol->mft_record_size)
 					>> vol->cluster_size_bits;
-			levcn = cpu_to_le64(vcn);
+			levcn = cpu_to_sle64(vcn);
 			while ((length > 0)
 			    && al->length
 			    && ((al->type != AT_DATA)
@@ -922,7 +922,7 @@ static BOOL self_mapped_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 		a = find_unnamed_attr(mft1,AT_DATA);
 		if (a
 		    && (mft1->flags & MFT_RECORD_IN_USE)
-		    && ((VCN)le64_to_cpu(a->lowest_vcn) == lowest_vcn)
+		    && ((VCN)sle64_to_cpu(a->lowest_vcn) == lowest_vcn)
 		    && (le64_to_cpu(mft1->base_mft_record)
 				== selfloc->mft_ref0)
 		    && ((u16)MSEQNO(selfloc->mft_ref1)
@@ -1021,9 +1021,9 @@ static int fix_selfloc_conditions(struct MFT_SELF_LOCATED *selfloc)
 	mft1->sequence_number = const_cpu_to_le16(SELFLOC_LIMIT - 1);
 	a = find_unnamed_attr(mft1,AT_DATA);
 	if (a) {
-		a->allocated_size = const_cpu_to_le64(0);
-		a->data_size = const_cpu_to_le64(0);
-		a->initialized_size = const_cpu_to_le64(0);
+		a->allocated_size = const_cpu_to_sle64(0);
+		a->data_size = const_cpu_to_sle64(0);
+		a->initialized_size = const_cpu_to_sle64(0);
 	} else
 		res = -1; /* bug : it has been found earlier */
 
@@ -1191,8 +1191,8 @@ static int try_fix_boot(ntfs_volume *vol, char *full_bs,
 			ntfs_log_perror("Error reading alternate bootsector");
 	} else {
 		bs = (NTFS_BOOT_SECTOR*)full_bs;
-		got_sectors = le64_to_cpu(bs->number_of_sectors);
-		bs->number_of_sectors = cpu_to_le64(fix_sectors);
+		got_sectors = sle64_to_cpu(bs->number_of_sectors);
+		bs->number_of_sectors = cpu_to_sle64(fix_sectors);
 		/* alignment problem on Sparc, even doing memcpy() */
 		sector_size_le = cpu_to_le16(sector_size);
 		if (!memcmp(&sector_size_le, &bs->bpb.bytes_per_sector,2)
@@ -1327,7 +1327,7 @@ static int check_alternate_boot(ntfs_volume *vol)
 	br = ntfs_pread(vol->dev, 0, vol->sector_size, full_bs);
 	if (br == vol->sector_size) {
 		bs = (NTFS_BOOT_SECTOR*)full_bs;
-		got_sectors = le64_to_cpu(bs->number_of_sectors);
+		got_sectors = sle64_to_cpu(bs->number_of_sectors);
 		actual_sectors = ntfs_device_size_get(vol->dev,
 						vol->sector_size);
 		if (actual_sectors > got_sectors) {
@@ -1457,7 +1457,7 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	if (!ntfs_boot_sector_is_ntfs(bs)
 		/* get the bootsector data, only fails when inconsistent */
 	    || (ntfs_boot_sector_parse(vol, bs) < 0)) {
-		shown_sectors = le64_to_cpu(bs->number_of_sectors);
+		shown_sectors = sle64_to_cpu(bs->number_of_sectors);
 		/* boot sector is wrong, try the alternate boot sector */
 		if (try_alternate_boot(vol, full_bs, sector_size,
 						shown_sectors)) {

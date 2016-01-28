@@ -384,7 +384,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 	}
 
 	/* Get the starting vcn of the index_block holding the child node. */
-	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
+	vcn = sle64_to_cpup((sle64*)((u8*)ie + le16_to_cpu(ie->length) - 8));
 
 descend_into_child_node:
 
@@ -496,7 +496,7 @@ descend_into_child_node:
 			goto close_err_out;
 		}
 		/* Child node present, descend into it. */
-		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
+		vcn = sle64_to_cpup((sle64*)((u8*)ie + le16_to_cpu(ie->length) - 8));
 		if (vcn >= 0)
 			goto descend_into_child_node;
 		ntfs_log_error("Negative child node vcn in directory inode "
@@ -1531,7 +1531,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	si->last_access_time = ni->last_access_time;
 	if (securid) {
 		set_nino_flag(ni, v3_Extensions);
-		ni->owner_id = si->owner_id = 0;
+		ni->owner_id = si->owner_id = const_cpu_to_le32(0);
 		ni->security_id = si->security_id = securid;
 		ni->quota_charged = si->quota_charged = const_cpu_to_le64(0);
 		ni->usn = si->usn = const_cpu_to_le64(0);
@@ -1599,12 +1599,12 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 			ir->clusters_per_index_block = 
 					ni->vol->indx_record_size >>
 					NTFS_BLOCK_SIZE_BITS;
-		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
+		ir->index.entries_offset = const_cpu_to_le32(sizeof(INDEX_HEADER));
 		ir->index.index_length = cpu_to_le32(index_len);
 		ir->index.allocated_size = cpu_to_le32(index_len);
 		ie = (INDEX_ENTRY*)((u8*)ir + sizeof(INDEX_ROOT));
-		ie->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
-		ie->key_length = 0;
+		ie->length = const_cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
+		ie->key_length = const_cpu_to_le16(0);
 		ie->ie_flags = INDEX_ENTRY_END;
 		/* Add INDEX_ROOT attribute to inode. */
 		if (ntfs_attr_add(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4,
@@ -1691,7 +1691,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	fn->last_mft_change_time = ni->last_mft_change_time;
 	fn->last_access_time = ni->last_access_time;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
+		fn->data_size = fn->allocated_size = const_cpu_to_sle64(0);
 	else {
 		fn->data_size = cpu_to_sle64(ni->data_size);
 		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
@@ -1711,7 +1711,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		goto err_out;
 	}
 	/* Set hard links count and directory flag. */
-	ni->mrec->link_count = cpu_to_le16(1);
+	ni->mrec->link_count = const_cpu_to_le16(1);
 	if (S_ISDIR(type))
 		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
 	ntfs_inode_mark_dirty(ni);
@@ -1970,7 +1970,7 @@ search:
 	 * (Windows also does so), however delete the name if it were
 	 * in an extent, to avoid leaving an attribute list.
 	 */
-	if ((ni->mrec->link_count == cpu_to_le16(1)) && !actx->base_ntfs_ino) {
+	if ((ni->mrec->link_count == const_cpu_to_le16(1)) && !actx->base_ntfs_ino) {
 			/* make sure to not loop to another search */
 		looking_for_dos_name = FALSE;
 	} else {
@@ -2181,7 +2181,7 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 	fn->file_attributes = ni->flags;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
 		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
-		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
+		fn->data_size = fn->allocated_size = const_cpu_to_sle64(0);
 	} else {
 		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 		fn->data_size = cpu_to_sle64(ni->data_size);

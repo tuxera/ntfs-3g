@@ -719,7 +719,7 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	unsigned int nr_cbs, cb_clusters;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count 0x%llx.\n",
-			(unsigned long long)na->ni->mft_no, na->type,
+			(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
 			(long long)pos, (long long)count);
 	data_flags = na->data_flags;
 	compression = na->ni->flags & FILE_ATTR_COMPRESSED;

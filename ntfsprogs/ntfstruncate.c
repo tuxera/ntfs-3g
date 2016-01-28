@@ -75,7 +75,7 @@ BOOL success = FALSE;
 
 char *dev_name;
 s64 inode;
-u32 attr_type;
+ATTR_TYPES attr_type;
 ntfschar *attr_name = NULL;
 u32 attr_name_len;
 s64 new_len;
@@ -236,7 +236,7 @@ static void parse_options(int argc, char *argv[])
 		if (*s2 || !ul || (ul >= ULONG_MAX && errno == ERANGE))
 			err_exit("Invalid attribute type %s: %s\n", s,
 					strerror(errno));
-		attr_type = ul;
+		attr_type = cpu_to_le32(ul);
 
 		/* Get the attribute name, if specified. */
 		s = argv[optind++];
@@ -258,7 +258,7 @@ static void parse_options(int argc, char *argv[])
 			attr_name_len = 0;
 		}
 	}
-	ntfs_log_verbose("attribute type = 0x%x\n", (unsigned int)attr_type);
+	ntfs_log_verbose("attribute type = 0x%x\n", (unsigned int)le32_to_cpu(attr_type));
 	if (attr_name == AT_UNNAMED)
 		ntfs_log_verbose("attribute name = \"\" (UNNAMED)\n");
 	else
@@ -286,7 +286,7 @@ static void parse_options(int argc, char *argv[])
  */
 static int ucstos(char *dest, const ntfschar *src, int maxlen)
 {
-	ntfschar u;
+	u16 u;
 	int i;
 
 	/* Need one byte for null terminator. */
@@ -314,6 +314,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	const char *todo = "This is still work in progress.";
 	char *buf;
 	int i, j;
+	VOLUME_FLAGS flags;
 	u32 u;
 
 	switch (type) {
@@ -356,54 +357,54 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 #define VOL_INF(x) ((VOLUME_INFORMATION *)(x))
 		printf("NTFS version %i.%i\n", VOL_INF(val)->major_ver,
 				VOL_INF(val)->minor_ver);
-		i = VOL_INF(val)->flags;
+		flags = VOL_INF(val)->flags;
 #undef VOL_INF
-		printf("Volume flags = 0x%x: ", i);
-		if (!i) {
+		printf("Volume flags = 0x%x: ", le16_to_cpu(flags));
+		if (!flags) {
 			printf("NONE\n");
 			return;
 		}
 		j = 0;
-		if (i & VOLUME_MODIFIED_BY_CHKDSK) {
+		if (flags & VOLUME_MODIFIED_BY_CHKDSK) {
 			j = 1;
 			printf("VOLUME_MODIFIED_BY_CHKDSK");
 		}
-		if (i & VOLUME_REPAIR_OBJECT_ID) {
+		if (flags & VOLUME_REPAIR_OBJECT_ID) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_REPAIR_OBJECT_ID");
 		}
-		if (i & VOLUME_DELETE_USN_UNDERWAY) {
+		if (flags & VOLUME_DELETE_USN_UNDERWAY) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_DELETE_USN_UNDERWAY");
 		}
-		if (i & VOLUME_MOUNTED_ON_NT4) {
+		if (flags & VOLUME_MOUNTED_ON_NT4) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_MOUNTED_ON_NT4");
 		}
-		if (i & VOLUME_UPGRADE_ON_MOUNT) {
+		if (flags & VOLUME_UPGRADE_ON_MOUNT) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_UPGRADE_ON_MOUNT");
 		}
-		if (i & VOLUME_RESIZE_LOG_FILE) {
+		if (flags & VOLUME_RESIZE_LOG_FILE) {
 			if (j)
 				printf(" | ");
 			else
 				j = 0;
 			printf("VOLUME_RESIZE_LOG_FILE");
 		}
-		if (i & VOLUME_IS_DIRTY) {
+		if (flags & VOLUME_IS_DIRTY) {
 			if (j)
 				printf(" | ");
 			else
@@ -531,6 +532,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	unsigned int u;
 	char s[0x200];
 	int i;
+	ATTR_FLAGS flags;
 
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
 			(unsigned)((u8*)a - (u8*)m));
@@ -563,12 +565,12 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	printf("Length of resident part = %u (0x%x)\n", u, u);
 	printf("Attribute is %sresident\n", a->non_resident ? "non-" : "");
 	printf("Name length = %u unicode characters\n", a->name_length);
-	printf("Name offset = %u (0x%x)\n", cpu_to_le16(a->name_offset),
-			cpu_to_le16(a->name_offset));
-	u = a->flags;
+	printf("Name offset = %u (0x%x)\n", le16_to_cpu(a->name_offset),
+			le16_to_cpu(a->name_offset));
+	flags = a->flags;
 	if (a->name_length) {
 		if (ucstos(s, (ntfschar*)((char*)a +
-				cpu_to_le16(a->name_offset)),
+				le16_to_cpu(a->name_offset)),
 				min((int)sizeof(s),
 						a->name_length + 1)) == -1) {
 			ntfs_log_error("Could not convert Unicode string to single "
@@ -579,17 +581,17 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 		}
 		printf("Name = %s\n", s);
 	}
-	printf("Attribute flags = 0x%x: ", le16_to_cpu(u));
-	if (!u)
+	printf("Attribute flags = 0x%x: ", le16_to_cpu(flags));
+	if (!flags)
 		printf("NONE");
 	else {
 		int first = TRUE;
-		if (u & ATTR_COMPRESSION_MASK) {
-			if (u & ATTR_IS_COMPRESSED) {
+		if (flags & ATTR_COMPRESSION_MASK) {
+			if (flags & ATTR_IS_COMPRESSED) {
 				printf("ATTR_IS_COMPRESSED");
 				first = FALSE;
 			}
-			if ((u & ATTR_COMPRESSION_MASK) & ~ATTR_IS_COMPRESSED) {
+			if ((flags & ATTR_COMPRESSION_MASK) & ~ATTR_IS_COMPRESSED) {
 				if (!first)
 					printf(" | ");
 				else
@@ -597,14 +599,14 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 				printf("ATTR_UNKNOWN_COMPRESSION");
 			}
 		}
-		if (u & ATTR_IS_ENCRYPTED) {
+		if (flags & ATTR_IS_ENCRYPTED) {
 			if (!first)
 				printf(" | ");
 			else
 				first = FALSE;
 			printf("ATTR_IS_ENCRYPTED");
 		}
-		if (u & ATTR_IS_SPARSE) {
+		if (flags & ATTR_IS_SPARSE) {
 			if (!first)
 				printf(" | ");
 			else
@@ -638,7 +640,7 @@ static void dump_mft_record(MFT_RECORD *m)
 	printf("Update sequence array offset = %u (0x%x)\n", u, u);
 	printf("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
 	printf("$LogFile sequence number (lsn) = %llu\n",
-			(unsigned long long)le64_to_cpu(m->lsn));
+			(unsigned long long)sle64_to_cpu(m->lsn));
 	printf("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
 	printf("Reference (hard link) count = %u\n",
 						le16_to_cpu(m->link_count));
@@ -665,7 +667,7 @@ static void dump_mft_record(MFT_RECORD *m)
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	printf("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
-		if (a->type == cpu_to_le32(attr_type))
+		if (a->type == attr_type)
 			dump_attr_record(m, a);
 		if (a->type == AT_END)
 			break;
@@ -764,7 +766,7 @@ int main(int argc, char **argv)
 	na = ntfs_attr_open(ni, attr_type, attr_name, attr_name_len);
 	if (!na)
 		err_exit("Failed to open attribute 0x%x: %s\n",
-				(unsigned int)attr_type, strerror(errno));
+				(unsigned int)le32_to_cpu(attr_type), strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		ntfs_log_verbose("Dumping mft record before calling "
@@ -776,7 +778,7 @@ int main(int argc, char **argv)
 	err = ntfs_attr_truncate(na, new_len);
 	if (err)
 		err_exit("Failed to truncate attribute 0x%x: %s\n",
-				(unsigned int)attr_type, strerror(errno));
+				(unsigned int)le32_to_cpu(attr_type), strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		ntfs_log_verbose("Dumping mft record after calling "
