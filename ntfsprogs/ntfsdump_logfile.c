@@ -511,8 +511,8 @@ rstr_pass_loc:
 		 * The $LogFile versions specified in each of the two restart
 		 * page headers must match.
 		 */
-		if (rstr1->major_ver != rstr->major_ver ||
-				rstr1->minor_ver != rstr->minor_ver)
+		if (!sle16_eq(rstr1->major_ver, rstr->major_ver) ||
+				!sle16_eq(rstr1->minor_ver, rstr->minor_ver))
 			log_err_exit(buf, "Second restart area specifies "
 					"different $LogFile version to first "
 					"restart area.  Cannot handle this "
