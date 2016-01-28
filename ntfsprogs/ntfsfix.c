@@ -862,7 +862,7 @@ static BOOL attrlist_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			while ((length > 0)
 			    && al->length
 			    && (!le32_eq(al->type, AT_DATA)
-				|| ((leVCN)al->lowest_vcn != levcn))) {
+				|| !sle64_eq(al->lowest_vcn, levcn))) {
 				length -= le16_to_cpu(al->length);
 				al = (ATTR_LIST_ENTRY*)
 					((char*)al + le16_to_cpu(al->length));
