@@ -790,7 +790,7 @@ static int adjust_high_vcn(ntfs_volume *vol, ATTR_RECORD *attr)
 	int err;
 
 	err = 1;
-	attr->highest_vcn = cpu_to_sle64(0);
+	attr->highest_vcn = const_cpu_to_sle64(0);
 	rl = ntfs_mapping_pairs_decompress(vol, attr, (runlist_element*)NULL);
 	if (rl) {
 		xrl = rl;
