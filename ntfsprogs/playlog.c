@@ -82,10 +82,10 @@ struct STORE {
 struct STORE *cluster_door = (struct STORE*)NULL;
 
 /* check whether a MFT or INDX record is older than action */
-#define older_record(rec, logr) ((s64)(le64_to_cpu((rec)->lsn) \
+#define older_record(rec, logr) ((s64)(sle64_to_cpu((rec)->lsn) \
 			- le64_to_cpu((logr)->this_lsn)) < 0)
 /* check whether a MFT or INDX record is newer than action */
-#define newer_record(rec, logr) ((s64)(le64_to_cpu((rec)->lsn) \
+#define newer_record(rec, logr) ((s64)(sle64_to_cpu((rec)->lsn) \
 			- le64_to_cpu((logr)->this_lsn)) > 0)
 
 /*
@@ -634,8 +634,8 @@ static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
 			printf("update inode %ld lsn 0x%llx"
 				" (record %s than action 0x%llx)\n",
 				(long)le32_to_cpu(record->mft_record_number),
-				(long long)le64_to_cpu(record->lsn),
-				((s64)(le64_to_cpu(record->lsn)
+				(long long)sle64_to_cpu(record->lsn),
+				((s64)(sle64_to_cpu(record->lsn)
 				    - le64_to_cpu(logr->this_lsn)) < 0 ?
 					"older" : "newer"),
 				(long long)le64_to_cpu(logr->this_lsn));
@@ -659,8 +659,8 @@ static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
 		if (optv)
 			printf("update index lsn 0x%llx"
 				" (index %s than action 0x%llx)\n",
-				(long long)le64_to_cpu(indx->lsn),
-				((s64)(le64_to_cpu(indx->lsn)
+				(long long)sle64_to_cpu(indx->lsn),
+				((s64)(sle64_to_cpu(indx->lsn)
 				    - le64_to_cpu(logr->this_lsn)) < 0 ?
 					"older" : "newer"),
 				(long long)le64_to_cpu(logr->this_lsn));
@@ -790,14 +790,14 @@ static int adjust_high_vcn(ntfs_volume *vol, ATTR_RECORD *attr)
 	int err;
 
 	err = 1;
-	attr->highest_vcn = cpu_to_le64(0);
+	attr->highest_vcn = cpu_to_sle64(0);
 	rl = ntfs_mapping_pairs_decompress(vol, attr, (runlist_element*)NULL);
 	if (rl) {
 		xrl = rl;
 		while (xrl->length)
 			xrl++;
 		high_vcn = xrl->vcn - 1;
-		attr->highest_vcn = cpu_to_le64(high_vcn);
+		attr->highest_vcn = cpu_to_sle64(high_vcn);
 		free(rl);
 		err = 0;
 	} else {
@@ -1644,13 +1644,13 @@ static int insert_index_allocation(ntfs_volume *vol, char *buffer, u32 offs)
 			attr->instance = record->next_attr_instance;
 			instance = le16_to_cpu(record->next_attr_instance) + 1;
 			record->next_attr_instance = cpu_to_le16(instance);
-			attr->lowest_vcn = const_cpu_to_le64(0);
-			attr->highest_vcn = const_cpu_to_le64(0);
+			attr->lowest_vcn = const_cpu_to_sle64(0);
+			attr->highest_vcn = const_cpu_to_sle64(0);
 			attr->mapping_pairs_offset = cpu_to_le16(
 							2*namelength + 0x40);
 			attr->compression_unit = 0;
 			xsize = vol->indx_record_size;
-			attr->allocated_size = cpu_to_le64(xsize);
+			attr->allocated_size = cpu_to_sle64(xsize);
 			attr->data_size = attr->allocated_size;
 			attr->initialized_size = attr->allocated_size;
 			/*
@@ -1788,7 +1788,7 @@ static int create_indx(ntfs_volume *vol, const struct ACTION_RECORD *action,
 		indx->lsn = action->record.this_lsn;
 		vcn = le32_to_cpu(action->record.target_vcn);
 			/* beware of size change on big-endian cpus */
-		indx->index_block_vcn = cpu_to_le64(vcn);
+		indx->index_block_vcn = cpu_to_sle64(vcn);
 			/* INDEX_HEADER */
 		indx->index.entries_offset = const_cpu_to_le32(0x28);
 		indx->index.index_length = const_cpu_to_le32(0x38);
@@ -4335,7 +4335,7 @@ printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num)
 					mftrecsz, warn);
 		entry = (MFT_RECORD*)buffer;
 		if (entry && (entry->magic == magic_FILE)) {
-			data_lsn = le64_to_cpu(entry->lsn);
+			data_lsn = sle64_to_cpu(entry->lsn);
 			/*
 			 * Beware of records not updated
 			 * during the last session which may
@@ -4377,7 +4377,7 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 						xsize, warn);
 		indx = (INDEX_BLOCK*)buffer;
 		if (indx && (indx->magic == magic_INDX)) {
-			data_lsn = le64_to_cpu(indx->lsn);
+			data_lsn = sle64_to_cpu(indx->lsn);
 			/*
 			 * Beware of records not updated
 			 * during the last session which may
@@ -4721,7 +4721,7 @@ printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num)
 					executed = TRUE;
 if (optv > 1)
 printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
-(long long)le64_to_cpu(entry->lsn),
+(long long)sle64_to_cpu(entry->lsn),
 (executed ? "not older" : "older"),
 (int)action->num,
 (long long)le64_to_cpu(action->record.this_lsn));
@@ -4755,7 +4755,7 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 					executed = TRUE;
 if (optv > 1)
 printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
-(long long)le64_to_cpu(indx->lsn),
+(long long)sle64_to_cpu(indx->lsn),
 (executed ? "not older" : "older"),
 (int)action->num,
 (long long)le64_to_cpu(action->record.this_lsn));
