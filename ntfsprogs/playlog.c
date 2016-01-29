@@ -83,10 +83,10 @@ struct STORE *cluster_door = (struct STORE*)NULL;
 
 /* check whether a MFT or INDX record is older than action */
 #define older_record(rec, logr) ((s64)(sle64_to_cpu((rec)->lsn) \
-			- le64_to_cpu((logr)->this_lsn)) < 0)
+			- sle64_to_cpu((logr)->this_lsn)) < 0)
 /* check whether a MFT or INDX record is newer than action */
 #define newer_record(rec, logr) ((s64)(sle64_to_cpu((rec)->lsn) \
-			- le64_to_cpu((logr)->this_lsn)) > 0)
+			- sle64_to_cpu((logr)->this_lsn)) > 0)
 
 /*
  *		A few functions for debugging
@@ -636,9 +636,9 @@ static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
 				(long)le32_to_cpu(record->mft_record_number),
 				(long long)sle64_to_cpu(record->lsn),
 				((s64)(sle64_to_cpu(record->lsn)
-				    - le64_to_cpu(logr->this_lsn)) < 0 ?
+				    - sle64_to_cpu(logr->this_lsn)) < 0 ?
 					"older" : "newer"),
-				(long long)le64_to_cpu(logr->this_lsn));
+				(long long)sle64_to_cpu(logr->this_lsn));
 		if (optv > 1)
 			printf("mft vcn %ld index %d\n",
 				(long)le32_to_cpu(logr->target_vcn),
@@ -661,9 +661,9 @@ static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
 				" (index %s than action 0x%llx)\n",
 				(long long)sle64_to_cpu(indx->lsn),
 				((s64)(sle64_to_cpu(indx->lsn)
-				    - le64_to_cpu(logr->this_lsn)) < 0 ?
+				    - sle64_to_cpu(logr->this_lsn)) < 0 ?
 					"older" : "newer"),
-				(long long)le64_to_cpu(logr->this_lsn));
+				(long long)sle64_to_cpu(logr->this_lsn));
 		err = sanity_indx(vol, buffer);
 			/* Should set to some previous lsn for undos */
 		if (opts)
@@ -1979,7 +1979,7 @@ static int redo_compensate(ntfs_volume *vol __attribute__((unused)),
 
 	if (optv > 1)
 		printf("-> %s()\n",__func__);
-	lsn = le64_to_cpu(action->record.this_lsn);
+	lsn = sle64_to_cpu(action->record.this_lsn);
 	diff = lsn - restart_lsn;
 	if (diff > 0)
 		restart_lsn = lsn;
@@ -4243,12 +4243,12 @@ static int play_one_redo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 	err = 0;
 	rop = le16_to_cpu(action->record.redo_operation);
 	uop = le16_to_cpu(action->record.undo_operation);
-	this_lsn = le64_to_cpu(action->record.this_lsn);
+	this_lsn = sle64_to_cpu(action->record.this_lsn);
 	if (optv)
 		printf("Redo action %d %s (%s) 0x%llx\n",
 			action->num,
 			actionname(rop), actionname(uop),
-			(long long)le64_to_cpu(
+			(long long)sle64_to_cpu(
 				action->record.this_lsn));
 	buffer = (char*)NULL;
 	switch (rop) {
@@ -4635,7 +4635,7 @@ static int play_one_undo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 		printf("Undo action %d %s (%s) lsn 0x%llx\n",
 			action->num,
 			actionname(rop), actionname(uop),
-			(long long)le64_to_cpu(
+			(long long)sle64_to_cpu(
 				action->record.this_lsn));
 	buffer = (char*)NULL;
 	executed = FALSE;
@@ -4724,7 +4724,7 @@ printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 (long long)sle64_to_cpu(entry->lsn),
 (executed ? "not older" : "older"),
 (int)action->num,
-(long long)le64_to_cpu(action->record.this_lsn));
+(long long)sle64_to_cpu(action->record.this_lsn));
 			} else {
 				printf("** %s (action %d) not acting on MFT\n",
 					actionname(rop), (int)action->num);
@@ -4758,7 +4758,7 @@ printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 (long long)sle64_to_cpu(indx->lsn),
 (executed ? "not older" : "older"),
 (int)action->num,
-(long long)le64_to_cpu(action->record.this_lsn));
+(long long)sle64_to_cpu(action->record.this_lsn));
 			} else {
 				printf("** %s (action %d) not acting on INDX\n",
 					actionname(rop), (int)action->num);

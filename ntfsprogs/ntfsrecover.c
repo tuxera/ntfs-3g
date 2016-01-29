@@ -1155,14 +1155,14 @@ void copy_attribute(struct ATTR *pa, const char *buf, int length)
 		case sizeof(struct ATTR_NEW) :
 			panew = (const struct ATTR_NEW*)buf;
 			pa->type = panew->type;
-			pa->lsn = le64_to_cpu(panew->lsn);
+			pa->lsn = sle64_to_cpu(panew->lsn);
 			pa->inode = MREF(le64_to_cpu(panew->inode));
 			break;
 		case sizeof(struct ATTR_OLD) :
 				/* Badly aligned, first realign */
 			memcpy(&old_aligned,buf,sizeof(old_aligned));
 			pa->type = old_aligned.type;
-			pa->lsn = le64_to_cpu(old_aligned.lsn);
+			pa->lsn = sle64_to_cpu(old_aligned.lsn);
 			pa->inode = MREF(le64_to_cpu(old_aligned.inode));
 			break;
 		default :
@@ -2080,13 +2080,13 @@ static void detaillogr(CONTEXT *ctx, const struct LOG_RECORD *logr)
 		printf("redo_length            %04x\n",
 			(int)le16_to_cpu(logr->redo_length));
 		printf("transaction_lsn        %016llx\n",
-			(long long)le64_to_cpu(logr->transaction_lsn));
+			(long long)sle64_to_cpu(logr->transaction_lsn));
 		printf("attributes_lsn         %016llx\n",
-			(long long)le64_to_cpu(logr->attributes_lsn));
+			(long long)sle64_to_cpu(logr->attributes_lsn));
 		printf("names_lsn              %016llx\n",
-			(long long)le64_to_cpu(logr->names_lsn));
+			(long long)sle64_to_cpu(logr->names_lsn));
 		printf("dirty_pages_lsn        %016llx\n",
-			(long long)le64_to_cpu(logr->dirty_pages_lsn));
+			(long long)sle64_to_cpu(logr->dirty_pages_lsn));
 		listsize = le32_to_cpu(logr->client_data_length)
 				+ LOG_RECORD_HEAD_SZ
 				- offsetof(struct LOG_RECORD, unknown_list);
@@ -2135,15 +2135,15 @@ static void showlogr(CONTEXT *ctx, int k, const struct LOG_RECORD *logr)
 	s32 diff;
 
 	if (optv && (!optc || within_lcn_range(logr))) {
-		diff = le64_to_cpu(logr->this_lsn) - synced_lsn;
+		diff = sle64_to_cpu(logr->this_lsn) - synced_lsn;
 		printf("this_lsn               %016llx (synced%s%ld) %s\n",
-			(long long)le64_to_cpu(logr->this_lsn),
+			(long long)sle64_to_cpu(logr->this_lsn),
 			(diff < 0 ? "" : "+"),(long)diff,
 			commitment(diff + synced_lsn));
 		printf("client_previous_lsn    %016llx\n",
-			(long long)le64_to_cpu(logr->client_previous_lsn));
+			(long long)sle64_to_cpu(logr->client_previous_lsn));
 		printf("client_undo_next_lsn   %016llx\n",
-			(long long)le64_to_cpu(logr->client_undo_next_lsn));
+			(long long)sle64_to_cpu(logr->client_undo_next_lsn));
 		printf("client_data_length     %08lx\n",
 			(long)le32_to_cpu(logr->client_data_length));
 		printf("seq_number             %d\n",
@@ -2168,28 +2168,28 @@ static void showlogr(CONTEXT *ctx, int k, const struct LOG_RECORD *logr)
 		if (logr->record_type == const_cpu_to_le32(2))
 			state = "--checkpoint--";
 		else
-			state = commitment(le64_to_cpu(logr->this_lsn));
+			state = commitment(sle64_to_cpu(logr->this_lsn));
 		printf("      at %04x  %016llx %s (%ld) %s\n",k,
-			(long long)le64_to_cpu(logr->this_lsn),
+			(long long)sle64_to_cpu(logr->this_lsn),
 			state,
-			(long)(le64_to_cpu(logr->this_lsn) - synced_lsn),
+			(long)(sle64_to_cpu(logr->this_lsn) - synced_lsn),
 			actionname(le16_to_cpu(logr->redo_operation)));
 		if (logr->client_previous_lsn || logr->client_undo_next_lsn) {
 			if (logr->client_previous_lsn
 					== logr->client_undo_next_lsn) {
 				printf("                               "
 					" previous and undo %016llx\n",
-					(long long)le64_to_cpu(
+					(long long)sle64_to_cpu(
 						logr->client_previous_lsn));
 			} else {
 				printf("                               "
 					" previous %016llx",
-					(long long)le64_to_cpu(
+					(long long)sle64_to_cpu(
 						logr->client_previous_lsn));
 				
 				if (logr->client_undo_next_lsn)
 					printf(" undo %016llx\n",
-						(long long)le64_to_cpu(
+						(long long)sle64_to_cpu(
 						logr->client_undo_next_lsn));
 				else
 					printf("\n");
@@ -2227,7 +2227,7 @@ static void mark_transactions(struct ACTION_RECORD *lastaction)
 					printf("Marking transaction 0x%x\n",
 						(int)le32_to_cpu(id));
 			}
-			committed = ((s64)(le64_to_cpu(logr->this_lsn)
+			committed = ((s64)(sle64_to_cpu(logr->this_lsn)
 					- committed_lsn)) <= 0;
 			if (!logr->transaction_id
 			    && committed)
@@ -2334,7 +2334,7 @@ static TRISTATE enqueue_action(CONTEXT *ctx, const struct LOG_RECORD *logr,
 			ctx->lastaction = (struct ACTION_RECORD*)NULL;
  		}
 		if (opts
-		    && ((s64)(le64_to_cpu(logr->this_lsn) - synced_lsn) <= 0)) {
+		    && ((s64)(sle64_to_cpu(logr->this_lsn) - synced_lsn) <= 0)) {
 			if (optv)
 				printf("* Refreshing attributes\n");
 // should refresh backward ?
@@ -2373,10 +2373,10 @@ static void showheadrcrd(u32 blk, const struct RECORD_PAGE_HEADER *rph)
 			printf("file_offset        %08lx\n",
 				(long)le32_to_cpu(rph->copy.file_offset));
 		else {
-			diff = le64_to_cpu(rph->copy.last_lsn) - synced_lsn;
+			diff = sle64_to_cpu(rph->copy.last_lsn) - synced_lsn;
 			printf("last_lsn           %016llx"
 				" (synced%s%ld)\n",
-				(long long)le64_to_cpu(rph->copy.last_lsn),
+				(long long)sle64_to_cpu(rph->copy.last_lsn),
 				(diff < 0 ? "" : "+"),(long)diff);
 		}
 		printf("flags              %08lx\n",
@@ -2391,9 +2391,9 @@ static void showheadrcrd(u32 blk, const struct RECORD_PAGE_HEADER *rph)
 			(int)le16_to_cpu(rph->reserved4[0]),
 			(int)le16_to_cpu(rph->reserved4[1]),
 			(int)le16_to_cpu(rph->reserved4[2]));
-		diff = le64_to_cpu(rph->last_end_lsn) - synced_lsn;
+		diff = sle64_to_cpu(rph->last_end_lsn) - synced_lsn;
 		printf("last_end_lsn       %016llx (synced%s%ld)\n",
-			(long long)le64_to_cpu(rph->last_end_lsn),
+			(long long)sle64_to_cpu(rph->last_end_lsn),
 			(diff < 0 ? "" : "+"),(long)diff);
 		printf("usn                %04x\n",
 			(int)getle16(rph,le16_to_cpu(rph->head.usa_ofs)));
@@ -2402,15 +2402,15 @@ static void showheadrcrd(u32 blk, const struct RECORD_PAGE_HEADER *rph)
 		if (optt) {
 			const char *state;
 
-			state = commitment(le64_to_cpu(rph->copy.last_lsn));
-			diff = le64_to_cpu(rph->copy.last_lsn) - synced_lsn;
+			state = commitment(sle64_to_cpu(rph->copy.last_lsn));
+			diff = sle64_to_cpu(rph->copy.last_lsn) - synced_lsn;
 			printf("   last        %016llx (synced%s%ld) %s\n",
-				(long long)le64_to_cpu(rph->copy.last_lsn),
+				(long long)sle64_to_cpu(rph->copy.last_lsn),
 				(diff < 0 ? "" : "+"),(long)diff, state);
-			state = commitment(le64_to_cpu(rph->last_end_lsn));
-			diff = le64_to_cpu(rph->last_end_lsn) - synced_lsn;
+			state = commitment(sle64_to_cpu(rph->last_end_lsn));
+			diff = sle64_to_cpu(rph->last_end_lsn) - synced_lsn;
 			printf("   last_end    %016llx (synced%s%ld) %s\n",
-				(long long)le64_to_cpu(rph->last_end_lsn),
+				(long long)sle64_to_cpu(rph->last_end_lsn),
 				(diff < 0 ? "" : "+"),(long)diff, state);
 		}
 	}
@@ -2700,7 +2700,7 @@ static void showrest(const struct RESTART_PAGE_HEADER *rest)
 			printf("usa_count              %04x\n",
 				(int)le16_to_cpu(rest->head.usa_count));
 			printf("chkdsk_lsn             %016llx\n",
-				(long long)le64_to_cpu(rest->chkdsk_lsn));
+				(long long)sle64_to_cpu(rest->chkdsk_lsn));
 			printf("system_page_size       %08lx\n",
 				(long)le32_to_cpu(rest->system_page_size));
 			printf("log_page_size          %08lx\n",
@@ -2717,13 +2717,13 @@ static void showrest(const struct RESTART_PAGE_HEADER *rest)
 		} else {
 			if (optt)
 				printf("    chkdsk         %016llx\n",
-				    (long long)le64_to_cpu(rest->chkdsk_lsn));
+				    (long long)sle64_to_cpu(rest->chkdsk_lsn));
 		}
 		resa = (const struct RESTART_AREA*)
 				&data[le16_to_cpu(rest->restart_offset)];
 		if (optv) {
 			printf("current_lsn            %016llx\n",
-				(long long)le64_to_cpu(resa->current_lsn));
+				(long long)sle64_to_cpu(resa->current_lsn));
 			printf("log_clients            %04x\n",
 				(int)le16_to_cpu(resa->log_clients));
 			printf("client_free_list       %04x\n",
@@ -2752,7 +2752,7 @@ static void showrest(const struct RESTART_PAGE_HEADER *rest)
 		} else {
 			if (optt)
 				printf("    latest         %016llx\n",
-				    (long long)le64_to_cpu(resa->current_lsn));
+				    (long long)sle64_to_cpu(resa->current_lsn));
 		}
 
 		rcli = (const struct RESTART_CLIENT*)
@@ -2760,9 +2760,9 @@ static void showrest(const struct RESTART_PAGE_HEADER *rest)
 				+ le16_to_cpu(resa->client_array_offset)];
 		if (optv) {
 			printf("oldest_lsn             %016llx\n",
-				(long long)le64_to_cpu(rcli->oldest_lsn));
+				(long long)sle64_to_cpu(rcli->oldest_lsn));
 			printf("client_restart_lsn     %016llx\n",
-				(long long)le64_to_cpu(rcli->client_restart_lsn));
+				(long long)sle64_to_cpu(rcli->client_restart_lsn));
 			printf("prev_client            %04x\n",
 				(int)le16_to_cpu(rcli->prev_client));
 			printf("next_client            %04x\n",
@@ -2777,10 +2777,10 @@ static void showrest(const struct RESTART_PAGE_HEADER *rest)
 		} else {
 			if (optt) {
 				printf("    synced         %016llx\n",
-					(long long)le64_to_cpu(
+					(long long)sle64_to_cpu(
 						rcli->oldest_lsn));
 				printf("    committed      %016llx\n",
-					(long long)le64_to_cpu(
+					(long long)sle64_to_cpu(
 						rcli->client_restart_lsn));
 			}
 		}
@@ -2808,9 +2808,9 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 				+ le16_to_cpu(resa->client_array_offset)];
 	if (initial) {
 		/* Information from block initially found best */
-		latest_lsn = le64_to_cpu(resa->current_lsn);
-		committed_lsn = le64_to_cpu(rcli->client_restart_lsn);
-		synced_lsn = le64_to_cpu(rcli->oldest_lsn);
+		latest_lsn = sle64_to_cpu(resa->current_lsn);
+		committed_lsn = sle64_to_cpu(rcli->client_restart_lsn);
+		synced_lsn = sle64_to_cpu(rcli->oldest_lsn);
 		memcpy(&log_header, rph,
 				sizeof(struct RESTART_PAGE_HEADER));
 		offs = le16_to_cpu(log_header.restart_offset);
@@ -2847,16 +2847,16 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 		showrest(rph);
 		/* Information from an older restart block if requested */
 		dirty = !(restart.flags & RESTART_VOLUME_IS_CLEAN);
-		diff = le64_to_cpu(rcli->client_restart_lsn) - committed_lsn;
+		diff = sle64_to_cpu(rcli->client_restart_lsn) - committed_lsn;
 		if (ctx->vol) {
 			change = (opts > 1) && (diff < 0);
 		} else {
 			change = (opts > 1 ? diff < 0 : diff > 0);
 		}
 		if (change) {
-			committed_lsn = le64_to_cpu(rcli->client_restart_lsn);
-			synced_lsn = le64_to_cpu(rcli->oldest_lsn);
-			latest_lsn = le64_to_cpu(resa->current_lsn);
+			committed_lsn = sle64_to_cpu(rcli->client_restart_lsn);
+			synced_lsn = sle64_to_cpu(rcli->oldest_lsn);
+			latest_lsn = sle64_to_cpu(resa->current_lsn);
 			memcpy(&log_header, rph,
 					sizeof(struct RESTART_PAGE_HEADER));
 			offs = le16_to_cpu(log_header.restart_offset);
@@ -2973,7 +2973,7 @@ static int reset_logfile(CONTEXT *ctx __attribute__((unused)))
 		memset(buffer, 0, blocksz);
 		restart.client_in_use_list = LOGFILE_NO_CLIENT;
 		restart.flags |= RESTART_VOLUME_IS_CLEAN;
-		client.oldest_lsn = cpu_to_le64(restart_lsn);
+		client.oldest_lsn = cpu_to_sle64(restart_lsn);
 		memcpy(buffer, &log_header,
 					sizeof(struct RESTART_PAGE_HEADER));
 		off = le16_to_cpu(log_header.restart_offset);
@@ -3011,8 +3011,8 @@ static const struct BUFFER *best_start(const struct BUFFER *buf,
 		head = &buf->block.record;
 		althead = &altbuf->block.record;
 		/* determine most recent, caring for wraparounds */
-		diff = le64_to_cpu(althead->last_end_lsn)
-					- le64_to_cpu(head->last_end_lsn);
+		diff = sle64_to_cpu(althead->last_end_lsn)
+					- sle64_to_cpu(head->last_end_lsn);
 		if (diff > 0)
 			best = altbuf;
 		else
@@ -3724,10 +3724,10 @@ static int walk(CONTEXT *ctx)
 				/* The latest buf may be more recent
 				   than restart */
 				rph = &buf->block.record;
-				if ((s64)(le64_to_cpu(rph->last_end_lsn)
+				if ((s64)(sle64_to_cpu(rph->last_end_lsn)
 					  - committed_lsn) > 0) {
 					committed_lsn =
-						le64_to_cpu(rph->last_end_lsn);
+						sle64_to_cpu(rph->last_end_lsn);
 					if (optv)
 						printf("* Restart page was "
 						       "obsolete, updated "
@@ -3779,9 +3779,9 @@ static int walk(CONTEXT *ctx)
 			}
 			/* The latest buf may be more recent than restart */
 			rph = &buf->block.record;
-			if ((s64)(le64_to_cpu(rph->last_end_lsn)
+			if ((s64)(sle64_to_cpu(rph->last_end_lsn)
 					- committed_lsn) > 0) {
-				committed_lsn = le64_to_cpu(rph->last_end_lsn);
+				committed_lsn = sle64_to_cpu(rph->last_end_lsn);
 				if (optv)
 					printf("* Restart page was obsolete\n");
 			}

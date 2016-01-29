@@ -109,7 +109,7 @@ typedef le16 LOG_RECORD_FLAGS;
 
 typedef struct RESTART_PAGE_HEADER { /* size 32 */
 	NTFS_RECORD head;
-	le64 chkdsk_lsn;
+	leLSN chkdsk_lsn;
 	le32 system_page_size;
 	le32 log_page_size;
 	le16 restart_offset;
@@ -121,7 +121,7 @@ typedef struct RESTART_PAGE_HEADER { /* size 32 */
 /* ntfsdoc p 40 (48), not in layout.h */
 
 struct RESTART_AREA { /* size 44 */
-	le64 current_lsn;
+	leLSN current_lsn;
 	le16 log_clients;
 	le16 client_free_list;
 	le16 client_in_use_list;
@@ -138,9 +138,9 @@ struct RESTART_AREA { /* size 44 */
 
 typedef struct RESTART_CLIENT { /* size 160 */
 /*Ofs*/
-/*  0*/	le64 oldest_lsn;	/* Oldest LSN needed by this client.  On create
+/*  0*/	leLSN oldest_lsn;	/* Oldest LSN needed by this client.  On create
 				   set to 0. */
-/*  8*/	le64 client_restart_lsn;/* LSN at which this client needs to restart
+/*  8*/	leLSN client_restart_lsn;/* LSN at which this client needs to restart
 				   the volume, i.e. the current position within
 				   the log file.  At present, if clean this
 				   should = current_lsn in restart area but it
@@ -176,7 +176,7 @@ typedef struct RESTART_CLIENT { /* size 160 */
 struct RECORD_PAGE_HEADER { /* size 40 */
 	NTFS_RECORD head;       /* the magic is "RCRD" */
 	union {
-		le64 last_lsn;
+		leLSN last_lsn;
 		le32 file_offset;
 	} __attribute__((__packed__)) copy;
 	le32 flags;
@@ -184,7 +184,7 @@ struct RECORD_PAGE_HEADER { /* size 40 */
 	le16 page_position;
 	le16 next_record_offset;
 	le16 reserved4[3];
-	le64 last_end_lsn;
+	leLSN last_end_lsn;
 } __attribute__((__packed__)) ;
 
 /* ntfsdoc p 42 (50), not in layout.h */
@@ -192,9 +192,9 @@ struct RECORD_PAGE_HEADER { /* size 40 */
 #define LOG_RECORD_HEAD_SZ 0x30 /* size of header of struct LOG_RECORD */
 
 typedef struct LOG_RECORD { /* size 80 */
-	le64 this_lsn;
-	le64 client_previous_lsn;
-	le64 client_undo_next_lsn;
+	leLSN this_lsn;
+	leLSN client_previous_lsn;
+	leLSN client_undo_next_lsn;
 	le32 client_data_length;
 	struct {
 		le16 seq_number;
@@ -223,10 +223,10 @@ typedef struct LOG_RECORD { /* size 80 */
 			le64 lcn_list[0];
 		} __attribute__((__packed__));
 		struct {
-			le64 transaction_lsn;
-			le64 attributes_lsn;
-			le64 names_lsn;
-			le64 dirty_pages_lsn;
+			leLSN transaction_lsn;
+			leLSN attributes_lsn;
+			leLSN names_lsn;
+			leLSN dirty_pages_lsn;
 			le64 unknown_list[0];
 		} __attribute__((__packed__));
 	} __attribute__((__packed__));
@@ -275,7 +275,7 @@ typedef struct ATTR_OLD {	/* Format up to Win10 (44 bytes) */
 	le64 unknown1;
 	le64 unknown2;
 	le64 inode;
-	le64 lsn;
+	leLSN lsn;
 	le32 unknown3;
 	le32 type;
 	le32 unknown4;
@@ -287,7 +287,7 @@ typedef struct ATTR_NEW {	/* Format since Win10 (40 bytes) */
 	le32 type;
 	le32 unknown3;
 	le64 inode;
-	le64 lsn;
+	leLSN lsn;
 } __attribute__((__packed__)) ATTR_NEW;
 
 extern u32 clustersz;
