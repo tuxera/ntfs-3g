@@ -187,30 +187,30 @@ static BOOL valid_type(ATTR_TYPES type)
 {
 	BOOL ok;
 
-	switch (type) {
-	case AT_STANDARD_INFORMATION :
-	case AT_ATTRIBUTE_LIST :
-	case AT_FILE_NAME :
-	case AT_OBJECT_ID :
-	case AT_SECURITY_DESCRIPTOR :
-	case AT_VOLUME_NAME :
-	case AT_VOLUME_INFORMATION :
-	case AT_DATA :
-	case AT_INDEX_ROOT :
-	case AT_INDEX_ALLOCATION :
-	case AT_BITMAP :
-	case AT_REPARSE_POINT :
-	case AT_EA_INFORMATION :
-	case AT_EA :
-	case AT_PROPERTY_SET :
-	case AT_LOGGED_UTILITY_STREAM :
-	case AT_FIRST_USER_DEFINED_ATTRIBUTE :
-	case AT_END :
+	if (le32_eq(type, AT_STANDARD_INFORMATION) ||
+	    le32_eq(type, AT_ATTRIBUTE_LIST) ||
+	    le32_eq(type, AT_FILE_NAME) ||
+	    le32_eq(type, AT_OBJECT_ID) ||
+	    le32_eq(type, AT_SECURITY_DESCRIPTOR) ||
+	    le32_eq(type, AT_VOLUME_NAME) ||
+	    le32_eq(type, AT_VOLUME_INFORMATION) ||
+	    le32_eq(type, AT_DATA) ||
+	    le32_eq(type, AT_INDEX_ROOT) ||
+	    le32_eq(type, AT_INDEX_ALLOCATION) ||
+	    le32_eq(type, AT_BITMAP) ||
+	    le32_eq(type, AT_REPARSE_POINT) ||
+	    le32_eq(type, AT_EA_INFORMATION) ||
+	    le32_eq(type, AT_EA) ||
+	    le32_eq(type, AT_PROPERTY_SET) ||
+	    le32_eq(type, AT_LOGGED_UTILITY_STREAM) ||
+	    le32_eq(type, AT_FIRST_USER_DEFINED_ATTRIBUTE) ||
+	    le32_eq(type, AT_END))
+	{
 		ok = TRUE;
-		break;
-	default :
+	}
+	else {
 		ok = FALSE;
-		break;
+		/* break; */
 	}
 	return (ok);
 }
@@ -270,7 +270,7 @@ static int sanity_indx_list(const char *buffer, u32 k, u32 end)
 					(int)lth,
 					(int)getle16(buffer,k+12),(int)k);
 			}
-		done = (feedle16(buffer,k+12) & INDEX_ENTRY_END) || !lth;
+		done = !le16_andz(feedle16(buffer,k+12), INDEX_ENTRY_END) || !lth;
 	   	k += lth;
    	}
 	if (k != end) {
@@ -309,7 +309,7 @@ static int sanity_mft(const char *buffer)
 	attr = (const ATTR_RECORD*)&buffer[k];
 	prevtype = 0;
 	while ((k < mftrecsz)
-	    && (attr->type != AT_END)
+	    && !le32_eq(attr->type, AT_END)
 	    && valid_type(attr->type)) {
 		type = le32_to_cpu(attr->type);
 		if (type < prevtype) {
@@ -333,7 +333,7 @@ static int sanity_mft(const char *buffer)
 			instances |= (u64)1 << instance;
 		}
 		if (optv > 1) {
-			if ((attr->type == AT_FILE_NAME)
+			if (le32_eq(attr->type, AT_FILE_NAME)
 			   && buffer[k + 88]) {
 				printf("attr %08lx offs 0x%x nres %d",
 					(long)type, (int)k,
@@ -345,7 +345,7 @@ static int sanity_mft(const char *buffer)
 					(long)type, (int)k,
 					(int)attr->non_resident);
 		}
-		if ((attr->type == AT_INDEX_ROOT)
+		if (le32_eq(attr->type, AT_INDEX_ROOT)
 		    && sanity_indx_list(buffer,
 				k + le16_to_cpu(attr->value_offset) + 32,
 				k + le32_to_cpu(attr->length))) {
@@ -355,10 +355,10 @@ static int sanity_mft(const char *buffer)
 		attr = (const ATTR_RECORD*)&buffer[k];
 		prevtype = type;
 	}
-	if ((optv > 1) && (attr->type == AT_END))
+	if ((optv > 1) && le32_eq(attr->type, AT_END))
 		printf("attr %08lx offs 0x%x\n",
 				(long)le32_to_cpu(attr->type), (int)k);
-	if ((attr->type != AT_END)
+	if (!le32_eq(attr->type, AT_END)
 	    || (le32_to_cpu(record->bytes_in_use) != (k + 8))
 	    || (le32_to_cpu(record->bytes_allocated) < (k + 8))) {
 		printf("** Bad MFT record length %ld"
@@ -761,7 +761,7 @@ static void adjust_instance(const ATTR_RECORD *attr, MFT_RECORD *entry, int incr
 
 	if (increment > 0) {
 			/* Allocating a new instance ? */
-		if (attr->instance == entry->next_attr_instance) {
+		if (le16_eq(attr->instance, entry->next_attr_instance)) {
 			instance = (le16_to_cpu(entry->next_attr_instance)
 					+ 1) & 0xffff;
 			entry->next_attr_instance = cpu_to_le16(instance);
@@ -771,7 +771,7 @@ static void adjust_instance(const ATTR_RECORD *attr, MFT_RECORD *entry, int incr
 			/* Freeing the latest instance ? */
 		instance = (le16_to_cpu(entry->next_attr_instance)
 					- 1) & 0xffff;
-		if (attr->instance == cpu_to_le16(instance))
+		if (le16_eq(attr->instance, cpu_to_le16(instance)))
 			entry->next_attr_instance = attr->instance;
 	}
 }
@@ -832,7 +832,7 @@ static BOOL index_match_undo(const char *first, const char *second, int length)
 			dump(second,length);
 		}
 		len = (first[80] & 255)*2 + 2;
-		match = (feedle64(first, 16) == feedle64(second, 16))
+		match = le64_eq(feedle64(first, 16), feedle64(second, 16))
 		    && !memcmp(first + 80, second + 80, len);
 		if (match && optv)
 			printf("However parent dir and name do match\n");
@@ -855,7 +855,7 @@ static int change_resident(ntfs_volume *vol, const struct ACTION_RECORD *action,
 	int changed;
 
 	err = 1;
-	if (action->record.undo_length != action->record.redo_length)
+	if (!le16_eq(action->record.undo_length, action->record.redo_length))
 		printf("** Error size change in change_resident\n");
 	if (optv > 1) {
 		lcn = le64_to_cpu(action->record.lcn_list[0]);
@@ -909,7 +909,7 @@ static int change_resident_expect(ntfs_volume *vol, const struct ACTION_RECORD *
 	BOOL found;
 
 	err = 1;
-	if (action->record.undo_length != action->record.redo_length)
+	if (!le16_eq(action->record.undo_length, action->record.redo_length))
 		printf("** Error size change in change_resident\n");
 	if (optv > 1) {
 		lcn = le64_to_cpu(action->record.lcn_list[0]);
@@ -925,7 +925,7 @@ static int change_resident_expect(ntfs_volume *vol, const struct ACTION_RECORD *
 		printf("-> full record :\n");
 		dump((char*)attr, le32_to_cpu(attr->length));
 	}
-	if ((attr->type == type)
+	if (le32_eq(attr->type, type)
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		found = !memcmp(buffer + target, expected, length);
@@ -1209,15 +1209,15 @@ static int insert_resident(ntfs_volume *vol, const struct ACTION_RECORD *action,
 			newused = le32_to_cpu(entry->bytes_in_use)
 						+ length;
 			entry->bytes_in_use = cpu_to_le32(newused);
-			if (action->record.redo_operation
-			    == const_cpu_to_le16(CreateAttribute)) {
+			if (le16_eq(action->record.redo_operation,
+			    const_cpu_to_le16(CreateAttribute))) {
 			/*
 			 * For a real create, may have to adjust
 			 * the next attribute instance
 			 */
 				adjust_instance(newattr, entry, 1);
 			}
-			if (newattr->type == AT_FILE_NAME) {
+			if (le32_eq(newattr->type, AT_FILE_NAME)) {
 				links = le16_to_cpu(entry->link_count) + 1;
 				entry->link_count = cpu_to_le16(links);
 			}
@@ -1272,7 +1272,7 @@ static int remove_resident(ntfs_volume *vol, const struct ACTION_RECORD *action,
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
 	/* For AT_DATA the value is not always present */
-		if (attr->type == AT_DATA)
+		if (le32_eq(attr->type, AT_DATA))
 			found = !memcmp(buffer + target, data, 
 				le16_to_cpu(attr->value_offset));
 		else
@@ -1293,12 +1293,12 @@ static int remove_resident(ntfs_volume *vol, const struct ACTION_RECORD *action,
 		}
 		err = 0;
 		if (found) {
-			if (attr->type == AT_FILE_NAME) {
+			if (le32_eq(attr->type, AT_FILE_NAME)) {
 				links = le16_to_cpu(entry->link_count) - 1;
 				entry->link_count = cpu_to_le16(links);
 			}
-			if (action->record.redo_operation
-			    == const_cpu_to_le16(CreateAttribute)) {
+			if (le16_eq(action->record.redo_operation,
+			    const_cpu_to_le16(CreateAttribute))) {
 				adjust_instance(attr, entry, -1);
 			}
 			/* Remove the entry */
@@ -1489,7 +1489,7 @@ static int update_index(ntfs_volume *vol, const struct ACTION_RECORD *action,
 		printf("-> existing index :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
@@ -1533,7 +1533,7 @@ static int delete_names(char *buffer)
 	do {
 		attr = (ATTR_RECORD*)&buffer[pos];
 		length = le32_to_cpu(attr->length);
-		if (attr->type == AT_FILE_NAME) {
+		if (le32_eq(attr->type, AT_FILE_NAME)) {
 			if (optv)
 				showname("Controversial deletion of ",
 					&buffer[pos+90], buffer[pos+88] & 255);
@@ -1620,7 +1620,7 @@ static int insert_index_allocation(ntfs_volume *vol, char *buffer, u32 offs)
 		length = le32_to_cpu(attr->length);
 		addedlength = length - 8 /* index allocation */
                      + length - 48; /* bitmap */
-		if ((attr->type == AT_INDEX_ROOT)
+		if (le32_eq(attr->type, AT_INDEX_ROOT)
 		    && ((pos + length) == offs)
 		    && ((used + addedlength) < mftrecsz)) {
 			/* Make space for the attribute */
@@ -1708,9 +1708,9 @@ static BOOL check_full_mft(const struct ACTION_RECORD *action, BOOL redoing)
 		length = le16_to_cpu(action->record.undo_length);
 	}
 		/* The length in use must be fed */
-	ok = !action->record.record_offset
-		&& !action->record.attribute_offset
-		&& (record->magic == magic_FILE)
+	ok = le16_cmpz(action->record.record_offset)
+		&& le16_cmpz(action->record.attribute_offset)
+		&& le32_eq(record->magic, magic_FILE)
 		&& (length <= mftrecsz)
 		&& (length >= (offsetof(MFT_RECORD, bytes_in_use)
 			 + sizeof(record->bytes_in_use)));
@@ -1718,14 +1718,14 @@ static BOOL check_full_mft(const struct ACTION_RECORD *action, BOOL redoing)
 		k = le16_to_cpu(record->attrs_offset);
 		attr = (const ATTR_RECORD*)((const char*)record + k);
 		while (((k + sizeof(attr->type)) <= length)
-		    && (attr->type != AT_END)
+		    && !le32_eq(attr->type, AT_END)
 		    && valid_type(attr->type)) {
 			k += le32_to_cpu(attr->length);
 			attr = (const ATTR_RECORD*)((const char*)record + k);
 		}
 			/* AT_END must be present */
 		ok = ((k + sizeof(attr->type)) <= length)
-		    && (attr->type == AT_END);
+		    && le32_eq(attr->type, AT_END);
 	}
 	return (ok);
 }
@@ -1751,9 +1751,9 @@ static BOOL check_full_index(const struct ACTION_RECORD *action, BOOL redoing)
 		length = le16_to_cpu(action->record.undo_length);
 	}
 	/* the index length must be fed, so must be the full index block */
-	return (!action->record.record_offset
-		&& !action->record.attribute_offset
-		&& (indx->magic == magic_INDX)
+	return (le16_cmpz(action->record.record_offset)
+		&& le16_cmpz(action->record.attribute_offset)
+		&& le32_eq(indx->magic, magic_INDX)
 		&& (length >= (offsetof(INDEX_BLOCK, index.index_length) + 4))
 		&& (length >= (le32_to_cpu(indx->index.index_length) + 24)));
 }
@@ -1876,7 +1876,7 @@ static int redo_add_index(ntfs_volume *vol, const struct ACTION_RECORD *action,
 		printf("-> existing record :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
@@ -1942,7 +1942,7 @@ static int redo_add_root_index(ntfs_volume *vol,
 		printf("existing index :\n");
 		dump(buffer + target,length);
 	}
-	if ((attr->type == AT_INDEX_ROOT)
+	if (le32_eq(attr->type, AT_INDEX_ROOT)
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
@@ -2019,9 +2019,9 @@ static int redo_create_file(ntfs_volume *vol,
 	if ((target + length) <= mftrecsz) {
 		changed = memcmp(buffer + target, data, length);
 		err = 0;
-		if (changed || !(record->flags & MFT_RECORD_IN_USE)) {
+		if (changed || le16_andz(record->flags, MFT_RECORD_IN_USE)) {
 			memcpy(buffer + target, data, length);
-			record->flags |= MFT_RECORD_IN_USE;
+			record->flags = le16_or(record->flags, MFT_RECORD_IN_USE);
 			if (optv > 1) {
 				printf("-> new record :\n");
 				dump(buffer,mftrecsz);
@@ -2056,7 +2056,7 @@ static int redo_create_attribute(ntfs_volume *vol,
 	target = le16_to_cpu(action->record.record_offset)
 		+ le16_to_cpu(action->record.attribute_offset);
 // Could also be AT_DATA or AT_INDEX_ALLOCATION
-	if (!action->record.undo_length)
+	if (le16_cmpz(action->record.undo_length))
 		err = insert_resident(vol, action, buffer, data,
 				target, length);
 	return (err);
@@ -2078,7 +2078,7 @@ static int redo_delete_attribute(ntfs_volume *vol,
 	length = le16_to_cpu(action->record.undo_length);
 	target = le16_to_cpu(action->record.record_offset)
 		+ le16_to_cpu(action->record.attribute_offset);
-	if (!action->record.redo_length)
+	if (le16_cmpz(action->record.redo_length))
 		err = remove_resident(vol, action, buffer, data,
 				target, length);
 	return (err);
@@ -2117,11 +2117,11 @@ static int redo_delete_file(ntfs_volume *vol,
 	if ((target + length) <= mftrecsz) {
 		/* write a void mft entry (needed ?) */
 		changed = memcmp(buffer + target, data, length)
-			|| (record->flags & MFT_RECORD_IN_USE);
+			|| !le16_andz(record->flags, MFT_RECORD_IN_USE);
 		err = 0;
 		if (changed) {
 			memcpy(buffer + target, data, length);
-			record->flags &= ~MFT_RECORD_IN_USE;
+			record->flags = le16_and(record->flags, le16_not(MFT_RECORD_IN_USE));
 			if (optv > 1) {
 				printf("-> new record :\n");
 				dump(buffer,mftrecsz);
@@ -2171,7 +2171,7 @@ static int redo_delete_index(ntfs_volume *vol,
 		printf("-> existing record :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
@@ -2233,7 +2233,7 @@ static int redo_delete_root_index(ntfs_volume *vol,
 		printf("existing index :\n");
 		dump(buffer + target,length);
 	}
-	if ((attr->type == AT_INDEX_ROOT)
+	if (le32_eq(attr->type, AT_INDEX_ROOT)
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
@@ -2280,8 +2280,8 @@ static int redo_force_bits(ntfs_volume *vol,
 				+ get_redo_offset(&action->record));
 	firstbit = le32_to_cpu(data->firstbit);
 	count = le32_to_cpu(data->count);
-	if (action->record.redo_operation
-			== const_cpu_to_le16(SetBitsInNonResidentBitMap))
+	if (le16_eq(action->record.redo_operation,
+			const_cpu_to_le16(SetBitsInNonResidentBitMap)))
 		wanted = 1;
 	else
 		wanted = 0;
@@ -2325,7 +2325,7 @@ static int redo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
 	extra = get_extra_offset(&action->record);
-	if (action->record.undo_length) {
+	if (!le16_cmpz(action->record.undo_length)) {
 		name = ((const char*)&action->record) + extra;
 		namelen = le32_to_cpu(action->record.client_data_length)
 				+ LOG_RECORD_HEAD_SZ - extra;
@@ -2354,13 +2354,13 @@ static int redo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 					/* Badly aligned */
 				memcpy(&inode, &attr_old->inode, 8);
 				err = (MREF(le64_to_cpu(inode)) != pa->inode)
-				    || (attr_old->type != pa->type);
+				    || !le32_eq(attr_old->type, pa->type);
 				break;
 			case sizeof(struct ATTR_NEW) :
 				attr_new = (const struct ATTR_NEW*)data;
 				err = (MREF(le64_to_cpu(attr_new->inode))
 							!= pa->inode)
-				    || (attr_new->type != pa->type);
+				    || !le32_eq(attr_new->type, pa->type);
 				break;
 			default : err = 1;
 			}
@@ -2840,14 +2840,14 @@ static int redo_write_index(ntfs_volume *vol,
 	}
 	xsize = vol->indx_record_size;
 	indx = (INDEX_BLOCK*)buffer;
-	if (action->record.record_offset) {
+	if (!le16_cmpz(action->record.record_offset)) {
 		printf("** Non-null record_offset in redo_write_index()\n");
 	}
 	if (optv > 1) {
 		printf("-> existing index :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
@@ -2934,7 +2934,7 @@ static int undo_add_index(ntfs_volume *vol,
 		printf("-> existing record :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
@@ -2999,7 +2999,7 @@ static int undo_add_root_index(ntfs_volume *vol,
 		printf("existing index :\n");
 		dump(buffer + target,length);
 	}
-	if ((attr->type == AT_INDEX_ROOT)
+	if (le32_eq(attr->type, AT_INDEX_ROOT)
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
@@ -3042,7 +3042,7 @@ static int undo_create_attribute(ntfs_volume *vol,
 	length = le16_to_cpu(action->record.redo_length);
 	target = le16_to_cpu(action->record.record_offset)
 		+ le16_to_cpu(action->record.attribute_offset);
-	if (!action->record.undo_length)
+	if (le16_cmpz(action->record.undo_length))
 		err = remove_resident(vol, action, buffer, data,
 				target, length);
 	return (err);
@@ -3064,7 +3064,7 @@ static int undo_delete_attribute(ntfs_volume *vol,
 	length = le16_to_cpu(action->record.undo_length);
 	target = le16_to_cpu(action->record.record_offset)
 		+ le16_to_cpu(action->record.attribute_offset);
-	if (!action->record.redo_length)
+	if (le16_cmpz(action->record.redo_length))
 		err = insert_resident(vol, action, buffer, data,
 				target, length);
 	return (err);
@@ -3104,7 +3104,7 @@ static int undo_delete_index(ntfs_volume *vol,
 		printf("-> existing record :\n");
 		dump(&buffer[target], length);
 	}
-	if ((indx->magic == magic_INDX)
+	if (le32_eq(indx->magic, magic_INDX)
 	    && !(length & 7)
 	    && ((target + length) <= xsize)
 	    && !sanity_indx(vol,buffer)) {
@@ -3169,7 +3169,7 @@ static int undo_delete_root_index(ntfs_volume *vol,
 			+ le16_to_cpu(action->record.record_offset));
 	index = (INDEX_ROOT*)(((char*)attr)
 			+ le16_to_cpu(attr->value_offset));
-	if (attr->type != AT_INDEX_ROOT) {
+	if (!le32_eq(attr->type, AT_INDEX_ROOT)) {
 		printf("** Unexpected attr type 0x%lx\n",
 				(long)le32_to_cpu(attr->type));
 		printf("existing mft\n");
@@ -3181,7 +3181,7 @@ static int undo_delete_root_index(ntfs_volume *vol,
 		printf("existing index :\n");
 		dump(buffer + target,length);
 	}
-	if ((attr->type == AT_INDEX_ROOT)
+	if (le32_eq(attr->type, AT_INDEX_ROOT)
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
@@ -3244,9 +3244,9 @@ static int undo_create_file(ntfs_volume *vol,
 	if ((target + length) <= mftrecsz) {
 		changed = memcmp(buffer + target, data, length);
 		err = 0;
-		if (changed || (record->flags & MFT_RECORD_IN_USE)) {
+		if (changed || !le16_andz(record->flags, MFT_RECORD_IN_USE)) {
 			memcpy(buffer + target, data, length);
-			record->flags &= ~MFT_RECORD_IN_USE;
+			record->flags = le16_and(record->flags, le16_not(MFT_RECORD_IN_USE));
 			if (optv > 1) {
 				printf("-> new record :\n");
 				dump(buffer,mftrecsz);
@@ -3294,7 +3294,7 @@ static int undo_delete_file(ntfs_volume *vol,
 	record = (MFT_RECORD*)buffer;
 	if ((target + length) <= mftrecsz) {
 		changed = memcmp(buffer + target, data, length)
-			|| !(record->flags & MFT_RECORD_IN_USE);
+			|| le16_andz(record->flags, MFT_RECORD_IN_USE);
 		err = 0;
 		if (changed) {
 			memcpy(buffer + target, data, length);
@@ -3310,10 +3310,10 @@ static int undo_delete_file(ntfs_volume *vol,
 		 * the record now appears to not be in use and there are
 		 * links.
 		 */
-			if (record->link_count
-			    && !(record->flags & MFT_RECORD_IN_USE))
+			if (!le16_cmpz(record->link_count)
+			    && le16_andz(record->flags, MFT_RECORD_IN_USE))
 				err = delete_names(buffer);
-			record->flags |= MFT_RECORD_IN_USE;
+			record->flags = le16_or(record->flags, MFT_RECORD_IN_USE);
 			if (optv > 1) {
 				printf("-> new record :\n");
 				dump(buffer,mftrecsz);
@@ -3350,8 +3350,8 @@ static int undo_force_bits(ntfs_volume *vol,
 				+ get_redo_offset(&action->record));
 	firstbit = le32_to_cpu(data->firstbit);
 	count = le32_to_cpu(data->count);
-	if (action->record.redo_operation
-			== const_cpu_to_le16(SetBitsInNonResidentBitMap))
+	if (le16_eq(action->record.redo_operation,
+			const_cpu_to_le16(SetBitsInNonResidentBitMap)))
 		wanted = 0;
 	else
 		wanted = 1;
@@ -3395,7 +3395,7 @@ static int undo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
 	extra = get_extra_offset(&action->record);
-	if (action->record.undo_length) {
+	if (!le16_cmpz(action->record.undo_length)) {
 		name = ((const char*)&action->record) + extra;
 		namelen = le32_to_cpu(action->record.client_data_length)
 				+ LOG_RECORD_HEAD_SZ - extra;
@@ -3420,12 +3420,12 @@ static int undo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 				/* Badly aligned */
 			memcpy(&inode, &attr_old->inode, 8);
 			err = (MREF(le64_to_cpu(inode)) != pa->inode)
-			    || (attr_old->type != pa->type);
+			    || !le32_eq(attr_old->type, pa->type);
 			break;
 		case sizeof(struct ATTR_NEW) :
 			attr_new = (const struct ATTR_NEW*)data;
 			err = (MREF(le64_to_cpu(attr_new->inode))!= pa->inode)
-			    || (attr_new->type != pa->type);
+			    || !le32_eq(attr_new->type, pa->type);
 			break;
 		default : err = 1;
 		}
@@ -3465,14 +3465,14 @@ static int undo_sizes(ntfs_volume *vol,
 		+ le16_to_cpu(action->record.attribute_offset)
 		+ offsetof(ATTR_RECORD, allocated_size);
 	entry = (MFT_RECORD*)buffer;
-	if (!(entry->flags & MFT_RECORD_IS_DIRECTORY))
+	if (le16_andz(entry->flags, MFT_RECORD_IS_DIRECTORY))
 		err = change_resident(vol, action, buffer,
 			data, target, length);
 	else {
 		/* On a directory, may have to build an index allocation */
 		offs = le16_to_cpu(action->record.record_offset);
 		attr = (ATTR_RECORD*)(buffer + offs);
-		if (attr->type != AT_INDEX_ALLOCATION) {
+		if (!le32_eq(attr->type, AT_INDEX_ALLOCATION)) {
 			err = insert_index_allocation(vol, buffer, offs);
 			if (!err)
 				err = change_resident(vol, action, buffer,
@@ -3990,14 +3990,14 @@ static enum ACTION_KIND get_action_kind(const struct ACTION_RECORD *action)
 		 * Unfortunately, only on some cases we can determine
 		 * the action was defined by Win10 (or subsequent).
 		 */
-	if (action->record.log_record_flags
-			& const_cpu_to_le16(RECORD_DELETING | RECORD_ADDING)) {
-		if (action->record.attribute_flags
-					& const_cpu_to_le16(ACTS_ON_INDX))
+	if (!le16_andz(action->record.log_record_flags,
+			const_cpu_to_le16(RECORD_DELETING | RECORD_ADDING))) {
+		if (!le16_andz(action->record.attribute_flags,
+					const_cpu_to_le16(ACTS_ON_INDX)))
 			kind = ON_INDX;
 		else
-			if (action->record.attribute_flags
-					& const_cpu_to_le16(ACTS_ON_MFT))
+			if (!le16_andz(action->record.attribute_flags,
+					const_cpu_to_le16(ACTS_ON_MFT)))
 				kind = ON_MFT;
 			else
 				kind = ON_RAW;
@@ -4008,7 +4008,7 @@ static enum ACTION_KIND get_action_kind(const struct ACTION_RECORD *action)
 		 */
 		pa = getattrentry(le16_to_cpu(
 					action->record.target_attribute),0);
-		if (!pa || !pa->type) {
+		if (!pa || le32_cmpz(pa->type)) {
 		/*
 		 * Even when the attribute has not been recorded,
 		 * we can sometimes tell the record does not apply
@@ -4020,8 +4020,8 @@ static enum ACTION_KIND get_action_kind(const struct ACTION_RECORD *action)
 		 */
 			data = (const char*)&action->record
 				+ get_redo_offset(&action->record);
-			if (action->record.record_offset
-			    || (!action->record.attribute_offset
+			if (!le16_cmpz(action->record.record_offset)
+			    || (le16_cmpz(action->record.attribute_offset)
 				&& (le16_to_cpu(action->record.redo_length)
 									>= 4)
 				&& memcmp(data,"FILE",4)
@@ -4035,7 +4035,7 @@ static enum ACTION_KIND get_action_kind(const struct ACTION_RECORD *action)
 				kind = ON_NONE;
 			}
 		} else {
-			if (pa->type == AT_INDEX_ALLOCATION)
+			if (le32_eq(pa->type, AT_INDEX_ALLOCATION))
 				kind = ON_INDX;
 			else
 				kind = ON_RAW;
@@ -4074,93 +4074,93 @@ static int distribute_redos(ntfs_volume *vol,
 	uop = le16_to_cpu(action->record.undo_operation);
 	switch (rop) {
 	case AddIndexEntryAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(DeleteIndexEntryAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(DeleteIndexEntryAllocation)))
 			err = redo_add_index(vol, action, buffer);
 		break;
 	case AddIndexEntryRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(DeleteIndexEntryRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(DeleteIndexEntryRoot)))
 			err = redo_add_root_index(vol, action, buffer);
 		break;
 	case ClearBitsInNonResidentBitMap :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetBitsInNonResidentBitMap))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetBitsInNonResidentBitMap)))
 			err = redo_force_bits(vol, action, buffer);
 		break;
 	case CompensationlogRecord :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(Noop)))
 			err = redo_compensate(vol, action, buffer);
 		break;
 	case CreateAttribute :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(DeleteAttribute))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(DeleteAttribute)))
 			err = redo_create_attribute(vol, action, buffer);
 		break;
 	case DeallocateFileRecordSegment :
-		if (action->record.undo_operation
-			== const_cpu_to_le16(InitializeFileRecordSegment))
+		if (le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(InitializeFileRecordSegment)))
 			err = redo_delete_file(vol, action, buffer);
 		break;
 	case DeleteAttribute :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(CreateAttribute))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(CreateAttribute)))
 			err = redo_delete_attribute(vol, action, buffer);
 		break;
 	case DeleteIndexEntryAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(AddIndexEntryAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(AddIndexEntryAllocation)))
 			err = redo_delete_index(vol, action, buffer);
 		break;
 	case DeleteIndexEntryRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(AddIndexEntryRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(AddIndexEntryRoot)))
 			err = redo_delete_root_index(vol, action, buffer);
 		break;
 	case InitializeFileRecordSegment :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(Noop)))
 			err = redo_create_file(vol, action, buffer);
 		break;
 	case OpenNonResidentAttribute :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(Noop)))
 			err = redo_open_attribute(vol, action);
 		break;
 	case SetBitsInNonResidentBitMap :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(ClearBitsInNonResidentBitMap))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(ClearBitsInNonResidentBitMap)))
 			err = redo_force_bits(vol, action, buffer);
 		break;
 	case SetIndexEntryVcnAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetIndexEntryVcnAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetIndexEntryVcnAllocation)))
 			err = redo_update_vcn(vol, action, buffer);
 		break;
 	case SetIndexEntryVcnRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(SetIndexEntryVcnRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(SetIndexEntryVcnRoot)))
 			err = redo_update_root_vcn(vol, action, buffer);
 		break;
 	case SetNewAttributeSizes :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetNewAttributeSizes))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetNewAttributeSizes)))
 			err = redo_sizes(vol, action, buffer);
 		break;
 	case UpdateFileNameAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateFileNameAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateFileNameAllocation)))
 			err = redo_update_index(vol, action, buffer);
 		break;
 	case UpdateFileNameRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(UpdateFileNameRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(UpdateFileNameRoot)))
 			err = redo_update_root_index(vol, action, buffer);
 		break;
 	case UpdateMappingPairs :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateMappingPairs))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateMappingPairs)))
 			err = redo_update_mapping(vol, action, buffer);
 		break;
 	case UpdateNonResidentValue :
@@ -4177,23 +4177,23 @@ static int distribute_redos(ntfs_volume *vol,
 		}
 		break;
 	case UpdateResidentValue :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateResidentValue))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateResidentValue)))
 			err = redo_update_resident(vol, action, buffer);
 		break;
 	case Win10Action37 :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(Noop)))
 			err = redo_action37(vol, action, buffer);
 		break;
 	case WriteEndofFileRecordSegment :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(WriteEndofFileRecordSegment))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(WriteEndofFileRecordSegment)))
 			err = redo_write_end(vol, action, buffer);
 		break;
 	case WriteEndOfIndexBuffer :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(WriteEndOfIndexBuffer))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(WriteEndOfIndexBuffer)))
 			err = redo_write_index(vol, action, buffer);
 		break;
 	case AttributeNamesDump :
@@ -4334,7 +4334,7 @@ printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num)
 		buffer = read_protected(vol, &action->record,
 					mftrecsz, warn);
 		entry = (MFT_RECORD*)buffer;
-		if (entry && (entry->magic == magic_FILE)) {
+		if (entry && le32_eq(entry->magic, magic_FILE)) {
 			data_lsn = sle64_to_cpu(entry->lsn);
 			/*
 			 * Beware of records not updated
@@ -4376,7 +4376,7 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 		buffer = read_protected(vol, &action->record,
 						xsize, warn);
 		indx = (INDEX_BLOCK*)buffer;
-		if (indx && (indx->magic == magic_INDX)) {
+		if (indx && le32_eq(indx->magic, magic_INDX)) {
 			data_lsn = sle64_to_cpu(indx->lsn);
 			/*
 			 * Beware of records not updated
@@ -4406,8 +4406,8 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 		}
 		break;
 	case ON_RAW :
-		if (action->record.attribute_flags
-			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+		if (!le16_andz(action->record.attribute_flags,
+			(const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT)))) {
 			printf("** Error : action %s on MFT"
 				" or INDX\n",
 				actionname(rop));
@@ -4474,88 +4474,88 @@ static int distribute_undos(ntfs_volume *vol, const struct ACTION_RECORD *action
 	uop = le16_to_cpu(action->record.undo_operation);
 	switch (rop) {
 	case AddIndexEntryAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(DeleteIndexEntryAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(DeleteIndexEntryAllocation)))
 			err = undo_add_index(vol, action, buffer);
 		break;
 	case AddIndexEntryRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(DeleteIndexEntryRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(DeleteIndexEntryRoot)))
 			err = undo_add_root_index(vol, action, buffer);
 		break;
 	case ClearBitsInNonResidentBitMap :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetBitsInNonResidentBitMap))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetBitsInNonResidentBitMap)))
 			err = undo_force_bits(vol, action, buffer);
 		break;
 	case CreateAttribute :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(DeleteAttribute))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(DeleteAttribute)))
 			err = undo_create_attribute(vol, action, buffer);
 		break;
 	case DeallocateFileRecordSegment :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(InitializeFileRecordSegment))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(InitializeFileRecordSegment)))
 			err = undo_delete_file(vol, action, buffer);
 		break;
 	case DeleteAttribute :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(CreateAttribute))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(CreateAttribute)))
 			err = undo_delete_attribute(vol, action, buffer);
 		break;
 	case DeleteIndexEntryAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(AddIndexEntryAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(AddIndexEntryAllocation)))
 			err = undo_delete_index(vol, action, buffer);
 		break;
 	case DeleteIndexEntryRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(AddIndexEntryRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(AddIndexEntryRoot)))
 			err = undo_delete_root_index(vol, action, buffer);
 		break;
 	case InitializeFileRecordSegment :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(Noop)))
 			err = undo_create_file(vol, action, buffer);
 		break;
 	case OpenNonResidentAttribute :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(Noop)))
 			err = undo_open_attribute(vol, action);
 		break;
 	case SetBitsInNonResidentBitMap :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(ClearBitsInNonResidentBitMap))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(ClearBitsInNonResidentBitMap)))
 			err = undo_force_bits(vol, action, buffer);
 		break;
 	case SetIndexEntryVcnAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetIndexEntryVcnAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetIndexEntryVcnAllocation)))
 			err = undo_update_vcn(vol, action, buffer);
 		break;
 	case SetIndexEntryVcnRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(SetIndexEntryVcnRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(SetIndexEntryVcnRoot)))
 			err = undo_update_root_vcn(vol, action, buffer);
 		break;
 	case SetNewAttributeSizes :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(SetNewAttributeSizes))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(SetNewAttributeSizes)))
 			err = undo_sizes(vol, action, buffer);
 		break;
 	case UpdateFileNameAllocation :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateFileNameAllocation))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateFileNameAllocation)))
 			err = undo_update_index(vol, action, buffer);
 		break;
 	case UpdateFileNameRoot :
-		if (action->record.undo_operation
-		        == const_cpu_to_le16(UpdateFileNameRoot))
+		if (le16_eq(action->record.undo_operation,
+		        const_cpu_to_le16(UpdateFileNameRoot)))
 			err = undo_update_root_index(vol, action, buffer);
 		break;
 	case UpdateMappingPairs :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateMappingPairs))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateMappingPairs)))
 			err = undo_update_mapping(vol, action, buffer);
 		break;
 	case UpdateNonResidentValue :
@@ -4572,23 +4572,23 @@ static int distribute_undos(ntfs_volume *vol, const struct ACTION_RECORD *action
 		}
 		break;
 	case UpdateResidentValue :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(UpdateResidentValue))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(UpdateResidentValue)))
 			err = undo_update_resident(vol, action, buffer);
 		break;
 	case Win10Action37 :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(Noop))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(Noop)))
 			err = undo_action37(vol, action, buffer);
 		break;
 	case WriteEndofFileRecordSegment :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(WriteEndofFileRecordSegment))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(WriteEndofFileRecordSegment)))
 			err = undo_write_end(vol, action, buffer);
 		break;
 	case WriteEndOfIndexBuffer :
-		if (action->record.undo_operation
-		    == const_cpu_to_le16(WriteEndOfIndexBuffer))
+		if (le16_eq(action->record.undo_operation,
+		    const_cpu_to_le16(WriteEndOfIndexBuffer)))
 			err = undo_write_index(vol, action, buffer);
 		break;
 	case AttributeNamesDump :
@@ -4713,7 +4713,7 @@ printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num)
 		buffer = read_protected(vol, &action->record, mftrecsz, TRUE);
 		entry = (MFT_RECORD*)buffer;
 		if (entry) {
-			if (entry->magic == magic_FILE) {
+			if (le32_eq(entry->magic, magic_FILE)) {
 				executed = !older_record(entry,
 					&action->record);
 				if (!executed
@@ -4747,7 +4747,7 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 		buffer = read_protected(vol, &action->record, xsize, TRUE);
 		indx = (INDEX_BLOCK*)buffer;
 		if (indx) {
-			if (indx->magic == magic_INDX) {
+			if (le32_eq(indx->magic, magic_INDX)) {
 				executed = !older_record(indx,
 					&action->record);
 				if (!executed
@@ -4775,8 +4775,8 @@ printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 		}
 		break;
 	case ON_RAW :
-		if (action->record.attribute_flags
-			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+		if (!le16_andz(action->record.attribute_flags,
+			(const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT)))) {
 			printf("** Error : action %s on MFT or INDX\n",
 				actionname(rop));
 			err = 1;
