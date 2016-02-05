@@ -873,6 +873,9 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
+		/* Avoid getting fixup warnings on unitialized inodes */
+	NVolSetNoFixupWarn(vol);
+
 	for (inode_num = FILE_first_user; inode_num < nr_mft_records;
 							inode_num++) {
 		s64 attr_wiped;
@@ -881,7 +884,10 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 		ntfs_log_verbose("Inode %lld - ", (long long)inode_num);
 		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
-			ntfs_log_verbose("Could not open inode\n");
+			if (opts.verbose)
+				ntfs_log_verbose("Could not open inode\n");
+			else
+				ntfs_log_verbose("\r");
 			continue;
 		}
 
@@ -920,6 +926,7 @@ close_inode:
 		ntfs_inode_close(ni);
 	}
 close_abort :
+	NVolClearNoFixupWarn(vol);
 	ntfs_log_quiet("wipe_tails 0x%02x, %lld bytes\n", byte,
 				(long long)total);
 	return total;
@@ -974,6 +981,12 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			// We know that the end marker will only take 4 bytes
 			size = le32_to_cpu(rec->bytes_in_use) - 4;
 
+			if ((size <= 0) || (size > (int)vol->mft_record_size)) {
+				ntfs_log_error("Bad mft record %lld\n",
+						(long long)i);
+				total = -1;
+				goto free;
+			}
 			if (act == act_info) {
 				//ntfs_log_info("mft %d\n", size);
 				total += size;
@@ -1233,6 +1246,9 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
+		/* Avoid getting fixup warnings on unitialized inodes */
+	NVolSetNoFixupWarn(vol);
+
 	for (inode_num = 5; inode_num < nr_mft_records; inode_num++) {
 		u32 indx_record_size;
 		s64 wiped;
@@ -1333,6 +1349,7 @@ close_inode:
 		ntfs_inode_close(ni);
 	}
 
+	NVolClearNoFixupWarn(vol);
 	ntfs_log_quiet("wipe_directory 0x%02x, %lld bytes\n", byte,
 			(long long)total);
 	return total;
@@ -1720,14 +1737,18 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 		return -2;
 	}
 
+		/* Avoid getting fixup warnings on unitialized inodes */
+	NVolSetNoFixupWarn(nv);
 	/* Read the MFT reocrd of the i-node */
 	if (ntfs_attr_mst_pread(mft, nv->mft_record_size * record, 1LL,
 		nv->mft_record_size, file->mft) < 1) {
 
+		NVolClearNoFixupWarn(nv);
 		ntfs_attr_close(mft);
 		free_file(file);
 		return -3;
 	}
+	NVolClearNoFixupWarn(nv);
 	ntfs_attr_close(mft);
 	mft = NULL;
 
@@ -2246,9 +2267,14 @@ int main(int argc, char *argv[])
 				break;
 		}
 
-		ntfs_log_info(
-			"%lld bytes were wiped (excluding undelete data)\n",
-			(long long)total);
+		if (opts.noaction || opts.info)
+			ntfs_log_info("%lld bytes would be wiped"
+					" (excluding undelete data)\n",
+					(long long)total);
+		else
+			ntfs_log_info("%lld bytes were wiped"
+					" (excluding undelete data)\n",
+					(long long)total);
 	}
 	result = 0;
 umount:

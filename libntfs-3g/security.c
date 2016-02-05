@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2014 Jean-Pierre Andre
+ * Copyright (c) 2007-2015 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -224,7 +224,7 @@ int ntfs_sid_to_mbs_size(const SID *sid)
 {
 	int size, i;
 
-	if (!ntfs_sid_is_valid(sid)) {
+	if (!ntfs_valid_sid(sid)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -298,7 +298,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	 * No need to check @sid if !@sid_str since ntfs_sid_to_mbs_size() will
 	 * check @sid, too.  8 is the minimum SID string size.
 	 */
-	if (sid_str && (sid_str_size < 8 || !ntfs_sid_is_valid(sid))) {
+	if (sid_str && (sid_str_size < 8 || !ntfs_valid_sid(sid))) {
 		errno = EINVAL;
 		return NULL;
 	}
@@ -2916,6 +2916,14 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		if (cached) {
 			ni->security_id = cached->securid;
 			NInoSetDirty(ni);
+				/* adjust Windows read-only flag */
+			if (!isdir) {
+				if (mode & S_IWUSR)
+					ni->flags = le32_and(ni->flags, le32_not(FILE_ATTR_READONLY));
+				else
+					ni->flags = le32_or(ni->flags, FILE_ATTR_READONLY);
+				NInoFileNameSetDirty(ni);
+			}
 		}
 	} else cached = (struct CACHED_SECURID*)NULL;
 

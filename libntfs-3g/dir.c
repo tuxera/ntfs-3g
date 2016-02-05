@@ -2157,11 +2157,6 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 		goto err_out;
 	}
 	
-	if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)
-	   && !ntfs_possible_symlink(ni)) {
-		err = EOPNOTSUPP;
-		goto err_out;
-	}
 	if (NVolHideDotFiles(dir_ni->vol)) {
 		/* Set hidden flag according to the latest name */
 		if ((name_len > 1)

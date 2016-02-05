@@ -4,7 +4,7 @@
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2005-2007 Anton Altaparmakov
  * Copyright (c) 2007 Yura Pakhuchiy
- * Copyright (c) 2014 Jean-Pierre Andre
+ * Copyright (c) 2014-2015 Jean-Pierre Andre
  *
  * This utility will decrypt files and print the decrypted data on the standard
  * output.
@@ -117,6 +117,7 @@ typedef enum {
 typedef struct {
 	u64 in_whitening, out_whitening;
 	u8 des_key[8];
+	u64 prev_blk;
 } ntfs_desx_ctx;
 
 /**
@@ -164,7 +165,7 @@ static void version(void)
 			"standard output.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2005 Yuval Fledel\n");
 	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
-	ntfs_log_info("Copyright (c) 2014 Jean-Pierre Andre\n");
+	ntfs_log_info("Copyright (c) 2014-2015 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -895,39 +896,39 @@ out:
 /**
  * ntfs_desx_decrypt
  */
-static void ntfs_desx_decrypt(ntfs_fek *fek, u8 *outbuf, const u8 *inbuf)
+static gcry_error_t ntfs_desx_decrypt(ntfs_fek *fek, u8 *outbuf,
+				const u8 *inbuf)
 {
 	gcry_error_t err;
+	u64 curr_blk;
 	ntfs_desx_ctx *ctx = &fek->desx_ctx;
 
-	err = gcry_cipher_reset(fek->gcry_cipher_hd);
-	if (err != GPG_ERR_NO_ERROR)
-		ntfs_log_error("Failed to reset des cipher (error 0x%x).\n",
-				err);
-	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->out_whitening;
+	curr_blk = *(const u64*)inbuf;
+	*(u64*)outbuf = curr_blk ^ ctx->out_whitening;
 	err = gcry_cipher_encrypt(fek->gcry_cipher_hd, outbuf, 8, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR)
 		ntfs_log_error("Des decryption failed (error 0x%x).\n", err);
-	*(u64*)outbuf ^= ctx->in_whitening;
+	*(u64*)outbuf ^= ctx->in_whitening ^ ctx->prev_blk;
+	ctx->prev_blk = curr_blk;
+	return (err);
 }
 
 /**
  * ntfs_desx_encrypt
  */
-static void ntfs_desx_encrypt(ntfs_fek *fek, u8 *outbuf, const u8 *inbuf)
+static gcry_error_t ntfs_desx_encrypt(ntfs_fek *fek, u8 *outbuf,
+				const u8 *inbuf)
 {
 	gcry_error_t err;
 	ntfs_desx_ctx *ctx = &fek->desx_ctx;
 
-	err = gcry_cipher_reset(fek->gcry_cipher_hd);
-	if (err != GPG_ERR_NO_ERROR)
-		ntfs_log_error("Failed to reset des cipher (error 0x%x).\n",
-				err);
-	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->in_whitening;
+	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->in_whitening ^ ctx->prev_blk;
 	err = gcry_cipher_decrypt(fek->gcry_cipher_hd, outbuf, 8, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR)
 		ntfs_log_error("Des decryption failed (error 0x%x).\n", err);
 	*(u64*)outbuf ^= ctx->out_whitening;
+	ctx->prev_blk = *(u64*)outbuf;
+	return (err);
 }
 
 //#define DO_CRYPTO_TESTS 1
@@ -1300,8 +1301,9 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		int k;
 
-		for (k=0; k<512; k+=8) {
-			ntfs_desx_decrypt(fek, &data[k], &data[k]);
+		fek->desx_ctx.prev_blk = 0;
+		for (k=0; (k < 512) && (err == GPG_ERR_NO_ERROR); k+=8) {
+			err = ntfs_desx_decrypt(fek, &data[k], &data[k]);
 		}
 	} else
 		err = gcry_cipher_decrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);
@@ -1350,8 +1352,9 @@ static int ntfs_fek_encrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	if (le32_eq(fek->alg_id, CALG_DESX)) {
 		int k;
 
-		for (k=0; k<512; k+=8) {
-			ntfs_desx_encrypt(fek, &data[k], &data[k]);
+		fek->desx_ctx.prev_blk = 0;
+		for (k=0; (k < 512) && (err == GPG_ERR_NO_ERROR); k+=8) {
+			err = ntfs_desx_encrypt(fek, &data[k], &data[k]);
 		}
 	} else
 		err = gcry_cipher_encrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);

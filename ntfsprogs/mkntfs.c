@@ -3636,10 +3636,12 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 			opts.part_start_sect = 0;
 			winboot = FALSE;
 		} else if (opts.part_start_sect >> 32) {
-			ntfs_log_warning("The partition start sector specified "
-				"for %s and the automatically determined value "
-				"is too large.  It has been set to 0.\n",
-				vol->dev->d_name);
+			ntfs_log_warning("The partition start sector was not "
+				"specified for %s and the automatically "
+				"determined value is too large (%lld). "
+				"It has been set to 0.\n",
+				vol->dev->d_name,
+				(long long)opts.part_start_sect);
 			opts.part_start_sect = 0;
 			winboot = FALSE;
 		}

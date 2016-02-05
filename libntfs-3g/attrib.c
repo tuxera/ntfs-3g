@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2014 Jean-Pierre Andre
+ * Copyright (c) 2007-2015 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1780,7 +1780,8 @@ static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize,
  * appropriately to the return code of ntfs_pwrite(), or to EINVAL in case of
  * invalid arguments.
  */
-s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
+static s64 ntfs_attr_pwrite_i(ntfs_attr *na, const s64 pos, s64 count,
+								const void *b)
 {
 	s64 written, to_write, ofs, old_initialized_size, old_data_size;
 	s64 total = 0;
@@ -1799,15 +1800,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	BOOL wasnonresident = FALSE;
 	BOOL compressed;
 
-	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
-		       "0x%llx.\n", (long long)na->ni->mft_no, le32_to_cpu(na->type),
-		       (long long)pos, (long long)count);
-	
-	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
-		errno = EINVAL;
-		ntfs_log_perror("%s", __FUNCTION__);
-		goto errno_set;
-	}
 	vol = na->ni->vol;
 	compressed = !le16_eq(le16_and(na->data_flags, ATTR_COMPRESSION_MASK),
 			 const_cpu_to_le16(0));
@@ -2268,7 +2260,6 @@ done:
 		NAttrClearDataAppending(na);
 	}
 out:	
-	ntfs_log_leave("\n");
 	return total;
 rl_err_out:
 	eo = errno;
@@ -2334,6 +2325,39 @@ errno_set:
 	total = -1;
 	goto out;
 }
+
+s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
+{
+	s64 total;
+	s64 written;
+
+	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
+		       "0x%llx.\n", (long long)na->ni->mft_no, le32_to_cpu(na->type),
+		       (long long)pos, (long long)count);
+	
+	total = 0;
+	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
+		errno = EINVAL;
+		written = -1;
+		ntfs_log_perror("%s", __FUNCTION__);
+		goto out;
+	}
+
+		/*
+		 * Compressed attributes may be written partially, so
+		 * we may have to iterate.
+		 */
+	do {
+		written = ntfs_attr_pwrite_i(na, pos + total,
+				count - total, (const u8*)b + total);
+		if (written > 0)
+			total += written;
+	} while ((written > 0) && (total < count));
+out :
+	ntfs_log_leave("\n");
+	return (total > 0 ? total : written);
+}
+
 
 int ntfs_attr_pclose(ntfs_attr *na)
 {

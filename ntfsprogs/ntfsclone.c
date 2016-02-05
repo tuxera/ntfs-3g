@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2014 Jean-Pierre Andre
+ * Copyright (c) 2010-2015 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -391,7 +391,7 @@ static void version(void)
 		   "Efficiently clone, image, restore or rescue an NTFS Volume.\n\n"
 		   "Copyright (c) 2003-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
-		   "Copyright (c) 2010-2014 Jean-Pierre Andre\n\n");
+		   "Copyright (c) 2010-2015 Jean-Pierre Andre\n\n");
 	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(0);
 }
@@ -2458,64 +2458,27 @@ static void check_output_device(s64 input_size)
 		set_filesize(input_size);
 }
 
-static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni)
-{
-	ntfs_attr_search_ctx *ret;
-
-	if ((ret = ntfs_attr_get_search_ctx(ni, NULL)) == NULL)
-		perr_printf("ntfs_attr_get_search_ctx");
-
-	return ret;
-}
-
-/**
- * lookup_data_attr
- *
- * Find the $DATA attribute (with or without a name) for the given ntfs inode.
- */
-static ntfs_attr_search_ctx *lookup_data_attr(ntfs_inode *ni, const char *aname)
-{
-	ntfs_attr_search_ctx *ctx;
-	ntfschar *ustr;
-	int len = 0;
-
-	if ((ctx = attr_get_search_ctx(ni)) == NULL)
-		return NULL;
-
-	if ((ustr = ntfs_str2ucs(aname, &len)) == NULL) {
-		perr_printf("Couldn't convert '%s' to Unicode", aname);
-		goto error_out;
-	}
-
-	if (ntfs_attr_lookup(AT_DATA, ustr, len, CASE_SENSITIVE,
-				0, NULL, 0, ctx)) {
-		perr_printf("ntfs_attr_lookup");
-		goto error_out;
-	}
-	ntfs_ucsfree(ustr);
-	return ctx;
-error_out:
-	ntfs_attr_put_search_ctx(ctx);
-	return NULL;
-}
-
 static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 {
 	ntfs_inode *ni;
-	ntfs_attr_search_ctx *ctx = NULL;
-	runlist *rl, *rl_bad;
+	ntfs_attr *na;
+	runlist *rl;
 	s64 nr_bad_clusters = 0;
+	static le16 Bad[4] = {
+		const_cpu_to_le16('$'), const_cpu_to_le16('B'),
+		const_cpu_to_le16('a'), const_cpu_to_le16('d')
+	} ;
 
 	if (!(ni = ntfs_inode_open(vol, FILE_BadClus)))
 		perr_exit("ntfs_open_inode");
 
-	if ((ctx = lookup_data_attr(ni, "$Bad")) == NULL)
-		exit(1);
+	na = ntfs_attr_open(ni, AT_DATA, Bad, 4);
+	if (!na)
+		perr_exit("ntfs_attr_open");
+	if (ntfs_attr_map_whole_runlist(na))
+		perr_exit("ntfs_attr_map_whole_runlist");
 
-	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
-		perr_exit("ntfs_mapping_pairs_decompress");
-
-	for (rl = rl_bad; rl->length; rl++) {
+	for (rl = na->rl; rl->length; rl++) {
 		s64 lcn = rl->lcn;
 
 		if (lcn == LCN_HOLE || lcn < 0)
@@ -2529,9 +2492,7 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 	if (nr_bad_clusters)
 		Printf("WARNING: The disk has %lld or more bad sectors"
 		       " (hardware faults).\n", (long long)nr_bad_clusters);
-	free(rl_bad);
-
-	ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni))
 		perr_exit("ntfs_inode_close failed for $BadClus");
 }

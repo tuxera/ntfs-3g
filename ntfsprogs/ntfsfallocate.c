@@ -859,15 +859,8 @@ int main(int argc, char **argv)
 
 	/* Open the specified inode. */
 #ifdef HAVE_WINDOWS_H
-	unix_name = (char*)malloc(strlen(file_name) + 1);
+	unix_name = ntfs_utils_unix_path(file_name);
 	if (unix_name) {
-		int i;
-		for (i=0; file_name[i]; i++)
-			if (file_name[i] == '\\')
-				unix_name[i] = '/';
-			else
-				unix_name[i] = file_name[i];
-		unix_name[i] = 0;
 		ni = ntfs_pathname_to_inode(vol, NULL, unix_name);
 		free(unix_name);
 	} else

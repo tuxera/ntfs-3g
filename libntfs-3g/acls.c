@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2014 Jean-Pierre Andre
+ * Copyright (c) 2007-2015 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -362,16 +362,18 @@ unsigned int ntfs_attr_size(const char *attr)
 	return (attrsz);
 }
 
-/*
- *		Do sanity checks on a SID read from storage
- *	(just check revision and number of authorities)
+/**
+ * ntfs_valid_sid - determine if a SID is valid
+ * @sid:	SID for which to determine if it is valid
+ *
+ * Determine if the SID pointed to by @sid is valid.
+ *
+ * Return TRUE if it is valid and FALSE otherwise.
  */
-
 BOOL ntfs_valid_sid(const SID *sid)
 {
-	return ((sid->revision == SID_REVISION)
-		&& (sid->sub_authority_count >= 1)
-		&& (sid->sub_authority_count <= 8));
+	return sid && sid->revision == SID_REVISION &&
+		sid->sub_authority_count <= SID_MAX_SUB_AUTHORITIES;
 }
 
 /*
@@ -2314,10 +2316,21 @@ return (0);
 					mapping,flags,pxace,pset);
 			break;
 
-		case POSIX_ACL_GROUP :
 		case POSIX_ACL_GROUP_OBJ :
+			/* denials and grants for group when needed */
+			if (pset->groupowns && !pset->adminowns
+			    && (pset->grpperms == pset->othperms)
+			    && !pset->designates && !pset->withmask) {
+				ok = TRUE;
+			} else {
+				ok = build_group_denials_grant(pacl,gsid,
+						mapping,flags,pxace,pset);
+			}
+			break;
 
-			/* denials and grants for groups */
+		case POSIX_ACL_GROUP :
+
+			/* denials and grants for designated groups */
 
 			ok = build_group_denials_grant(pacl,gsid,
 					mapping,flags,pxace,pset);
@@ -2574,7 +2587,6 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	/* this ACE will be inserted after denials for group */
 
 	if (adminowns
-	    || groupowns
 	    || (((mode >> 3) ^ mode) & 7)) {
 		grants = WORLD_RIGHTS;
 		if (isdir) {

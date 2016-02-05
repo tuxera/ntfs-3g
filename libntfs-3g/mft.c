@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c)      2005 Yura Pakhuchiy
- * Copyright (c)      2014 Jean-Pierre Andre
+ * Copyright (c) 2014-2015 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1620,7 +1620,6 @@ err_out:
  * when reading the bitmap but if we are careful, we should be able to avoid
  * all problems.
  */
-//ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 {
 	s64 ll, bit;
@@ -1628,6 +1627,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	MFT_RECORD *m;
 	ntfs_inode *ni = NULL;
 	int err;
+	u32 usa_ofs;
 	le16 seq_no, usn;
 
 	if (base_ni)
@@ -1754,7 +1754,16 @@ found_free_rec:
 		goto retry;
 	}
 	seq_no = m->sequence_number;
-	usn = *(le16*)((u8*)m + le16_to_cpu(m->usa_ofs));
+		/*
+		 * As ntfs_mft_record_read() returns what has been read
+		 * even when the fixups have been found bad, we have to
+		 * check where we fetch the initial usn from.
+		 */
+	usa_ofs = le16_to_cpu(m->usa_ofs);
+	if (!(usa_ofs & 1) && (usa_ofs < NTFS_BLOCK_SIZE)) {
+		usn = *(le16*)((u8*)m + usa_ofs);
+	} else
+		usn = const_cpu_to_le16(1);
 	if (ntfs_mft_record_layout(vol, bit, m)) {
 		ntfs_log_error("Failed to re-format mft record.\n");
 		free(m);

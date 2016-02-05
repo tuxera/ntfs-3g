@@ -910,6 +910,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	ATTR_RECORD *a;
 	VOLUME_INFORMATION *vinf;
 	ntfschar *vname;
+	u32 record_size;
 	int i, j, eo;
 	unsigned int k;
 	u32 u;
@@ -989,7 +990,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 				goto io_error_exit;
 			}
 		}
-		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
+		record_size = ntfs_mft_record_get_data_size(mrec);
+		if ((record_size <= sizeof(MFT_RECORD))
+		    || (record_size > vol->mft_record_size)
+		    || memcmp(mrec, mrec2, record_size)) {
 			ntfs_log_error("$MFTMirr does not match $MFT (record "
 				       "%d).\n", i);
 			goto io_error_exit;

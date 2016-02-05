@@ -1175,8 +1175,7 @@ retry :
 			 * index, we may have to move the root to an extent
 			 */
 		if ((errno == ENOSPC)
-		    && !ctx->al_entry
-		    && !ntfs_inode_add_attrlist(icx->ni)) {
+		    && (ctx->al_entry || !ntfs_inode_add_attrlist(icx->ni))) {
 			ntfs_attr_put_search_ctx(ctx);
 			ctx = (ntfs_attr_search_ctx*)NULL;
 			ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len,
@@ -1842,7 +1841,8 @@ err_out:
 	goto out;
 }
 
-int ntfs_index_remove(ntfs_inode *dir_ni, ntfs_inode *ni,
+int ntfs_index_remove(ntfs_inode *dir_ni,
+		ntfs_inode *ni __attribute__((unused)),
 		const void *key, const int keylen)
 {
 	int ret = STATUS_ERROR;
@@ -1856,13 +1856,6 @@ int ntfs_index_remove(ntfs_inode *dir_ni, ntfs_inode *ni,
 				
 		if (ntfs_index_lookup(key, keylen, icx))
 			goto err_out;
-
-		if (!le32_andz(((FILE_NAME_ATTR *)icx->data)->file_attributes,
-				FILE_ATTR_REPARSE_POINT)
-		   && !ntfs_possible_symlink(ni)) {
-			errno = EOPNOTSUPP;
-			goto err_out;
-		}
 
 		ret = ntfs_index_rm(icx);
 		if (ret == STATUS_ERROR)

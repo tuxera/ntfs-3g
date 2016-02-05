@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2014 Jean-Pierre Andre
+ * Copyright (c) 2011-2015 Jean-Pierre Andre
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -154,7 +154,7 @@ static void version(void)
 		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2007      Yura Pakhuchiy\n"
-		   "Copyright (c) 2011-2014 Jean-Pierre Andre\n\n",
+		   "Copyright (c) 2011-2015 Jean-Pierre Andre\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(0);
@@ -739,13 +739,14 @@ static ATTR_RECORD *find_unnamed_attr(MFT_RECORD *mrec, ATTR_TYPES type)
 			/* fetch the requested attribute */
 	offset = le16_to_cpu(mrec->attrs_offset);
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while (!le32_eq(a->type, AT_END)
-	    && (!le32_eq(a->type, type) || a->name_length)
-	    && (offset < le32_to_cpu(mrec->bytes_in_use))) {
+	while ((offset < le32_to_cpu(mrec->bytes_in_use))
+	    && !le32_eq(a->type, AT_END)
+	    && (!le32_eq(a->type, type) || a->name_length)) {
 		offset += le32_to_cpu(a->length);
 		a = (ATTR_RECORD*)((char*)mrec + offset);
 	}
-	if (!le32_eq(a->type, type)
+	if ((offset >= le32_to_cpu(mrec->bytes_in_use))
+	    || !le32_eq(a->type, type)
 	    || a->name_length)
 		a = (ATTR_RECORD*)NULL;
 	return (a);
@@ -1117,9 +1118,10 @@ static int fix_selfloc_conditions(struct MFT_SELF_LOCATED *selfloc)
  *
  *	Only low-level library functions can be used.
  *
- *	Returns 0 if the conditions for the error were not met or
- *			the error could be fixed,
- *		-1 if some error was encountered
+ *	Returns 0 if the conditions for the error was met and
+ *			this error could be fixed,
+ *		-1 if the condition was not met or some error
+ *			which could not be fixed was encountered.
  */
 
 static int fix_self_located_mft(ntfs_volume *vol)
@@ -1146,7 +1148,7 @@ static int fix_self_located_mft(ntfs_volume *vol)
 			ntfs_log_info(res ? FAILED : OK);
 		} else {
 			ntfs_log_info(OK);
-			res = 0;
+			res = -1;
 		}
 		free(selfloc.mft0);
 		free(selfloc.mft1);
@@ -1377,6 +1379,8 @@ error_exit :
  *
  *	This is a replay of the normal start up sequence with fixes when
  *	some problem arise.
+ *
+ *	Returns 0 if there was an error and a fix is available
  */
 
 static int fix_startup(struct ntfs_device *dev, unsigned long flags)
@@ -1646,8 +1650,10 @@ int main(int argc, char **argv)
 	/* Set return code to 0. */
 	ret = 0;
 error_exit:
-	if (ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
+	if (ntfs_umount(vol, 1)) {
+		ntfs_log_info("Failed to unmount partition\n");
+		ret = 1;
+	}
 	if (ret)
 		exit(ret);
 	return ret;

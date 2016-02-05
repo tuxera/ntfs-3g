@@ -71,7 +71,6 @@ install-exec-local:	install-rootbinPROGRAMS
 	$(MKDIR_P) "$(DESTDIR)/sbin"
 	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
 	$(LN_S) -f "$(rootbindir)/lowntfs-3g" "$(DESTDIR)/sbin/mount.lowntfs-3g"
-endif
 
 install-data-local:	install-man8
 	$(LN_S) -f ntfs-3g.8 "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
@@ -79,7 +78,6 @@ install-data-local:	install-man8
 
 uninstall-local:
 	$(RM) -f "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
-if ENABLE_MOUNT_HELPER
 	$(RM) -f "$(DESTDIR)/sbin/mount.ntfs-3g" "$(DESTDIR)/sbin/mount.lowntfs-3g"
 endif
 
