@@ -389,7 +389,7 @@ static int change_label(ntfs_volume *vol, char *label)
 				(unsigned)(label_len -
 				(0x100 / sizeof(ntfschar))));
 		label_len = 0x100 / sizeof(ntfschar);
-		label[label_len] = 0;
+		new_label[label_len] = const_cpu_to_le16(0);
 	}
 
 	if(!opts.noaction)
