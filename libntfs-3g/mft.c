@@ -554,7 +554,7 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 					"data_pos 0x%llx, bit 0x%llx, "
 					"*byte 0x%hhx, b %u.\n", size,
 					(long long)data_pos, (long long)bit,
-					byte ? *byte : -1, b);
+					(u8) (byte ? *byte : -1), b);
 			for (; bit < size && data_pos + bit < pass_end;
 					bit &= ~7ull, bit += 8) {
 				/* 
@@ -581,7 +581,7 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 					"data_pos 0x%llx, bit 0x%llx, "
 					"*byte 0x%hhx, b %u.\n", size,
 					(long long)data_pos, (long long)bit,
-					byte ? *byte : -1, b);
+					(u8) (byte ? *byte : -1), b);
 			data_pos += size;
 			/*
 			 * If the end of the pass has not been reached yet,
