@@ -4609,11 +4609,9 @@ int main(int argc, char **argv)
 	printf("Successfully resized NTFS on device '%s'.\n", vol->dev->d_name);
 	if (resize.shrink)
 		printf("%s", resize_important_msg);
-#if CLEAN_EXIT
 	if (resize.lcn_bitmap.bm)
 		free(resize.lcn_bitmap.bm);
 	if (vol)
 		ntfs_umount(vol,0);
-#endif
 	return 0;
 }
