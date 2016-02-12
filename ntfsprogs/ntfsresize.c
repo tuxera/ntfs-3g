@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2015 Jean-Pierre Andre
+ * Copyright (c) 2011-2016 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -404,7 +404,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011-2015  Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2016  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -2537,8 +2537,6 @@ static void lookup_data_attr(ntfs_volume *vol,
 	ntfs_ucsfree(ustr);
 }
 
-#if CLEAN_EXIT
-
 static void close_inode_and_context(ntfs_attr_search_ctx *ctx)
 {
 	ntfs_inode *ni;
@@ -2550,8 +2548,6 @@ static void close_inode_and_context(ntfs_attr_search_ctx *ctx)
 	if (ni)
 		ntfs_inode_close(ni);
 }
-
-#endif /* CLEAN_EXIT */
 
 static int check_bad_sectors(ntfs_volume *vol)
 {
@@ -2619,11 +2615,7 @@ static void truncate_badclust_file(ntfs_resize_t *resize)
 	resize->mref = FILE_BadClus;
 	truncate_badclust_bad_attr(resize);
 
-#if CLEAN_EXIT
 	close_inode_and_context(resize->ctx);
-#else
-	ntfs_attr_put_search_ctx(resize->ctx);
-#endif
 }
 
 /**
