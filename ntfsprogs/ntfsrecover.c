@@ -1090,6 +1090,7 @@ static const struct BUFFER *findprevious(CONTEXT *ctx, const struct BUFFER *buf)
 
 	error = FALSE;
 	prevblk = buf->num;
+	prevbuf = (struct BUFFER*)NULL;
 	skipped = 0;
 	do {
 		prevmiddle = FALSE;
