@@ -36,6 +36,9 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
+#endif
 
 #include "types.h"
 #include "attrib.h"
