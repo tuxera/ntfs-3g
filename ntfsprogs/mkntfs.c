@@ -3704,7 +3704,8 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 				(long long)(volume_size / 1024));
 		return FALSE;
 	}
-	ntfs_log_debug("volume size = %llikiB\n", volume_size / 1024);
+	ntfs_log_debug("volume size = %llikiB\n",
+			(long long)(volume_size / 1024));
 	/* If user didn't specify the cluster size, determine it now. */
 	if (!vol->cluster_size) {
 		/*
@@ -3789,7 +3790,8 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 		return FALSE;
 	}
 	ntfs_log_debug("number of clusters = %llu (0x%llx)\n",
-			vol->nr_clusters, vol->nr_clusters);
+			(unsigned long long)vol->nr_clusters,
+			(unsigned long long)vol->nr_clusters);
 	/* Number of clusters must fit within 32 bits (Win2k limitation). */
 	if (vol->nr_clusters >> 32) {
 		if (vol->cluster_size >= 65536) {
@@ -3868,7 +3870,7 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	i = (g_lcn_bitmap_byte_size + g_vol->cluster_size - 1) &
 			~(g_vol->cluster_size - 1);
 	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %llu\n",
-			g_lcn_bitmap_byte_size, i);
+			g_lcn_bitmap_byte_size, (unsigned long long)i);
 	g_dynamic_buf_size = mkntfs_get_page_size();
 	g_dynamic_buf = (u8*)ntfs_calloc(g_dynamic_buf_size);
 	if (!g_dynamic_buf)
