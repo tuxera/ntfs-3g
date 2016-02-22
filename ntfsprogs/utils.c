@@ -420,7 +420,8 @@ int utils_parse_range(const char *string, s64 *start, s64 *finish, BOOL scale)
 	if (middle) {
 		if (middle[1] == 0) {
 			b = LONG_MAX;		// XXX ULLONG_MAX
-			ntfs_log_debug("Range has no end, defaulting to %lld.\n", b);
+			ntfs_log_debug("Range has no end, defaulting to "
+					"%lld.\n", (long long)b);
 		} else {
 			if (!utils_parse_size(middle+1, &b, scale))
 				return 0;
@@ -429,7 +430,8 @@ int utils_parse_range(const char *string, s64 *start, s64 *finish, BOOL scale)
 		b = a;
 	}
 
-	ntfs_log_debug("Range '%s' = %lld - %lld\n", string, a, b);
+	ntfs_log_debug("Range '%s' = %lld - %lld\n", string, (long long)a,
+			(long long)b);
 
 	*start  = a;
 	*finish = b;
@@ -813,7 +815,9 @@ int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref)
 
 	bit  = 1 << (mref & 7);
 	byte = (mref >> 3) & (sizeof(buffer) - 1);
-	ntfs_log_debug("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n", mref, bmpmref, byte, bit, buffer[byte] & bit);
+	ntfs_log_debug("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, "
+			"in use %d\n", (long long) mref, (long long) bmpmref,
+			byte, bit, buffer[byte] & bit);
 
 	return (buffer[byte] & bit);
 }

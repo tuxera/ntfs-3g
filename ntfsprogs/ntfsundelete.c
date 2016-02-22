@@ -2358,7 +2358,7 @@ static int copy_mft(ntfs_volume *vol, long long mft_begin, long long mft_end)
 	mft_end = min(mft_end, nr_mft_records - 1);
 
 	ntfs_log_debug("MFT records:\n");
-	ntfs_log_debug("\tTotal: %8lld\n", nr_mft_records);
+	ntfs_log_debug("\tTotal: %8lld\n", (long long)nr_mft_records);
 	ntfs_log_debug("\tBegin: %8lld\n", mft_begin);
 	ntfs_log_debug("\tEnd:   %8lld\n", mft_end);
 

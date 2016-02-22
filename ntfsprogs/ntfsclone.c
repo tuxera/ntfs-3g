@@ -1011,7 +1011,7 @@ static void restore_image(void)
 	Printf("Restoring NTFS from image ...\n");
 
 	progress_init(&progress, p_counter, opt.std_out ?
-		      sle64_to_cpu(image_hdr.nr_clusters) + 1 :
+		      (u64)sle64_to_cpu(image_hdr.nr_clusters) + 1 :
 		      le64_to_cpu(image_hdr.inuse) + 1,
 		      100);
 

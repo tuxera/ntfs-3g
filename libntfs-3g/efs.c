@@ -321,8 +321,8 @@ int ntfs_set_efs_info(ntfs_inode *ni, const char *value, size_t size,
 
 int ntfs_efs_fixup_attribute(ntfs_attr_search_ctx *ctx, ntfs_attr *na) 
 {
-	u64 newsize;
-	u64 oldsize;
+	s64 newsize;
+	s64 oldsize;
 	le16 appended_bytes;
 	u16 padding_length;
 	ntfs_inode *ni;

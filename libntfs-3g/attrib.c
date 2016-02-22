@@ -2373,7 +2373,8 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	BOOL compressed;
 
 	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x.\n",
-			na->ni->mft_no, le32_to_cpu(na->type));
+			(unsigned long long)na->ni->mft_no,
+			le32_to_cpu(na->type));
 	
 	if (!na || !na->ni || !na->ni->vol) {
 		errno = EINVAL;

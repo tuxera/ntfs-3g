@@ -63,10 +63,16 @@
 #		define __BYTE_ORDER BYTE_ORDER
 #		define __LITTLE_ENDIAN LITTLE_ENDIAN
 #		define __BIG_ENDIAN BIG_ENDIAN
-#	elif defined(__BYTE_ORDER__)
+#	elif defined(__BYTE_ORDER__) && defined(__LITTLE_ENDIAN__) && \
+			defined(__BIG_ENDIAN__)
 #		define __BYTE_ORDER __BYTE_ORDER__
 #		define __LITTLE_ENDIAN __LITTLE_ENDIAN__
 #		define __BIG_ENDIAN __BIG_ENDIAN__
+#	elif defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+			defined(__ORDER_BIG_ENDIAN__)
+#		define __BYTE_ORDER __BYTE_ORDER__
+#		define __LITTLE_ENDIAN __ORDER_LITTLE_ENDIAN__
+#		define __BIG_ENDIAN __ORDER_BIG_ENDIAN__
 #	elif (defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)) || \
 			defined(WORDS_LITTLEENDIAN)
 #		define __BYTE_ORDER 1
@@ -268,37 +274,37 @@
 
 /* Constant endianness conversion defines. */
 
-#define const_le16_to_cpu(x)	__constant_le16_to_cpu(x)
-#define const_le32_to_cpu(x)	__constant_le32_to_cpu(x)
-#define const_le64_to_cpu(x)	__constant_le64_to_cpu(x)
+#define const_le16_to_cpu(x)	((u16) __constant_le16_to_cpu(x))
+#define const_le32_to_cpu(x)	((u32) __constant_le32_to_cpu(x))
+#define const_le64_to_cpu(x)	((u64) __constant_le64_to_cpu(x))
 
-#define const_cpu_to_le16(x)	__constant_cpu_to_le16(x)
-#define const_cpu_to_le32(x)	__constant_cpu_to_le32(x)
-#define const_cpu_to_le64(x)	__constant_cpu_to_le64(x)
+#define const_cpu_to_le16(x)	((le16) __constant_cpu_to_le16(x))
+#define const_cpu_to_le32(x)	((le32) __constant_cpu_to_le32(x))
+#define const_cpu_to_le64(x)	((le64) __constant_cpu_to_le64(x))
 
-#define const_sle16_to_cpu(x)	__constant_le16_to_cpu((le16) x)
-#define const_sle32_to_cpu(x)	__constant_le32_to_cpu((le32) x)
-#define const_sle64_to_cpu(x)	__constant_le64_to_cpu((le64) x)
+#define const_sle16_to_cpu(x)	((s16) __constant_le16_to_cpu((le16) x))
+#define const_sle32_to_cpu(x)	((s32) __constant_le32_to_cpu((le32) x))
+#define const_sle64_to_cpu(x)	((s64) __constant_le64_to_cpu((le64) x))
 
-#define const_cpu_to_sle16(x)	__constant_cpu_to_le16((u16) x)
-#define const_cpu_to_sle32(x)	__constant_cpu_to_le32((u32) x)
-#define const_cpu_to_sle64(x)	__constant_cpu_to_le64((u64) x)
+#define const_cpu_to_sle16(x)	((sle16) __constant_cpu_to_le16((u16) x))
+#define const_cpu_to_sle32(x)	((sle32) __constant_cpu_to_le32((u32) x))
+#define const_cpu_to_sle64(x)	((sle64) __constant_cpu_to_le64((u64) x))
 
-#define const_be16_to_cpu(x)	__constant_be16_to_cpu(x)
-#define const_be32_to_cpu(x)	__constant_be32_to_cpu(x)
-#define const_be64_to_cpu(x)	__constant_be64_to_cpu(x)
+#define const_be16_to_cpu(x)	((u16) __constant_be16_to_cpu(x)))
+#define const_be32_to_cpu(x)	((u32) __constant_be32_to_cpu(x)))
+#define const_be64_to_cpu(x)	((u64) __constant_be64_to_cpu(x)))
 
-#define const_cpu_to_be16(x)	__constant_cpu_to_be16(x)
-#define const_cpu_to_be32(x)	__constant_cpu_to_be32(x)
-#define const_cpu_to_be64(x)	__constant_cpu_to_be64(x)
+#define const_cpu_to_be16(x)	((be16) __constant_cpu_to_be16(x))
+#define const_cpu_to_be32(x)	((be32) __constant_cpu_to_be32(x))
+#define const_cpu_to_be64(x)	((be64) __constant_cpu_to_be64(x))
 
-#define const_sbe16_to_cpu(x)	__constant_be16_to_cpu((be16) x)
-#define const_sbe32_to_cpu(x)	__constant_be32_to_cpu((be32) x)
-#define const_sbe64_to_cpu(x)	__constant_be64_to_cpu((be64) x)
+#define const_sbe16_to_cpu(x)	((s16) __constant_be16_to_cpu((be16) x))
+#define const_sbe32_to_cpu(x)	((s32) __constant_be32_to_cpu((be32) x))
+#define const_sbe64_to_cpu(x)	((s64) __constant_be64_to_cpu((be64) x))
 
-#define const_cpu_to_sbe16(x)	__constant_cpu_to_be16((u16) x)
-#define const_cpu_to_sbe32(x)	__constant_cpu_to_be32((u32) x)
-#define const_cpu_to_sbe64(x)	__constant_cpu_to_be64((u64) x)
+#define const_cpu_to_sbe16(x)	((sbe16) __constant_cpu_to_be16((u16) x))
+#define const_cpu_to_sbe32(x)	((sbe32) __constant_cpu_to_be32((u32) x))
+#define const_cpu_to_sbe64(x)	((sbe64) __constant_cpu_to_be64((u64) x))
 
 #define le16_eq(a, b) ((a) == (b))
 
@@ -508,33 +514,33 @@ static inline sbe64 cpu_to_sbe64p(const s64 *x) {
 
 /* Constant endianness conversion defines. */
 
-#define const_le16_to_cpu(x)	__constant_le16_to_cpu((u16)(x.value))
-#define const_le32_to_cpu(x)	__constant_le32_to_cpu((u32)(x.value))
-#define const_le64_to_cpu(x)	__constant_le64_to_cpu((u64)(x.value))
+#define const_le16_to_cpu(x)	((u16) __constant_le16_to_cpu((u16)(x.value)))
+#define const_le32_to_cpu(x)	((u32) __constant_le32_to_cpu((u32)(x.value)))
+#define const_le64_to_cpu(x)	((u64) __constant_le64_to_cpu((u64)(x.value)))
 
 #define const_cpu_to_le16(x)	((le16)(u16) __constant_cpu_to_le16((u16)(x)))
 #define const_cpu_to_le32(x)	((le32) __constant_cpu_to_le32((u32)(x)))
 #define const_cpu_to_le64(x)	((le64) __constant_cpu_to_le64((u64)(x)))
 
-#define const_sle16_to_cpu(x)	__constant_le16_to_cpu((u16)(x.value))
-#define const_sle32_to_cpu(x)	__constant_le32_to_cpu((u32)(x.value))
-#define const_sle64_to_cpu(x)	__constant_le64_to_cpu((u64)(x.value))
+#define const_sle16_to_cpu(x)	((s16) __constant_le16_to_cpu((u16)(x.value)))
+#define const_sle32_to_cpu(x)	((s32) __constant_le32_to_cpu((u32)(x.value)))
+#define const_sle64_to_cpu(x)	((s64) __constant_le64_to_cpu((u64)(x.value)))
 
 #define const_cpu_to_sle16(x)	((sle16)(u16) __constant_cpu_to_le16((u16)(x)))
 #define const_cpu_to_sle32(x)	((sle32) __constant_cpu_to_le32((u32)(x)))
 #define const_cpu_to_sle64(x)	((sle64) __constant_cpu_to_le64((u64)(x)))
 
-#define const_be16_to_cpu(x)	__constant_be16_to_cpu((u16)(x.value))
-#define const_be32_to_cpu(x)	__constant_be32_to_cpu((u32)(x.value))
-#define const_be64_to_cpu(x)	__constant_be64_to_cpu((u64)(x.value))
+#define const_be16_to_cpu(x)	((u16) __constant_be16_to_cpu((u16)(x.value)))
+#define const_be32_to_cpu(x)	((u32) __constant_be32_to_cpu((u32)(x.value)))
+#define const_be64_to_cpu(x)	((s64) __constant_be64_to_cpu((u64)(x.value)))
 
 #define const_cpu_to_be16(x)	((be16)(u16) __constant_cpu_to_be16((u16)(x)))
 #define const_cpu_to_be32(x)	((be32) __constant_cpu_to_be32((u32)(x)))
 #define const_cpu_to_be64(x)	((be64) __constant_cpu_to_be64((u64)(x)))
 
-#define const_sbe16_to_cpu(x)	__constant_be16_to_cpu((u16)(x.value))
-#define const_sbe32_to_cpu(x)	__constant_be32_to_cpu((u32)(x.value))
-#define const_sbe64_to_cpu(x)	__constant_be64_to_cpu((u64)(x.value))
+#define const_sbe16_to_cpu(x)	((s16) __constant_be16_to_cpu((u16)(x.value)))
+#define const_sbe32_to_cpu(x)	((s32) __constant_be32_to_cpu((u32)(x.value)))
+#define const_sbe64_to_cpu(x)	((s64) __constant_be64_to_cpu((u64)(x.value)))
 
 #define const_cpu_to_sbe16(x)	((sbe16)(u16) __constant_cpu_to_be16((u16)(x)))
 #define const_cpu_to_sbe32(x)	((sbe32) __constant_cpu_to_be32((u32)(x)))
