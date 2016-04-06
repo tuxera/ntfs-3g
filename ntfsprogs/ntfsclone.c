@@ -374,7 +374,7 @@ static void usage(int ret)
 #ifdef DEBUG
 		"    -d, --debug            Show debug information\n"
 #endif
-		"    -V, --version           Display version information\n"
+		"    -V, --version          Display version information\n"
 		"\n"
 		"    If FILE is '-' then send the image to the standard output. If SOURCE is '-'\n"
 		"    and --restore-image is used then read the image from the standard input.\n"
