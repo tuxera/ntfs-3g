@@ -1101,7 +1101,7 @@ static const struct BUFFER *findprevious(CONTEXT *ctx, const struct BUFFER *buf)
 				prevblk = (logfilesz >> blockbits) - 1;
 			else {
 				rph = &buf->block.record;
-				prevblk = (le32_to_cpu(rph->copy.file_offset)
+				prevblk = (sle64_to_cpu(rph->copy.file_offset)
 							>> blockbits) - 1;
 				/*
 				 * If an initial block leads to block 4, it
@@ -2371,8 +2371,8 @@ static void showheadrcrd(u32 blk, const RECORD_PAGE_HEADER *rph)
 		printf("usa_count          %04x\n",
 			(int)le16_to_cpu(rph->usa_count));
 		if (blk < 4)
-			printf("file_offset        %08lx\n",
-				(long)le32_to_cpu(rph->copy.file_offset));
+			printf("file_offset        %016llx\n",
+				(long long)sle64_to_cpu(rph->copy.file_offset));
 		else {
 			diff = sle64_to_cpu(rph->copy.last_lsn) - synced_lsn;
 			printf("last_lsn           %016llx"

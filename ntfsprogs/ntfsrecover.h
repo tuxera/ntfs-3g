@@ -202,7 +202,7 @@ typedef struct { /* size 40 */
 	le16 usa_count;
 	union {
 		leLSN last_lsn;
-		le32 file_offset;
+		sle64 file_offset;
 	} __attribute__((__packed__)) copy;
 	le32 flags;
 	le16 page_count;
