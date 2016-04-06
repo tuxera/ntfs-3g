@@ -2790,10 +2790,10 @@ char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
 	for (k=0; k<pxdesc->acccnt; k++) {
 		if ((pxdesc->acl.ace[k].tag == POSIX_ACL_USER)
 		    || (pxdesc->acl.ace[k].tag == POSIX_ACL_GROUP))
-			newattrsz += 3*40; /* fixme : maximum size */
+			newattrsz += 3*MAX_SID_SIZE;
 	}
 				/* account for default ACE's */
-	newattrsz += 2*40*pxdesc->defcnt;  /* fixme : maximum size */
+	newattrsz += 2*MAX_SID_SIZE*pxdesc->defcnt;
 	newattr = (char*)ntfs_malloc(newattrsz);
 	if (newattr) {
 		/* build the main header part */

@@ -102,10 +102,11 @@
 #define ROOT_GROUP_UNMARK FILE_READ_EA	/* ACL granted to root as group */
 
 /*
- *		A type large enough to hold any SID
+ *		Maximum SID size and a type large enough to hold it
  */
 
-typedef char BIGSID[40];
+#define MAX_SID_SIZE (8 + SID_MAX_SUB_AUTHORITIES*4)
+typedef char BIGSID[MAX_SID_SIZE];
 
 /*
  *		Struct to hold the input mapping file
