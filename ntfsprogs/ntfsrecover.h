@@ -157,6 +157,7 @@ typedef struct { /* size 44 */
 	le16 log_record_header_length;
 	le16 log_page_data_offset;
 	le32 restart_log_open_count;
+	le32 reserved;
 } __attribute__((__packed__)) RESTART_AREA;
 
 typedef struct { /* size 160 */
@@ -208,7 +209,7 @@ typedef struct { /* size 40 */
 	le16 page_count;
 	le16 page_position;
 	le16 next_record_offset;
-	le16 reserved4[3];
+	le16 reserved[3];
 	leLSN last_end_lsn;
 } __attribute__((__packed__)) RECORD_PAGE_HEADER;
 
@@ -228,7 +229,7 @@ typedef struct { /* size 80 */
 	LOG_RECORD_TYPE record_type;
 	le32 transaction_id;
 	LOG_RECORD_FLAGS log_record_flags;
-	le16 reserved1[3];
+	le16 reserved_or_alignment[3];
 	le16 redo_operation;
 	le16 undo_operation;
 	le16 redo_offset;

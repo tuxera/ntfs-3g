@@ -2156,9 +2156,9 @@ static void showlogr(CONTEXT *ctx, int k, const LOG_RECORD *logr)
 		printf("log_record_flags       %04x\n",
 			(int)le16_to_cpu(logr->log_record_flags));
 		printf("reserved1              %04x %04x %04x\n",
-			(int)le16_to_cpu(logr->reserved1[0]),
-		(int)le16_to_cpu(logr->reserved1[1]),
-		(int)le16_to_cpu(logr->reserved1[2]));
+			(int)le16_to_cpu(logr->reserved_or_alignment[0]),
+		(int)le16_to_cpu(logr->reserved_or_alignment[1]),
+		(int)le16_to_cpu(logr->reserved_or_alignment[2]));
 		detaillogr(ctx, logr);
 	}
 	if (optt) {
@@ -2387,9 +2387,9 @@ static void showheadrcrd(u32 blk, const RECORD_PAGE_HEADER *rph)
 		printf("next_record_offset %04x\n",
 			(int)le16_to_cpu(rph->next_record_offset));
 		printf("reserved4          %04x %04x %04x\n",
-			(int)le16_to_cpu(rph->reserved4[0]),
-			(int)le16_to_cpu(rph->reserved4[1]),
-			(int)le16_to_cpu(rph->reserved4[2]));
+			(int)le16_to_cpu(rph->reserved[0]),
+			(int)le16_to_cpu(rph->reserved[1]),
+			(int)le16_to_cpu(rph->reserved[2]));
 		diff = sle64_to_cpu(rph->last_end_lsn) - synced_lsn;
 		printf("last_end_lsn       %016llx (synced%s%ld)\n",
 			(long long)sle64_to_cpu(rph->last_end_lsn),
@@ -4068,7 +4068,7 @@ static BOOL checkstructs(void)
 			(int)sizeof(RESTART_PAGE_HEADER));
 		ok = FALSE;
 	}
-   	if (sizeof(RESTART_AREA) != 44) {
+   	if (sizeof(RESTART_AREA) != 48) {
       		fprintf(stderr,
 			"* error : bad sizeof(RESTART_AREA) %d\n",
 			(int)sizeof(RESTART_AREA));
