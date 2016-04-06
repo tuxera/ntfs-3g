@@ -832,7 +832,7 @@ static BOOL likelyop(const struct LOG_RECORD *logr)
 {
 	BOOL likely;
 
-	switch (le32_to_cpu(logr->record_type)) {
+	switch (logr->record_type) {
 	case LOG_STANDARD : /* standard record */
 	     /* Operations in range 0..LastAction-1, can be both null */
 		likely = ((unsigned int)le16_to_cpu(logr->redo_operation)
@@ -1845,8 +1845,8 @@ static void detaillogr(CONTEXT *ctx, const struct LOG_RECORD *logr)
 	unsigned int listsize;
 	BOOL onmft;
 
-	switch (le32_to_cpu(logr->record_type)) {
-	case 1 :
+	switch (logr->record_type) {
+	case LOG_STANDARD :
 		onmft = logr->cluster_index
 			|| acts_on_mft(le16_to_cpu(logr->redo_operation))
 			|| acts_on_mft(le16_to_cpu(logr->undo_operation));
@@ -2068,7 +2068,7 @@ static void detaillogr(CONTEXT *ctx, const struct LOG_RECORD *logr)
                 printf("* undo data overflows from record\n");
 	    }
          	break;
-	case 2 :
+	case LOG_CHECKPOINT :
 		printf("---> checkpoint record\n");
 		printf("redo_operation         %04x %s\n",
 			(int)le16_to_cpu(logr->redo_operation),
@@ -2117,8 +2117,8 @@ BOOL within_lcn_range(const struct LOG_RECORD *logr)
 	BOOL within;
 
 	within = FALSE;
-   	switch (le32_to_cpu(logr->record_type)) {
-      	case 1 :
+   	switch (logr->record_type) {
+      	case LOG_STANDARD :
          	for (i=0; i<le16_to_cpu(logr->lcns_to_follow); i++) {
             		lcn = MREF(le64_to_cpu(logr->lcn_list[i]));
 			if ((lcn >= firstlcn) && (lcn <= lastlcn))
@@ -2166,7 +2166,7 @@ static void showlogr(CONTEXT *ctx, int k, const struct LOG_RECORD *logr)
 	if (optt) {
 		const char *state;
 
-		if (logr->record_type == const_cpu_to_le32(2))
+		if (logr->record_type == LOG_CHECKPOINT)
 			state = "--checkpoint--";
 		else
 			state = commitment(sle64_to_cpu(logr->this_lsn));
@@ -2290,7 +2290,7 @@ static TRISTATE enqueue_action(CONTEXT *ctx, const struct LOG_RECORD *logr,
 		err = 0;
 		state = T_OK;
 		if ((optp || optu)
-		    && (logr->record_type == const_cpu_to_le32(2))) {
+		    && (logr->record_type == LOG_CHECKPOINT)) {
 			/* if chkp process queue, and increment count */
 			playedactions++;
 			if (playedactions <= playcount) {

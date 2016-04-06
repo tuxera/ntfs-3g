@@ -3991,13 +3991,11 @@ static enum ACTION_KIND get_action_kind(const struct ACTION_RECORD *action)
 		 * the action was defined by Win10 (or subsequent).
 		 */
 	if (action->record.log_record_flags
-			& const_cpu_to_le16(RECORD_DELETING | RECORD_ADDING)) {
-		if (action->record.attribute_flags
-					& const_cpu_to_le16(ACTS_ON_INDX))
+			& (LOG_RECORD_DELETING | LOG_RECORD_ADDING)) {
+		if (action->record.attribute_flags & ACTS_ON_INDX)
 			kind = ON_INDX;
 		else
-			if (action->record.attribute_flags
-					& const_cpu_to_le16(ACTS_ON_MFT))
+			if (action->record.attribute_flags & ACTS_ON_MFT)
 				kind = ON_MFT;
 			else
 				kind = ON_RAW;
@@ -4325,7 +4323,7 @@ static int play_one_redo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 	case ON_MFT :
 /*
  the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
+if (!(action->record.attribute_flags & ACTS_ON_MFT))
 printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
 */
 		/* Check whether data is to be discarded */
@@ -4366,7 +4364,7 @@ printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num)
 	case ON_INDX :
 /*
  the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
+if (!(action->record.attribute_flags & ACTS_ON_INDX))
 printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
 */
 		xsize = vol->indx_record_size;
@@ -4407,7 +4405,7 @@ printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num
 		break;
 	case ON_RAW :
 		if (action->record.attribute_flags
-			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+				& (ACTS_ON_INDX | ACTS_ON_MFT)) {
 			printf("** Error : action %s on MFT"
 				" or INDX\n",
 				actionname(rop));
@@ -4707,7 +4705,7 @@ static int play_one_undo(ntfs_volume *vol, const struct ACTION_RECORD *action)
 	case ON_MFT :
 /*
  the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_MFT)))
+if (!(action->record.attribute_flags & ACTS_ON_MFT))
 printf("** %s (action %d) not acting on MFT\n",actionname(rop),(int)action->num);
 */
 		buffer = read_protected(vol, &action->record, mftrecsz, TRUE);
@@ -4746,7 +4744,7 @@ printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 	case ON_INDX :
 /*
  the check below cannot be used on WinXP
-if (!(action->record.attribute_flags & const_cpu_to_le16(ACTS_ON_INDX)))
+if (!(action->record.attribute_flags & ACTS_ON_INDX))
 printf("** %s (action %d) not acting on INDX\n",actionname(rop),(int)action->num);
 */
 		xsize = vol->indx_record_size;
@@ -4797,7 +4795,7 @@ printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 		break;
 	case ON_RAW :
 		if (action->record.attribute_flags
-			& (const_cpu_to_le16(ACTS_ON_INDX | ACTS_ON_MFT))) {
+				& (ACTS_ON_INDX | ACTS_ON_MFT)) {
 			printf("** Error : action %s on MFT or INDX\n",
 				actionname(rop));
 			err = 1;

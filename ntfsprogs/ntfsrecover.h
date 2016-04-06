@@ -40,16 +40,29 @@
 #define feedle32(p,x) (*(const le32*)((const char*)(p) + (x)))
 #define feedle64(p,x) (*(const le64*)((const char*)(p) + (x)))
 
-enum LOG_RECORD_TYPE {
-	LOG_STANDARD = 1,
-	LOG_CHECKPOINT = 2
-} ;
+/*
+ *	LOG_RECORD_TYPE : types of log records
+ */
 
-	/* These flags were introduced in Vista in field attribute_flags */
-enum ATTRIBUTE_FLAGS {
-	ACTS_ON_MFT = 2,
-	ACTS_ON_INDX = 8
+enum {
+	LOG_STANDARD =		const_cpu_to_le32(1),
+	LOG_CHECKPOINT =	const_cpu_to_le32(2),
+	LOG_RECORD_TYPE_PLACE_HOLDER = 0xffffffffU
 } ;
+typedef le32 LOG_RECORD_TYPE;
+
+/*
+ *	ATTRIBUTE_FLAGS : flags describing the kind of NTFS record 
+ *	is being updated.
+ *	These flags were introduced in Vista, only two flags are known?
+ */
+
+enum {
+	ACTS_ON_MFT =		const_cpu_to_le16(2),
+	ACTS_ON_INDX =		const_cpu_to_le16(8),
+	ATTRIBUTE_FLAGS_PLACE_HOLDER = 0xffff,
+} ;
+typedef le16 ATTRIBUTE_FLAGS;
 
 enum ACTIONS {
 	Noop,					/* 0 */
@@ -93,14 +106,22 @@ enum ACTIONS {
 	LastAction				/* 38 */
 } ;
 
-	/* Flags for field log_record_flags, their meaning is unclear */
-enum RECORD_FLAGS {
-	RECORD_UNKNOWN = 1,
-	/* The flags below were introduced in Windows 10 */
-	RECORD_DELETING = 2,
-	RECORD_ADDING = 4
-} ;
-typedef le16 LOG_RECORD_FLAGS;
+/**
+ * enum LOG_RECORD_FLAGS - Possible 16-bit flags for log records.
+ *
+ *	Some flags describe what kind of update is being logged.
+ *
+ * (Or is it log record pages?)
+ */
+typedef enum {
+	LOG_RECORD_MULTI_PAGE = const_cpu_to_le16(0x0001),	/* ??? */
+		/* The flags below were introduced in Windows 10 */
+	LOG_RECORD_DELETING =	const_cpu_to_le16(0x0002),
+	LOG_RECORD_ADDING =	const_cpu_to_le16(0x0004),
+	LOG_RECORD_SIZE_PLACE_HOLDER = 0xffff,
+		/* This has nothing to do with the log record. It is only so
+		   gcc knows to make the flags 16-bit. */
+} __attribute__((__packed__)) LOG_RECORD_FLAGS;
 
 #define LOGFILE_NO_CLIENT const_cpu_to_le16(0xffff)
 #define RESTART_VOLUME_IS_CLEAN const_cpu_to_le16(0x0002)
@@ -200,7 +221,7 @@ typedef struct LOG_RECORD { /* size 80 */
 		le16 seq_number;
 		le16 client_index;
 	} __attribute__((__packed__)) client_id;
-	le32 record_type;
+	LOG_RECORD_TYPE record_type;
 	le32 transaction_id;
 	LOG_RECORD_FLAGS log_record_flags;
 	le16 reserved1[3];
@@ -217,7 +238,7 @@ typedef struct LOG_RECORD { /* size 80 */
 			le16 record_offset;
 			le16 attribute_offset;
 			le16 cluster_index;
-			le16 attribute_flags;
+			ATTRIBUTE_FLAGS attribute_flags;
 			le32 target_vcn;
 			le32 reserved3;
 			le64 lcn_list[0];
