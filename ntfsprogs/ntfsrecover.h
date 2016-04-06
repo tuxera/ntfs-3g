@@ -291,8 +291,16 @@ struct BITMAP_ACTION {
 	le32 count;
 } ;
 
-/* Danger in arrays : contains le64's though size is not a multiple of 8 */
-typedef struct ATTR_OLD {	/* Format up to Win10 (44 bytes) */
+/**
+ * struct ATTR - Attribute record.
+ *
+ *	The format of an attribute record has changed from Windows 10.
+ *	The old format was 44 bytes long, despite having 8 bytes fields,
+ *	and this leads to alignment problems in arrays.
+ *	This problem does not occur in the new format, which is shorter.
+ *	The format being used can generally be determined from size.
+ */
+typedef struct {	/* Format up to Win10 (44 bytes) */
 	le64 unknown1;
 	le64 unknown2;
 	le64 inode;
@@ -302,7 +310,7 @@ typedef struct ATTR_OLD {	/* Format up to Win10 (44 bytes) */
 	le32 unknown4;
 } __attribute__((__packed__)) ATTR_OLD;
 
-typedef struct ATTR_NEW {	/* Format since Win10 (40 bytes) */
+typedef struct {	/* Format since Win10 (40 bytes) */
 	le64 unknown1;
 	le64 unknown2;
 	le32 type;

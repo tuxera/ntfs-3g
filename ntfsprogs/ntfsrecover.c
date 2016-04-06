@@ -1153,13 +1153,13 @@ void copy_attribute(struct ATTR *pa, const char *buf, int length)
 
 	if (pa) {
 		switch (length) {
-		case sizeof(struct ATTR_NEW) :
-			panew = (const struct ATTR_NEW*)buf;
+		case sizeof(ATTR_NEW) :
+			panew = (const ATTR_NEW*)buf;
 			pa->type = panew->type;
 			pa->lsn = sle64_to_cpu(panew->lsn);
 			pa->inode = MREF(le64_to_cpu(panew->inode));
 			break;
-		case sizeof(struct ATTR_OLD) :
+		case sizeof(ATTR_OLD) :
 				/* Badly aligned, first realign */
 			memcpy(&old_aligned,buf,sizeof(old_aligned));
 			pa->type = old_aligned.type;
@@ -1758,8 +1758,8 @@ static void fixup(CONTEXT *ctx, const LOG_RECORD *logr, const char *buf,
 			     * Changed from Win10, formerly we got step = 44.
 			     * The record layout has also changed
 			     */
-			if ((step != sizeof(struct ATTR_OLD))
-			    && (step != sizeof(struct ATTR_NEW))) {
+			if ((step != sizeof(ATTR_OLD))
+			    && (step != sizeof(ATTR_NEW))) {
 				printf("   ** Unexpected step %d\n",step);
 			}
 			more = 0;
@@ -4076,16 +4076,16 @@ static BOOL checkstructs(void)
 			(int)sizeof(RESTART_AREA));
 		ok = FALSE;
 	}
-   	if (sizeof(struct ATTR_OLD) != 44) {
+   	if (sizeof(ATTR_OLD) != 44) {
       		fprintf(stderr,
-			"* error : bad sizeof(struct ATTR_OLD) %d\n",
-			(int)sizeof(struct ATTR_OLD));
+			"* error : bad sizeof(ATTR_OLD) %d\n",
+			(int)sizeof(ATTR_OLD));
 		ok = FALSE;
 	}
-   	if (sizeof(struct ATTR_NEW) != 40) {
+   	if (sizeof(ATTR_NEW) != 40) {
       		fprintf(stderr,
-			"* error : bad sizeof(struct ATTR_NEW) %d\n",
-			(int)sizeof(struct ATTR_NEW));
+			"* error : bad sizeof(ATTR_NEW) %d\n",
+			(int)sizeof(ATTR_NEW));
 		ok = FALSE;
 	}
 	if (LastAction != 38) {

@@ -2309,8 +2309,8 @@ static int redo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 {
 	const char *data;
 	struct ATTR *pa;
-	const struct ATTR_OLD *attr_old;
-	const struct ATTR_NEW *attr_new;
+	const ATTR_OLD *attr_old;
+	const ATTR_NEW *attr_new;
 	const char *name;
 	le64 inode;
 	u32 namelen;
@@ -2349,15 +2349,15 @@ static int redo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 			 * whether it matches what we have in store.
 			 */
 			switch (length) {
-			case sizeof(struct ATTR_OLD) :
-				attr_old = (const struct ATTR_OLD*)data;
+			case sizeof(ATTR_OLD) :
+				attr_old = (const ATTR_OLD*)data;
 					/* Badly aligned */
 				memcpy(&inode, &attr_old->inode, 8);
 				err = (MREF(le64_to_cpu(inode)) != pa->inode)
 				    || (attr_old->type != pa->type);
 				break;
-			case sizeof(struct ATTR_NEW) :
-				attr_new = (const struct ATTR_NEW*)data;
+			case sizeof(ATTR_NEW) :
+				attr_new = (const ATTR_NEW*)data;
 				err = (MREF(le64_to_cpu(attr_new->inode))
 							!= pa->inode)
 				    || (attr_new->type != pa->type);
@@ -3379,8 +3379,8 @@ static int undo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 {
 	const char *data;
 	struct ATTR *pa;
-	const struct ATTR_OLD *attr_old;
-	const struct ATTR_NEW *attr_new;
+	const ATTR_OLD *attr_old;
+	const ATTR_NEW *attr_new;
 	const char *name;
 	le64 inode;
 	u32 namelen;
@@ -3415,15 +3415,15 @@ static int undo_open_attribute(ntfs_volume *vol __attribute__((unused)),
 	if (pa) {
 		/* check whether the redo attr matches what we have in store */
 		switch (length) {
-		case sizeof(struct ATTR_OLD) :
-			attr_old = (const struct ATTR_OLD*)data;
+		case sizeof(ATTR_OLD) :
+			attr_old = (const ATTR_OLD*)data;
 				/* Badly aligned */
 			memcpy(&inode, &attr_old->inode, 8);
 			err = (MREF(le64_to_cpu(inode)) != pa->inode)
 			    || (attr_old->type != pa->type);
 			break;
-		case sizeof(struct ATTR_NEW) :
-			attr_new = (const struct ATTR_NEW*)data;
+		case sizeof(ATTR_NEW) :
+			attr_new = (const ATTR_NEW*)data;
 			err = (MREF(le64_to_cpu(attr_new->inode))!= pa->inode)
 			    || (attr_new->type != pa->type);
 			break;
