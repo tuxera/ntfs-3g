@@ -185,12 +185,14 @@ Clone NTFS to the non\-existent
 If
 .I FILE
 is '\-' then clone to the
-standard output.
+standard output. This option cannot be used for creating a partition,
+use \fB\-\-overwrite\fR for an existing partition.
 .TP
 \fB\-O\fR, \fB\-\-overwrite\fR FILE
 Clone NTFS to
 .IR FILE ,
-overwriting if exists.
+which can be an existing partition or a regular file which will be
+overwritten if it exists.
 .TP
 \fB\-s\fR, \fB\-\-save\-image\fR
 Save to the special image format. This is the most efficient way space and
