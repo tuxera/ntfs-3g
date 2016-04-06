@@ -4731,10 +4731,16 @@ printf("record lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 				err = 1;
 			}
 		} else {
-			/* Undoing a record create which was not done ? */
-// TODO make sure this is about a newly allocated record (with bad fixup)
-// TODO check this is inputting a full record (record lth == data lth)
-			buffer = (char*)calloc(1, mftrecsz);
+			/*
+			 * Could not read the MFT record :
+			 * if this is undoing a record create (from scratch)
+			 * which did not take place, there is nothing to redo,
+			 * otherwise this is an error.
+			 */
+			if (check_full_mft(action,TRUE))
+				executed = FALSE;
+			else
+				err = 1;
 		}
 		break;
 	case ON_INDX :
@@ -4765,13 +4771,28 @@ printf("index lsn 0x%llx is %s than action %d lsn 0x%llx\n",
 				err = 1;
 			}
 		} else {
-			/* Undoing a record create which was not done ? */
-// TODO make sure this is about a newly allocated record (with bad fixup)
-// TODO check this is inputting a full record (record lth == data lth)
-// recreate an INDX record if this is the first entry
-			buffer = (char*)calloc(1, xsize);
-			err = create_indx(vol, action, buffer);
-			executed = TRUE;
+			/*
+			 * Could not read the INDX record :
+			 * if this is undoing a record create (from scratch)
+			 * which did not take place, there is nothing to redo,
+			 * otherwise this must be an error.
+			 * However, after deleting the last index allocation
+			 * in a block, the block is apparently zeroed
+			 * and cannot be read. In this case we have to
+			 * create an initial index block and apply the undo.
+			 */
+			if (check_full_index(action,TRUE))
+				executed = FALSE;
+			else {
+				err = 1;
+				if (uop == AddIndexEntryAllocation) {
+					executed = TRUE;
+					buffer = (char*)calloc(1, xsize);
+					if (buffer)
+						err = create_indx(vol,
+							action, buffer);
+				}
+			}
 		}
 		break;
 	case ON_RAW :
