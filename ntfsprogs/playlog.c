@@ -1,7 +1,7 @@
 /*
  *		Redo or undo a list of logged actions
  *
- * Copyright (c) 2014-2015 Jean-Pierre Andre
+ * Copyright (c) 2014-2016 Jean-Pierre Andre
  *
  */
 
@@ -67,6 +67,7 @@
 #include "volume.h"
 #include "unistr.h"
 #include "mst.h"
+#include "logfile.h"
 #include "ntfsrecover.h"
 #include "misc.h"
 

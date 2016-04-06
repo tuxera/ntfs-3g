@@ -1,7 +1,7 @@
 /*
  *		Process log data from an NTFS partition
  *
- * Copyright (c) 2012-2015 Jean-Pierre Andre
+ * Copyright (c) 2012-2016 Jean-Pierre Andre
  *
  *	This program examines the Windows log file of an ntfs partition
  *	and plays the committed transactions in order to restore the
@@ -101,6 +101,7 @@
 #include "volume.h"
 #include "unistr.h"
 #include "mst.h"
+#include "logfile.h"
 #include "ntfsrecover.h"
 #include "utils.h"
 #include "misc.h"
@@ -3832,7 +3833,7 @@ static void version(void)
 {
 	printf("\n%s v%s (libntfs-3g) - Recover updates committed by Windows"
 			" on an NTFS Volume.\n\n", "ntfsrecover", VERSION);
-	printf("Copyright (c) 2012-2015 Jean-Pierre Andre\n");
+	printf("Copyright (c) 2012-2016 Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -3856,7 +3857,6 @@ static void usage(void)
 	fprintf(stderr,"	   -u : undo the latest count transaction sets\n");
 	fprintf(stderr,"	   -v : show more information (-vv yet more)\n");
 	fprintf(stderr,"	   -V : show version and exit\n");
-	fprintf(stderr,"     Copyright (c) 2012-2015 Jean-Pierre Andre\n");
 }
 
 /*
