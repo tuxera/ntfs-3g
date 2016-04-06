@@ -129,7 +129,9 @@ typedef enum {
 /* ntfsdoc p 39 (47), not in layout.h */
 
 typedef struct { /* size 32 */
-	NTFS_RECORD head;
+	NTFS_RECORD_TYPES magic;
+	le16 usa_ofs;
+	le16 usa_count;
 	leLSN chkdsk_lsn;
 	le32 system_page_size;
 	le32 log_page_size;
@@ -195,7 +197,9 @@ typedef struct { /* size 160 */
 /* ntfsdoc p 41 (49), not in layout.h */
 
 typedef struct { /* size 40 */
-	NTFS_RECORD head;       /* the magic is "RCRD" */
+	NTFS_RECORD_TYPES magic;
+	le16 usa_ofs;
+	le16 usa_count;
 	union {
 		leLSN last_lsn;
 		le32 file_offset;

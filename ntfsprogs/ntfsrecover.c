@@ -218,8 +218,8 @@ static int replaceusa(struct BUFFER *buffer, unsigned int lth)
 			/* Do not check beyond used sectors */
 		record = &buffer->block.record;
 		used = blocksz;
-		xusa = le16_to_cpu(record->head.usa_ofs);
-		nusa = le16_to_cpu(record->head.usa_count);
+		xusa = le16_to_cpu(record->usa_ofs);
+		nusa = le16_to_cpu(record->usa_count);
 		if (xusa && nusa
 		   && ((xusa + 1) < lth)
 		   && ((nusa - 1)*NTFSBLKLTH == lth)) {
@@ -2365,11 +2365,11 @@ static void showheadrcrd(u32 blk, const RECORD_PAGE_HEADER *rph)
 
 	if (optv) {
 		printf("magic              %08lx\n",
-			(long)le32_to_cpu(rph->head.magic));
+			(long)le32_to_cpu(rph->magic));
 		printf("usa_ofs            %04x\n",
-			(int)le16_to_cpu(rph->head.usa_ofs));
+			(int)le16_to_cpu(rph->usa_ofs));
 		printf("usa_count          %04x\n",
-			(int)le16_to_cpu(rph->head.usa_count));
+			(int)le16_to_cpu(rph->usa_count));
 		if (blk < 4)
 			printf("file_offset        %08lx\n",
 				(long)le32_to_cpu(rph->copy.file_offset));
@@ -2397,7 +2397,7 @@ static void showheadrcrd(u32 blk, const RECORD_PAGE_HEADER *rph)
 			(long long)sle64_to_cpu(rph->last_end_lsn),
 			(diff < 0 ? "" : "+"),(long)diff);
 		printf("usn                %04x\n",
-			(int)getle16(rph,le16_to_cpu(rph->head.usa_ofs)));
+			(int)getle16(rph,le16_to_cpu(rph->usa_ofs)));
 		printf("\n");
 	} else {
 		if (optt) {
@@ -2597,7 +2597,7 @@ static u16 forward_rcrd(CONTEXT *ctx, u32 blk, u16 pos,
 	BOOL stop;
 
 	rph = &buf->block.record;
-	if (rph && (rph->head.magic == magic_RCRD)) {
+	if (rph && (rph->magic == magic_RCRD)) {
 		data = buf->block.data;
 		showheadrcrd(blk, rph);
 		k = buf->headsz;
@@ -2674,7 +2674,7 @@ static u16 forward_rcrd(CONTEXT *ctx, u32 blk, u16 pos,
 		}
 	} else {
 		printf("** Not a RCRD record, MAGIC 0x%08lx\n",
-			(long)le32_to_cpu(rph->head.magic));
+			(long)le32_to_cpu(rph->magic));
 		k = 0;
 	}
 	return (k);
@@ -2691,15 +2691,15 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 	const char *data;
 
 	data = (const char*)rest;
-	if ((rest->head.magic == magic_RSTR)
-			|| (rest->head.magic == magic_CHKD)) {
+	if ((rest->magic == magic_RSTR)
+			|| (rest->magic == magic_CHKD)) {
 		if (optv) {
 			printf("magic                  %08lx\n",
-				(long)le32_to_cpu(rest->head.magic));
+				(long)le32_to_cpu(rest->magic));
 			printf("usa_ofs                %04x\n",
-				(int)le16_to_cpu(rest->head.usa_ofs));
+				(int)le16_to_cpu(rest->usa_ofs));
 			printf("usa_count              %04x\n",
-				(int)le16_to_cpu(rest->head.usa_count));
+				(int)le16_to_cpu(rest->usa_count));
 			printf("chkdsk_lsn             %016llx\n",
 				(long long)sle64_to_cpu(rest->chkdsk_lsn));
 			printf("system_page_size       %08lx\n",
@@ -2787,7 +2787,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 		}
 	} else
 		printf("Not a RSTR or CHKD record, MAGIC 0x%08lx\n",
-			(long)le32_to_cpu(rest->head.magic));
+			(long)le32_to_cpu(rest->magic));
 }
 
 static BOOL dorest(CONTEXT *ctx, unsigned long blk,
@@ -2925,7 +2925,7 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 	if (buf) {
 		NTFS_RECORD_TYPES magic;
 
-		magic = buf->block.restart.head.magic;
+		magic = buf->block.restart.magic;
 		switch (magic) {
 		case magic_RSTR :
 			break;
@@ -3019,7 +3019,7 @@ static const struct BUFFER *best_start(const struct BUFFER *buf,
 		else
 			best = buf;
 	}
-	if (best && (best->block.record.head.magic != magic_RCRD))
+	if (best && (best->block.record.magic != magic_RCRD))
 		best = (const struct BUFFER*)NULL;
 	return (best);
 }
@@ -3382,8 +3382,8 @@ static TRISTATE backward_rcrd(CONTEXT *ctx, u32 blk, int skipped,
 	if (prevbuf)
 		prevrph = &prevbuf->block.record;
 	data = buf->block.data;
-	if (rph && (rph->head.magic == magic_RCRD)
-	    && (!prevrph || (prevrph->head.magic == magic_RCRD))) {
+	if (rph && (rph->magic == magic_RCRD)
+	    && (!prevrph || (prevrph->magic == magic_RCRD))) {
 		if (optv) {
 			if (optv >= 2)
 				hexdump(data,blocksz);
@@ -3537,7 +3537,7 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 			else
 				skipped = blk - prevblk - 1
 					+ (logfilesz >> blockbits) - BASEBLKS;
-			magic = prevbuf->block.record.head.magic;
+			magic = prevbuf->block.record.magic;
 			switch (magic) {
 			case magic_RCRD :
 				break;
@@ -3652,7 +3652,7 @@ static int walk(CONTEXT *ctx)
 				err = 1;
 				break;
 			}
-			magic = buf->block.record.head.magic;
+			magic = buf->block.record.magic;
 			switch (magic) {
 			case magic_CHKD :
 			case magic_RSTR :
@@ -3790,7 +3790,7 @@ static int walk(CONTEXT *ctx)
 			prevbuf = findprevious(ctx, buf);
 			if (prevbuf) {
 				prevblk = prevbuf->num;
-				magic = prevbuf->block.record.head.magic;
+				magic = prevbuf->block.record.magic;
 				switch (magic) {
 				case magic_RCRD :
 					break;
