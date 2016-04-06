@@ -30,6 +30,8 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni);
 
 int ntfs_get_ntfs_reparse_data(ntfs_inode *ni, char *value, size_t size);
 
+REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni);
+
 int ntfs_set_ntfs_reparse_data(ntfs_inode *ni, const char *value,
 			size_t size, int flags);
 int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni);

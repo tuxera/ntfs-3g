@@ -11,6 +11,11 @@ FUSE_CFLAGS = $(FUSE_MODULE_CFLAGS)
 FUSE_LIBS   = $(FUSE_MODULE_LIBS)
 endif
 
+if !DISABLE_PLUGINS
+plugindir        = $(libdir)/ntfs-3g
+PLUGIN_CFLAGS    = -DPLUGIN_DIR=\"$(plugindir)\"
+endif
+
 if ENABLE_NTFS_3G
 
 bin_PROGRAMS	 = ntfs-3g.probe \
@@ -22,7 +27,7 @@ man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8 \
 		ntfs-3g.usermap.8 \
 		ntfs-3g.secaudit.8
 
-ntfs_3g_LDADD    = $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
+ntfs_3g_LDADD    = -ldl $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 ntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
@@ -30,10 +35,11 @@ ntfs_3g_CFLAGS   =			\
 	$(AM_CFLAGS) 			\
 	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
-	-I$(top_srcdir)/include/ntfs-3g
+	-I$(top_srcdir)/include/ntfs-3g	\
+	$(PLUGIN_CFLAGS)
 ntfs_3g_SOURCES  = ntfs-3g.c ntfs-3g_common.c
 
-lowntfs_3g_LDADD    = $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
+lowntfs_3g_LDADD    = -ldl $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 lowntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
@@ -41,7 +47,8 @@ lowntfs_3g_CFLAGS   =			\
 	$(AM_CFLAGS) 			\
 	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
-	-I$(top_srcdir)/include/ntfs-3g
+	-I$(top_srcdir)/include/ntfs-3g	\
+	$(PLUGIN_CFLAGS)
 lowntfs_3g_SOURCES  = lowntfs-3g.c ntfs-3g_common.c
 
 ntfs_3g_probe_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
@@ -61,9 +68,12 @@ ntfs_3g_secaudit_SOURCES 	= secaudit.c
 
 drivers : $(FUSE_LIBS) ntfs-3g lowntfs-3g
 
-if RUN_LDCONFIG
 install-exec-hook:
+if RUN_LDCONFIG
 	$(LDCONFIG)
+endif
+if !DISABLE_PLUGINS
+	$(MKDIR_P) $(DESTDIR)/$(plugindir)
 endif
 
 if ENABLE_MOUNT_HELPER

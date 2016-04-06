@@ -16,8 +16,10 @@ reliability and feature richness per invested effort wise.
 
 Besides the common file system features, NTFS-3G has support for file 
 ownership and permissions, POSIX ACLs, junction points, extended attributes 
-and creating compressed files. Parameter files in the directory .NTFS-3G may 
-be required to enable them, please get the instructions from
+and creating internally compressed files (parameter files in the directory
+.NTFS-3G may be required to enable them). The new compressed file formats
+available in Windows 10 can also be read through a plugin. For using
+advanced features, please get the instructions from
 
 	http://www.tuxera.com/community/ntfs-3g-advanced/
 
@@ -59,6 +61,7 @@ typing :
 
 Below are a few specific options to ./configure :
 	--disable-ntfsprogs : do not build the ntfsprogs tools,
+	--disable-plugins : disable support for plugins
 	--enable-posix-acls : enable support for Posix ACLs
 	--enable-xattr-mappings : enable system extended attributes mappings
 	--with-fuse=external : use external fuse (overriding Linux default)

@@ -30,7 +30,8 @@ headers = \
 	mst.h		\
 	ntfstime.h	\
 	object_id.h	\
-	param.h	\
+	param.h		\
+	plugin.h	\
 	realpath.h	\
 	reparse.h	\
 	runlist.h	\

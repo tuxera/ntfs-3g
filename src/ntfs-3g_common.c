@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2015 Jean-Pierre Andre
+ * Copyright (c) 2010-2016 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -28,6 +28,10 @@
 #include <stdlib.h>
 #endif
 
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
@@ -46,6 +50,8 @@
 #include "inode.h"
 #include "security.h"
 #include "xattrs.h"
+#include "reparse.h"
+#include "plugin.h"
 #include "ntfs-3g_common.h"
 #include "realpath.h"
 #include "misc.h"
@@ -750,3 +756,109 @@ exit :
 }
 
 #endif /* HAVE_SETXATTR */
+
+#ifndef PLUGINS_DISABLED
+
+int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
+				const plugin_operations_t *ops, void *handle)
+{
+	plugin_list_t *plugin;
+	int res;
+
+	res = -1;
+	plugin = (plugin_list_t*)ntfs_malloc(sizeof(plugin_list_t));
+	if (plugin) {
+		plugin->tag = tag;
+		plugin->ops = ops;
+		plugin->handle = handle;
+		plugin->next = ctx->plugins;
+		ctx->plugins = plugin;
+		res = 0;
+	}
+	return (res);
+}
+
+/*
+ *		Get the reparse operations associated to an inode
+ *
+ *	The plugin able to process the reparse point is dynamically loaded
+ *
+ *	When successful, returns the operations vector and the reparse
+ *		data if requested,
+ *	Otherwise returns NULL, with errno set.
+ */
+
+const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
+				ntfs_inode *ni, REPARSE_POINT **reparse_wanted)
+{
+	const struct plugin_operations *ops;
+	void *handle;
+	REPARSE_POINT *reparse;
+	le32 tag;
+	plugin_list_t *plugin;
+	plugin_init_t pinit;
+
+	ops = (struct plugin_operations*)NULL;
+	reparse = ntfs_get_reparse_point(ni);
+	if (reparse) {
+		tag = reparse->reparse_tag;
+		for (plugin=ctx->plugins; plugin && (plugin->tag != tag);
+						plugin = plugin->next) { }
+		if (plugin) {
+			ops = plugin->ops;
+		} else {
+#ifdef PLUGIN_DIR
+			char name[sizeof(PLUGIN_DIR) + 64];
+
+			snprintf(name,sizeof(name), PLUGIN_DIR
+					"/ntfs-plugin-%08lx.so",
+					(long)le32_to_cpu(tag));
+#else
+			char name[64];
+
+			snprintf(name,sizeof(name), "ntfs-plugin-%08lx.so",
+					(long)le32_to_cpu(tag));
+#endif
+			handle = dlopen(name, RTLD_LAZY);
+			if (handle) {
+				pinit = (plugin_init_t)dlsym(handle, "init");
+				if (pinit) {
+				/* pinit() should set errno if it fails */
+					ops = (*pinit)(tag);
+					if (ops && register_reparse_plugin(ctx,
+							tag, ops, handle))
+						ops = (struct plugin_operations*)NULL;
+				} else
+					errno = ELIBBAD;
+				if (!ops)
+					dlclose(handle);
+			} else {
+				if (!(ctx->errors_logged & ERR_PLUGIN))
+					ntfs_log_perror(
+						"Could not load plugin %s",
+						name);
+				ctx->errors_logged |= ERR_PLUGIN;
+			}
+		}
+		if (ops && reparse_wanted)
+			*reparse_wanted = reparse;
+		else
+			free(reparse);
+	}
+	return (ops);
+}
+
+void close_reparse_plugins(ntfs_fuse_context_t *ctx)
+{
+	while (ctx->plugins) {
+		plugin_list_t *next;
+
+		next = ctx->plugins->next;
+		if (ctx->plugins->handle)
+			dlclose(ctx->plugins->handle);
+		free(ctx->plugins);
+		ctx->plugins = next;
+	}
+}
+
+#endif /* PLUGINS_DISABLED */

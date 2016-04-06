@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2015 Jean-Pierre Andre
+ * Copyright (c) 2007-2016 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -99,6 +99,7 @@
 #include "xattrs.h"
 #include "misc.h"
 #include "ioctl.h"
+#include "plugin.h"
 
 #include "ntfs-3g_common.h"
 
@@ -129,6 +130,22 @@
 
 #define set_archive(ni) (ni)->flags |= FILE_ATTR_ARCHIVE
 
+/*
+ *		Call a function from a reparse plugin (variable arguments)
+ *	Requires "reparse" and "ops" to have been defined
+ *
+ *	Returns a non-negative value if successful,
+ *		and a negative error code if something fails.
+ */
+#define CALL_REPARSE_PLUGIN(ni, op_name, ...)			\
+	 (reparse = (REPARSE_POINT*)NULL,			 \
+	 ops = select_reparse_plugin(ctx, ni, &reparse),	 \
+	 (!ops ? -errno						 \
+		 : (ops->op_name ?				 \
+			 ops->op_name(ni, reparse, __VA_ARGS__)  \
+			 : -EOPNOTSUPP))),			 \
+		 free(reparse)
+
 typedef enum {
 	FSTYPE_NONE,
 	FSTYPE_UNKNOWN,
@@ -144,7 +161,8 @@ typedef struct {
 enum {
 	CLOSE_COMPRESSED = 1,
 	CLOSE_ENCRYPTED = 2,
-	CLOSE_DMTIME = 4
+	CLOSE_DMTIME = 4,
+	CLOSE_REPARSE = 8
 };
 
 static struct ntfs_options opts;
@@ -663,6 +681,67 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 	return NULL;
 }
 
+#ifndef PLUGINS_DISABLED
+
+/*
+ *		Define attributes for a junction or symlink
+ *		(internal plugin)
+ */
+
+static int junction_getattr(ntfs_inode *ni,
+		const REPARSE_POINT *reparse __attribute__((unused)),
+		struct stat *stbuf)
+{
+	char *target;
+	int attr_size;
+	int res;
+
+	errno = 0;
+	target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+		/*
+		 * If the reparse point is not a valid
+		 * directory junction, and there is no error
+		 * we still display as a symlink
+		 */
+	if (target || (errno == EOPNOTSUPP)) {
+			/* returning attribute size */
+		if (target)
+			stbuf->st_size = attr_size;
+		else
+			stbuf->st_size = sizeof(ntfs_bad_reparse);
+		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
+		stbuf->st_mode = S_IFLNK;
+		free(target);
+		res = 0;
+	} else {
+		res = -errno;
+	}
+	return (res);
+}
+
+/*
+ *		Apply permission masks to st_mode returned by a reparse handler
+ */
+
+static void apply_umask(struct stat *stbuf)
+{
+	switch (stbuf->st_mode & S_IFMT) {
+	case S_IFREG :
+		stbuf->st_mode &= ~ctx->fmask;
+		break;
+	case S_IFDIR :
+		stbuf->st_mode &= ~ctx->dmask;
+		break;
+	case S_IFLNK :
+		stbuf->st_mode = (stbuf->st_mode & S_IFMT) | 0777;
+		break;
+	default :
+		break;
+	}
+}
+
+#endif /* PLUGINS_DISABLED */
+
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
 	int res = 0;
@@ -696,10 +775,31 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
                	goto exit;
 	}
 #endif
+	stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+
 	if (((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 		|| (ni->flags & FILE_ATTR_REPARSE_POINT))
 	    && !stream_name_len) {
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			res = CALL_REPARSE_PLUGIN(ni, getattr, stbuf);
+			if (!res) {
+				apply_umask(stbuf);
+				goto ok;
+			} else {
+				stbuf->st_size =
+					sizeof(ntfs_bad_reparse);
+				stbuf->st_blocks =
+					(ni->allocated_size + 511) >> 9;
+				stbuf->st_mode = S_IFLNK;
+				res = 0;
+				goto ok;
+			}
+			goto exit;
+#else /* PLUGINS_DISABLED */
 			char *target;
 			int attr_size;
 
@@ -724,6 +824,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				res = -errno;
 				goto exit;
 			}
+#endif /* PLUGINS_DISABLED */
 		} else {
 			/* Directory. */
 			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
@@ -761,7 +862,6 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		 * See more on the ntfs-3g-devel list.
 		 */
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
-		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
 					stream_name_len);
@@ -845,6 +945,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		}
 		stbuf->st_mode |= (0777 & ~ctx->fmask);
 	}
+#ifndef PLUGINS_DISABLED
+ok:
+#endif /* PLUGINS_DISABLED */
 	if (withusermapping) {
 		if (ntfs_get_owner_mode(&security,ni,stbuf) < 0)
 			set_fuse_error(&res);
@@ -900,6 +1003,36 @@ exit:
 	return res;
 }
 
+#ifndef PLUGINS_DISABLED
+
+/*
+ *		Get the link defined by a junction or symlink
+ *		(internal plugin)
+ */
+
+static int junction_readlink(ntfs_inode *ni,
+			const REPARSE_POINT *reparse __attribute__((unused)),
+			char **pbuf)
+{
+	int attr_size;
+	int res;
+
+	errno = 0;
+	res = 0;
+	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+	if (!*pbuf) {
+		if (errno == EOPNOTSUPP) {
+			*pbuf = strdup(ntfs_bad_reparse);
+			if (!*pbuf)
+				res = -errno;
+		} else
+			res = -errno;
+	}
+	return (res);
+}
+
+#endif /* PLUGINS_DISABLED */
+
 static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 {
 	char *path = NULL;
@@ -926,6 +1059,21 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		 * Reparse point : analyze as a junction point
 		 */
 	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+		char *gotlink;
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		gotlink = (char*)NULL;
+		res = CALL_REPARSE_PLUGIN(ni, readlink, &gotlink);
+		if (gotlink) {
+			strncpy(buf, gotlink, buf_size);
+			free(gotlink);
+		} else {
+			strncpy(buf, ntfs_bad_reparse, buf_size);
+			res = 0;
+		}
+#else /* PLUGINS_DISABLED */
 		char *target;
 		int attr_size;
 
@@ -940,6 +1088,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 				strcpy(buf,ntfs_bad_reparse);
 			else
 				res = -errno;
+#endif /* PLUGINS_DISABLED */
 		goto exit;
 	}
 	/* Sanity checks. */
@@ -1163,7 +1312,7 @@ static int ntfs_fuse_open(const char *org_path,
 #endif
 {
 	ntfs_inode *ni;
-	ntfs_attr *na;
+	ntfs_attr *na = NULL;
 	int res = 0;
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -1178,50 +1327,66 @@ static int ntfs_fuse_open(const char *org_path,
 		return stream_name_len;
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (ni) {
-		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-		if (na) {
-#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-			if (ntfs_fuse_fill_security_context(&security)) {
-				if (fi->flags & O_WRONLY)
-					accesstype = S_IWRITE;
-				else
-					if (fi->flags & O_RDWR)
-						 accesstype = S_IWRITE | S_IREAD;
-					else
-						accesstype = S_IREAD;
-				/*
-				 * directory must be searchable
-				 * and requested access allowed
-				 */
-				if (!ntfs_allowed_dir_access(&security,
-					    path,(ntfs_inode*)NULL,ni,S_IEXEC)
-				  || !ntfs_allowed_access(&security,
-						ni,accesstype))
-					res = -EACCES;
+		if (!(ni->flags & FILE_ATTR_REPARSE_POINT)) {
+			na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+			if (!na) {
+				res = -errno;
+				goto close;
 			}
+		}
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		if (ntfs_fuse_fill_security_context(&security)) {
+			if (fi->flags & O_WRONLY)
+				accesstype = S_IWRITE;
+			else
+				if (fi->flags & O_RDWR)
+					 accesstype = S_IWRITE | S_IREAD;
+				else
+					accesstype = S_IREAD;
+			/*
+			 * directory must be searchable
+			 * and requested access allowed
+			 */
+			if (!ntfs_allowed_dir_access(&security,
+				    path,(ntfs_inode*)NULL,ni,S_IEXEC)
+			  || !ntfs_allowed_access(&security,
+					ni,accesstype))
+				res = -EACCES;
+		}
 #endif
-			if ((res >= 0)
-			    && (fi->flags & (O_WRONLY | O_RDWR))) {
-			/* mark a future need to compress the last chunk */
-				if (na->data_flags & ATTR_COMPRESSION_MASK)
-					fi->fh |= CLOSE_COMPRESSED;
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			fi->fh = 0;
+			res = CALL_REPARSE_PLUGIN(ni, open, fi);
+#else /* PLUGINS_DISABLED */
+			res = -EOPNOTSUPP;
+#endif /* PLUGINS_DISABLED */
+			goto close;
+		}
+		if ((res >= 0)
+		    && (fi->flags & (O_WRONLY | O_RDWR))) {
+		/* mark a future need to compress the last chunk */
+			if (na->data_flags & ATTR_COMPRESSION_MASK)
+				fi->fh |= CLOSE_COMPRESSED;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
-				if (ctx->efs_raw
-				    && !(na->data_flags & ATTR_IS_ENCRYPTED)
-				    && (ni->flags & FILE_ATTR_ENCRYPTED))
-					fi->fh |= CLOSE_ENCRYPTED;
+			if (ctx->efs_raw
+			    && !(na->data_flags & ATTR_IS_ENCRYPTED)
+			    && (ni->flags & FILE_ATTR_ENCRYPTED))
+				fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
-			/* mark a future need to update the mtime */
-				if (ctx->dmtime)
-					fi->fh |= CLOSE_DMTIME;
-			/* deny opening metadata files for writing */
-				if (ni->mft_no < FILE_first_user)
-					res = -EPERM;
-			}
-			ntfs_attr_close(na);
-		} else
-			res = -errno;
+		/* mark a future need to update the mtime */
+			if (ctx->dmtime)
+				fi->fh |= CLOSE_DMTIME;
+		/* deny opening metadata files for writing */
+			if (ni->mft_no < FILE_first_user)
+				res = -EPERM;
+		}
+		ntfs_attr_close(na);
+close:
 		if (ntfs_inode_close(ni))
 			set_fuse_error(&res);
 	} else
@@ -1252,6 +1417,24 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
+		goto exit;
+	}
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		if (stream_name_len || !fi) {
+			res = -EINVAL;
+			goto exit;
+		}
+		res = CALL_REPARSE_PLUGIN(ni, read, buf, size, offset, fi);
+		if (res >= 0) {
+			goto stamps;
+		}
+#else /* PLUGINS_DISABLED */
+		res = -EOPNOTSUPP;
+#endif /* PLUGINS_DISABLED */
 		goto exit;
 	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
@@ -1289,8 +1472,11 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		total += ret;
 	}
 ok:
-	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_ATIME);
 	res = total;
+#ifndef PLUGINS_DISABLED
+stamps:
+#endif /* PLUGINS_DISABLED */
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -1321,6 +1507,24 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		if (stream_name_len || !fi) {
+			res = -EINVAL;
+			goto exit;
+		}
+		res = CALL_REPARSE_PLUGIN(ni, write, buf, size, offset, fi);
+		if (res >= 0) {
+			goto stamps;
+		}
+#else /* PLUGINS_DISABLED */
+		res = -EOPNOTSUPP;
+#endif /* PLUGINS_DISABLED */
+		goto exit;
+	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na) {
 		res = -errno;
@@ -1337,15 +1541,18 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		total  += ret;
 	}
 	res = total;
+#ifndef PLUGINS_DISABLED
+stamps: 
+#endif /* PLUGINS_DISABLED */
 	if ((res > 0)
 	    && (!ctx->dmtime
 		|| (sle64_to_cpu(ntfs_current_time())
 		     - sle64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
-		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (total)
+	if (res > 0)
 		set_archive(ni);
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -1365,8 +1572,14 @@ static int ntfs_fuse_release(const char *org_path,
 	ntfschar *stream_name;
 	int stream_name_len, res;
 
+	if (!fi) {
+		res = -EINVAL;
+		goto out;
+	}
+
 	/* Only for marked descriptors there is something to do */
-	if (!(fi->fh & (CLOSE_COMPRESSED | CLOSE_ENCRYPTED | CLOSE_DMTIME))) {
+	
+	if (!fi->fh) {
 		res = 0;
 		goto out;
 	}
@@ -1380,20 +1593,42 @@ static int ntfs_fuse_release(const char *org_path,
 		res = -errno;
 		goto exit;
 	}
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		if (stream_name_len) {
+			res = -EINVAL;
+			goto exit;
+		}
+		res = CALL_REPARSE_PLUGIN(ni, release, fi);
+		if (!res) {
+			goto stamps;
+		}
+#else /* PLUGINS_DISABLED */
+			/* Assume release() was not needed */
+		res = 0;
+#endif /* PLUGINS_DISABLED */
+		goto exit;
+	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na) {
 		res = -errno;
 		goto exit;
 	}
 	res = 0;
-	if (fi->fh & CLOSE_DMTIME)
-		ntfs_inode_update_times(na->ni,NTFS_UPDATE_MCTIME);
 	if (fi->fh & CLOSE_COMPRESSED)
 		res = ntfs_attr_pclose(na);
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	if (fi->fh & CLOSE_ENCRYPTED)
 		res = ntfs_efs_fixup_attribute(NULL, na);
 #endif /* HAVE_SETXATTR */
+#ifndef PLUGINS_DISABLED
+stamps:
+#endif /* PLUGINS_DISABLED */
+	if (fi->fh & CLOSE_DMTIME)
+		ntfs_inode_update_times(ni,NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -1440,6 +1675,25 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 		goto exit;
 	}
 
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		if (stream_name_len) {
+			res = -EINVAL;
+			goto exit;
+		}
+		res = CALL_REPARSE_PLUGIN(ni, truncate, size);
+		if (!res) {
+			set_archive(ni);
+			goto stamps;
+		}
+#else /* PLUGINS_DISABLED */
+		res = -EOPNOTSUPP;
+#endif /* PLUGINS_DISABLED */
+		goto exit;
+	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na)
 		goto exit;
@@ -1472,8 +1726,11 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 			goto exit;
 	if (oldsize != size)
 		set_archive(ni);
-	
-	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
+
+#ifndef PLUGINS_DISABLED	
+stamps:
+#endif /* PLUGINS_DISABLED */
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_MCTIME);
 	errno = 0;
 exit:
 	res = -errno;
@@ -3352,6 +3609,20 @@ exit:
 #endif
 #endif /* HAVE_SETXATTR */
 
+#ifndef PLUGINS_DISABLED
+static void register_internal_reparse_plugins(void)
+{
+	static const plugin_operations_t ops = {
+		.getattr = junction_getattr,
+		.readlink = junction_readlink,
+	} ;
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_MOUNT_POINT,
+					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_SYMLINK,
+					&ops, (void*)NULL);
+}
+#endif /* PLUGINS_DISABLED */
+
 static void ntfs_close(void)
 {
 	struct SECURITY_CONTEXT security;
@@ -3968,6 +4239,10 @@ int main(int argc, char *argv[])
 		free(ctx->xattrmap_path);
 #endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
 
+#ifndef PLUGINS_DISABLED
+	register_internal_reparse_plugins();
+#endif /* PLUGINS_DISABLED */
+
 	fh = mount_fuse(parsed_options);
 	if (!fh) {
 		err = NTFS_VOLUME_FUSE_ERROR;
@@ -4005,6 +4280,9 @@ err_out:
 #endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
 err2:
 	ntfs_close();
+#ifndef PLUGINS_DISABLED
+	close_reparse_plugins(ctx);
+#endif /* PLUGINS_DISABLED */
 	free(ctx);
 	free(parsed_options);
 	free(opts.options);

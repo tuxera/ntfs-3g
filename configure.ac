@@ -122,6 +122,14 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[plugins],
+	[AS_HELP_STRING([--disable-plugins], [Disable external reparse point
+	 plugins for the ntfs-3g FUSE driver])],
+	,
+	[disable_plugins="no"]
+)
+
+AC_ARG_ENABLE(
 	[device-default-io-ops],
 	[AS_HELP_STRING([--disable-device-default-io-ops],[install default IO ops])],
 	,
@@ -566,6 +574,7 @@ test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
 test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
 test "${enable_posix_acls}" != "no" && AC_DEFINE([POSIXACLS], [1], [POSIX ACL support])
 test "${enable_xattr_mappings}" != "no" && AC_DEFINE([XATTR_MAPPINGS], [1], [system extended attributes mappings])
+test "${disable_plugins}" != "no" && AC_DEFINE([DISABLE_PLUGINS], [1], [Define to 1 for disabling reparse plugins])
 
 test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"
@@ -617,6 +626,7 @@ AM_CONDITIONAL([ENABLE_NTFS_3G], [test "${enable_ntfs_3g}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" = "yes"])
 AM_CONDITIONAL([ENABLE_EXTRAS], [test "${enable_extras}" = "yes"])
 AM_CONDITIONAL([ENABLE_QUARANTINED], [test "${enable_quarantined}" = "yes"])
+AM_CONDITIONAL([DISABLE_PLUGINS], [test "${disable_plugins}" != "no"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then

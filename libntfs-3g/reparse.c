@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2008-2014 Jean-Pierre Andre
+ * Copyright (c) 2008-2016 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1256,3 +1256,31 @@ int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 }
 
 #endif /* HAVE_SETXATTR */
+
+/*
+ *		Get the reparse data into a buffer
+ *
+ *	Returns the buffer if the reparse data exists and is valid
+ *		NULL otherwise (with errno set according to the cause).
+ *	When a buffer is returned, it has to be freed by caller.
+ */
+
+REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni)
+{
+	s64 attr_size = 0;
+	REPARSE_POINT *reparse_attr;
+
+	reparse_attr = (REPARSE_POINT*)NULL;
+	if (ni) {
+		reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
+			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
+		if (reparse_attr
+		    && !valid_reparse_data(ni, reparse_attr, attr_size)) {
+			free(reparse_attr);
+			reparse_attr = (REPARSE_POINT*)NULL;
+			errno = ENOENT;
+		}
+	} else
+		errno = EINVAL;
+	return (reparse_attr);
+}
