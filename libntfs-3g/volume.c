@@ -97,6 +97,11 @@ static const char *hibernated_volume_msg =
 "Windows fully (no hibernation or fast restarting), or mount the volume\n"
 "read-only with the 'ro' mount option.\n";
 
+static const char *fallback_readonly_msg =
+"Falling back to read-only mount because the NTFS partition is in an\n"
+"unsafe state. Please resume and shutdown Windows fully (no hibernation\n"
+"or fast restarting.)\n";
+
 static const char *unclean_journal_msg =
 "Write access is denied because the disk wasn't safely powered\n"
 "off and the 'norecover' mount option was specified.\n";
@@ -914,7 +919,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	int i, j, eo;
 	unsigned int k;
 	u32 u;
+	BOOL need_fallback_ro;
 
+	need_fallback_ro = FALSE;
 	vol = ntfs_volume_startup(dev, flags);
 	if (!vol)
 		return NULL;
@@ -1233,20 +1240,35 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	 */
 	if (!(flags & (NTFS_MNT_RDONLY | NTFS_MNT_FORENSIC))) {
 		if (!(flags & NTFS_MNT_IGNORE_HIBERFILE) &&
-		    ntfs_volume_check_hiberfile(vol, 1) < 0)
-			goto error_exit;
+		    ntfs_volume_check_hiberfile(vol, 1) < 0) {
+			if (flags & NTFS_MNT_MAY_RDONLY)
+				need_fallback_ro = TRUE;
+			else
+				goto error_exit;
+			}
 		if (ntfs_volume_check_logfile(vol) < 0) {
 			/* Always reject cached metadata for now */
-			if (!(flags & NTFS_MNT_RECOVER) || (errno == EPERM))
-				goto error_exit;
-			ntfs_log_info("The file system wasn't safely "
-				      "closed on Windows. Fixing.\n");
-			if (ntfs_logfile_reset(vol))
-				goto error_exit;
+			if (!(flags & NTFS_MNT_RECOVER) || (errno == EPERM)) {
+				if (flags & NTFS_MNT_MAY_RDONLY)
+					need_fallback_ro = TRUE;
+				else
+					goto error_exit;
+			} else {
+				ntfs_log_info("The file system wasn't safely "
+					      "closed on Windows. Fixing.\n");
+				if (ntfs_logfile_reset(vol))
+					goto error_exit;
+			}
 		}
 		/* make $TXF_DATA resident if present on the root directory */
-		if (fix_txf_data(vol))
-			goto error_exit;
+		if (!(flags & NTFS_MNT_RDONLY) && !need_fallback_ro) {
+			if (fix_txf_data(vol))
+				goto error_exit;
+		}
+	}
+	if (need_fallback_ro) {
+		NVolSetReadOnly(vol);
+		ntfs_log_error("%s", fallback_readonly_msg);
 	}
 
 	return vol;

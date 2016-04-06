@@ -3744,6 +3744,8 @@ static int ntfs_open(const char *device)
 		flags |= NTFS_MNT_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= NTFS_MNT_RDONLY;
+	else
+		flags |= NTFS_MNT_MAY_RDONLY;
 	if (ctx->recover)
 		flags |= NTFS_MNT_RECOVER;
 	if (ctx->hiberfile)
