@@ -150,6 +150,7 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
    STATUS_FILE_NOT_FOUND =       0xC0000028,
    STATUS_OBJECT_NAME_INVALID =  0xC0000033,
    STATUS_OBJECT_NAME_NOT_FOUND = 0xC0000034,
+   STATUS_SHARING_VIOLATION =    0xC0000043,
    STATUS_INVALID_PARAMETER_1 =  0xC00000EF,
    STATUS_IO_DEVICE_ERROR =      0xC0000185,
    STATUS_GUARD_PAGE_VIOLATION = 0x80000001
@@ -354,6 +355,8 @@ static int ntfs_ntstatus_to_errno(NTSTATUS status)
 		case STATUS_IO_DEVICE_ERROR :
 		case STATUS_END_OF_FILE :
 			return (EIO);
+		case STATUS_SHARING_VIOLATION :
+			return (EBUSY);
 		default:
 			/* generic message */
 			return ENOMSG;
