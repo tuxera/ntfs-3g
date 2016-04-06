@@ -486,6 +486,9 @@ int main(int argc, char *argv[])
 	struct match m;
 	int res;
 	int result = 1;
+#ifdef HAVE_WINDOWS_H
+	char *unix_name;
+#endif
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
@@ -521,7 +524,17 @@ int main(int argc, char *argv[])
 			result = cluster_find(vol, opts.range_begin, opts.range_end, (cluster_cb*)&print_match, NULL);
 			break;
 		case act_file:
+#ifdef HAVE_WINDOWS_H
+			unix_name = ntfs_utils_unix_path(opts.filename);
+			ino = 0;
+			if (unix_name) {
+				ino = ntfs_pathname_to_inode(vol, NULL,
+								unix_name);
+				free(unix_name);
+			}
+#else
 			ino = ntfs_pathname_to_inode(vol, NULL, opts.filename);
+#endif
 			if (ino)
 				result = dump_file(vol, ino);
 			break;
