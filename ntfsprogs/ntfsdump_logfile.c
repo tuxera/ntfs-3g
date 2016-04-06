@@ -319,7 +319,7 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array size is "
 				"wrong.  Cannot handle this yet.\n");
-	if (le16_to_cpu(rstr->usa_ofs) < sizeof(RESTART_PAGE_HEADER))
+	if (le16_to_cpu(rstr->usa_ofs) < offsetof(RESTART_PAGE_HEADER, usn))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array overlaps "
 				"restart page header.  Cannot handle this "

@@ -93,7 +93,8 @@ typedef struct {
 				   version is 1. */
 /* 28*/	sle16 major_ver;	/* Log file major version.  We only support
 				   version 1.1. */
-/* sizeof() = 30 (0x1e) bytes */
+/* 30*/	le16 usn;
+/* sizeof() = 32 (0x20) bytes */
 } __attribute__((__packed__)) RESTART_PAGE_HEADER;
 
 /*

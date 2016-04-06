@@ -119,7 +119,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	/* Verify the position of the update sequence array. */
 	usa_ofs = le16_to_cpu(rp->usa_ofs);
 	usa_end = usa_ofs + usa_count * sizeof(u16);
-	if (usa_ofs < sizeof(RESTART_PAGE_HEADER) ||
+	if (usa_ofs < offsetof(RESTART_PAGE_HEADER, usn) ||
 			usa_end > NTFS_BLOCK_SIZE - sizeof(u16)) {
 		ntfs_log_error("$LogFile restart page specifies "
 				"inconsistent update sequence array offset.\n");
@@ -134,7 +134,7 @@ skip_usa_checks:
 	 */
 	ra_ofs = le16_to_cpu(rp->restart_area_offset);
 	if (ra_ofs & 7 || (have_usa ? ra_ofs < usa_end :
-			ra_ofs < sizeof(RESTART_PAGE_HEADER)) ||
+			ra_ofs < offsetof(RESTART_PAGE_HEADER, usn)) ||
 			ra_ofs > logfile_system_page_size) {
 		ntfs_log_error("$LogFile restart page specifies "
 				"inconsistent restart area offset.\n");
