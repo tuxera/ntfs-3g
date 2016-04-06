@@ -1629,6 +1629,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	int err;
 	u32 usa_ofs;
 	le16 seq_no, usn;
+	BOOL oldwarn;
 
 	if (base_ni)
 		ntfs_log_enter("Entering (allocating an extent mft record for "
@@ -1742,10 +1743,22 @@ found_free_rec:
 	if (!m)
 		goto undo_mftbmp_alloc;
 	
+	/*
+	 * As this is allocating a new record, do not expect it to have
+	 * been initialized previously, so do not warn over bad fixups
+	 * (hence avoid warn flooding when an NTFS partition has been wiped).
+	 */
+	oldwarn = !NVolNoFixupWarn(vol);
+	NVolSetNoFixupWarn(vol);
 	if (ntfs_mft_record_read(vol, bit, m)) {
+		if (oldwarn)
+			NVolClearNoFixupWarn(vol);
 		free(m);
 		goto undo_mftbmp_alloc;
 	}
+	if (oldwarn)
+		NVolClearNoFixupWarn(vol);
+
 	/* Sanity check that the mft record is really not in use. */
 	if (ntfs_is_file_record(m->magic) && (m->flags & MFT_RECORD_IN_USE)) {
 		ntfs_log_error("Inode %lld is used but it wasn't marked in "
