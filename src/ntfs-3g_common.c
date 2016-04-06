@@ -48,6 +48,7 @@
 #include <fuse.h>
 
 #include "inode.h"
+#include "dir.h"
 #include "security.h"
 #include "xattrs.h"
 #include "reparse.h"
@@ -862,3 +863,60 @@ void close_reparse_plugins(ntfs_fuse_context_t *ctx)
 }
 
 #endif /* PLUGINS_DISABLED */
+
+#ifdef HAVE_SETXATTR
+
+/*
+ *		Check whether a user xattr is allowed
+ *
+ *	The inode must be a plain file or a directory. The only allowed
+ *	metadata file is the root directory (useful for MacOSX and hopefully
+ *	does not harm Windows).
+ */
+
+BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx, ntfs_inode *ni)
+{
+	u32 dt_type;
+	BOOL res;
+
+		/* Quick return for common cases and root */
+	if (!(ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+	    || (ni->mft_no == FILE_root))
+		res = TRUE;
+	else {
+			/* Reparse point depends on kind, see plugin */
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef PLUGINS_DISABLED
+			struct stat stbuf;
+			REPARSE_POINT *reparse;
+			const plugin_operations_t *ops;
+
+			res = FALSE; /* default for error cases */
+			ops = select_reparse_plugin(ctx, ni, &reparse);
+			if (ops) {
+				if (ops->getattr
+				    && !ops->getattr(ni,reparse,&stbuf)) {
+					res = S_ISREG(stbuf.st_mode)
+						    || S_ISDIR(stbuf.st_mode);
+				}
+				free(reparse);
+#else /* PLUGINS_DISABLED */
+			res = FALSE; /* mountpoints, symlinks, ... */
+#endif /* PLUGINS_DISABLED */
+			}
+		} else {
+				/* Metadata */
+			if (ni->mft_no < FILE_first_user)
+				res = FALSE;
+			else {
+				/* Interix types */
+				dt_type = ntfs_interix_types(ni);
+				res = (dt_type == NTFS_DT_REG)
+					|| (dt_type == NTFS_DT_DIR);
+			}
+		}
+	}
+	return (res);
+}
+
+#endif /* HAVE_SETXATTR */

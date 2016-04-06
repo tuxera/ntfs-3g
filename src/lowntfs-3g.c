@@ -3165,7 +3165,7 @@ static void ntfs_fuse_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		goto out;
 	}
 		/* Return with no result for symlinks, fifo, etc. */
-	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+	if (!user_xattrs_allowed(ctx, ni))
 		goto exit;
 		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -3314,7 +3314,7 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto out;
 	}
 		/* Return with no result for symlinks, fifo, etc. */
-	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+	if (!user_xattrs_allowed(ctx, ni)) {
 		res = -ENODATA;
 		goto exit;
 	}
@@ -3511,7 +3511,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		break;
 	default :
 		/* User xattr not allowed for symlinks, fifo, etc. */
-		if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+		if (!user_xattrs_allowed(ctx, ni)) {
 			res = -EPERM;
 			goto exit;
 		}
@@ -3524,7 +3524,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && !user_xattrs_allowed(ctx, ni)) {
 		res = -EPERM;
 		goto exit;
 	}
@@ -3756,7 +3756,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 		break;
 	default :
 		/* User xattr not allowed for symlinks, fifo, etc. */
-		if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+		if (!user_xattrs_allowed(ctx, ni)) {
 			res = -EPERM;
 			goto exit;
 		}
@@ -3769,7 +3769,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 #else
 		/* User xattr not allowed for symlinks, fifo, etc. */
 	if ((namespace == XATTRNS_USER)
-	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+	    && !user_xattrs_allowed(ctx, ni)) {
 		res = -EPERM;
 		goto exit;
 	}

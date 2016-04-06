@@ -208,6 +208,7 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 				ntfs_inode *ni, REPARSE_POINT **reparse);
 int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
                                 const plugin_operations_t *ops, void *handle);
+BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx, ntfs_inode *ni);
 
 #endif /* PLUGINS_DISABLED */
 

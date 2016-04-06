@@ -109,6 +109,7 @@ extern int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		void *dirent, ntfs_filldir_t filldir);
 
 ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni);
+u32 ntfs_interix_types(ntfs_inode *ni);
 
 int ntfs_get_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			char *value, size_t size);

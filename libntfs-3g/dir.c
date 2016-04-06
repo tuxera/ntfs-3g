@@ -875,7 +875,7 @@ typedef enum {
  *	and most metadata files have such similar patters.
  */
 
-static u32 ntfs_interix_types(ntfs_inode *ni)
+u32 ntfs_interix_types(ntfs_inode *ni)
 {
 	ntfs_attr *na;
 	u32 dt_type;
@@ -884,8 +884,14 @@ static u32 ntfs_interix_types(ntfs_inode *ni)
 	dt_type = NTFS_DT_UNKNOWN;
 	na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
 	if (na) {
-		/* Unrecognized patterns (eg HID + SYST) are plain files */
-		dt_type = NTFS_DT_REG;
+		/*
+		 * Unrecognized patterns (eg HID + SYST for metadata)
+		 * are plain files or directories
+		 */
+		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			dt_type = NTFS_DT_DIR;
+		else
+			dt_type = NTFS_DT_REG;
 		if (na->data_size <= 1) {
 			if (!(ni->flags & FILE_ATTR_HIDDEN))
 				dt_type = (na->data_size ?
