@@ -2742,7 +2742,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 			printf("last_lsn_data_len      %08lx\n",
 				(long)le32_to_cpu(resa->last_lsn_data_length));
 			printf("record_length          %04x\n",
-				(int)le16_to_cpu(resa->record_length));
+				(int)le16_to_cpu(resa->log_record_header_length));
 			printf("log_page_data_offs     %04x\n",
 				(int)le16_to_cpu(resa->log_page_data_offset));
 			printf("restart_log_open_count %08lx\n",

@@ -154,7 +154,7 @@ typedef struct { /* size 44 */
 	le16 client_array_offset;
 	le64 file_size;
 	le32 last_lsn_data_length;
-	le16 record_length;
+	le16 log_record_header_length;
 	le16 log_page_data_offset;
 	le32 restart_log_open_count;
 } __attribute__((__packed__)) RESTART_AREA;
