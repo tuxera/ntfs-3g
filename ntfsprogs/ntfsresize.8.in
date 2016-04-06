@@ -88,7 +88,7 @@ To enlarge an NTFS filesystem, first you must enlarge the size of the
 underlying partition. This can be done using
 .BR fdisk (8)
 by deleting the partition and recreating it with a larger size.
-Make sure it will not overlap with an other existing partition.
+Make sure it will not overlap with another existing partition.
 You may enlarge upwards (first sector unchanged) or downwards (last
 sector unchanged), but you may not enlarge at both ends in a single step.
 If you merge two NTFS partitions, only one of them can be expanded to the
