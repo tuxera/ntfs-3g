@@ -135,7 +135,7 @@ typedef struct { /* size 32 */
 	leLSN chkdsk_lsn;
 	le32 system_page_size;
 	le32 log_page_size;
-	le16 restart_offset;
+	le16 restart_area_offset;
 	le16 minor_ver;
 	le16 major_ver;
 	le16 usn;

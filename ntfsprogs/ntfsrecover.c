@@ -2704,8 +2704,8 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 				(long)le32_to_cpu(rest->system_page_size));
 			printf("log_page_size          %08lx\n",
 				(long)le32_to_cpu(rest->log_page_size));
-			printf("restart_offset         %04x\n",
-				(int)le16_to_cpu(rest->restart_offset));
+			printf("restart_area_offset         %04x\n",
+				(int)le16_to_cpu(rest->restart_area_offset));
 			printf("minor_vers             %d\n",
 				(int)le16_to_cpu(rest->minor_ver));
 			printf("major_vers             %d\n",
@@ -2719,7 +2719,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 				    (long long)sle64_to_cpu(rest->chkdsk_lsn));
 		}
 		resa = (const RESTART_AREA*)
-				&data[le16_to_cpu(rest->restart_offset)];
+				&data[le16_to_cpu(rest->restart_area_offset)];
 		if (optv) {
 			printf("current_lsn            %016llx\n",
 				(long long)sle64_to_cpu(resa->current_lsn));
@@ -2755,7 +2755,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 		}
 
 		rcli = (const LOG_CLIENT_RECORD*)
-				&data[le16_to_cpu(rest->restart_offset)
+				&data[le16_to_cpu(rest->restart_area_offset)
 				+ le16_to_cpu(resa->client_array_offset)];
 		if (optv) {
 			printf("oldest_lsn             %016llx\n",
@@ -2801,7 +2801,7 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 	BOOL dirty;
 
 	data = (const char*)rph;
-	offs = le16_to_cpu(rph->restart_offset);
+	offs = le16_to_cpu(rph->restart_area_offset);
 	resa = (const RESTART_AREA*)&data[offs];
 	rcli = (const LOG_CLIENT_RECORD*)&data[offs
 				+ le16_to_cpu(resa->client_array_offset)];
@@ -2812,7 +2812,7 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 		synced_lsn = sle64_to_cpu(rcli->oldest_lsn);
 		memcpy(&log_header, rph,
 				sizeof(RESTART_PAGE_HEADER));
-		offs = le16_to_cpu(log_header.restart_offset);
+		offs = le16_to_cpu(log_header.restart_area_offset);
 		memcpy(&restart, &data[offs],
 				sizeof(RESTART_AREA));
 		offs += le16_to_cpu(restart.client_array_offset);
@@ -2858,7 +2858,7 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 			latest_lsn = sle64_to_cpu(resa->current_lsn);
 			memcpy(&log_header, rph,
 					sizeof(RESTART_PAGE_HEADER));
-			offs = le16_to_cpu(log_header.restart_offset);
+			offs = le16_to_cpu(log_header.restart_area_offset);
 			memcpy(&restart, &data[offs],
 					sizeof(RESTART_AREA));
 			offs += le16_to_cpu(restart.client_array_offset);
@@ -2975,7 +2975,7 @@ static int reset_logfile(CONTEXT *ctx __attribute__((unused)))
 		client.oldest_lsn = cpu_to_sle64(restart_lsn);
 		memcpy(buffer, &log_header,
 					sizeof(RESTART_PAGE_HEADER));
-		off = le16_to_cpu(log_header.restart_offset);
+		off = le16_to_cpu(log_header.restart_area_offset);
 		memcpy(&buffer[off], &restart,
 					sizeof(RESTART_AREA));
 		off += le16_to_cpu(restart.client_array_offset);
@@ -3117,7 +3117,7 @@ static BOOL getlogfiledata(CONTEXT *ctx, const char *boot)
 	fseek(ctx->file,0L,2);
 	size = ftell(ctx->file);
 	rph = (const RESTART_PAGE_HEADER*)boot;
-	off = le16_to_cpu(rph->restart_offset);
+	off = le16_to_cpu(rph->restart_area_offset);
 	rest = (const RESTART_AREA*)&boot[off];
 
 		/* estimate cluster size from log file size (unreliable) */
