@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2015 Jean-Pierre Andre
+ * Copyright (c) 2010-2016 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -160,6 +160,7 @@ static struct {
 	int new_serial;
 	int metadata_image;
 	int preserve_timestamps;
+	int full_logfile;
 	int restore_image;
 	char *output;
 	char *volume;
@@ -368,6 +369,7 @@ static void usage(int ret)
 		"    -t, --preserve-timestamps Do not clear the timestamps\n"
 		"    -q, --quiet            Do not display any progress bars\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
+		"        --full-logfile     Include the full logfile in metadata output\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
 		"    -d, --debug            Show debug information\n"
@@ -391,7 +393,7 @@ static void version(void)
 		   "Efficiently clone, image, restore or rescue an NTFS Volume.\n\n"
 		   "Copyright (c) 2003-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
-		   "Copyright (c) 2010-2015 Jean-Pierre Andre\n\n");
+		   "Copyright (c) 2010-2016 Jean-Pierre Andre\n\n");
 	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(0);
 }
@@ -415,6 +417,7 @@ static void parse_options(int argc, char **argv)
 		{ "rescue",           no_argument,	 NULL, 'R' },
 		{ "new-serial",       no_argument,	 NULL, 'I' },
 		{ "new-half-serial",  no_argument,	 NULL, 'i' },
+		{ "full-logfile",     no_argument,	 NULL, 'l' },
 		{ "save-image",	      no_argument,	 NULL, 's' },
 		{ "preserve-timestamps",   no_argument,  NULL, 't' },
 		{ "version",	      no_argument,	 NULL, 'V' },
@@ -450,6 +453,9 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 'I':	/* not proposed as a short option */
 			opt.new_serial |= 2;
+			break;
+		case 'l':
+			opt.full_logfile++;
 			break;
 		case 'm':
 			opt.metadata++;
@@ -633,7 +639,7 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 		if (inode == FILE_BadClus && image->ctx->attr->type == AT_DATA)
 			return 0;
 
-		if (inode != FILE_LogFile)
+		if ((inode != FILE_LogFile) || opt.full_logfile)
 			return rl->length;
 
 		if (image->ctx->attr->type == AT_DATA) {
@@ -2150,11 +2156,20 @@ static void mount_volume(unsigned long new_mntflag)
 		 * Normally avoided in order to get the original log file
 		 * data, but needed when remounting the metadata of a
 		 * volume improperly unmounted from Windows.
+		 * If the full log file was requested, it must be kept
+		 * as is, so we just remount read-only.
 		 */
 		if (!(new_mntflag & (NTFS_MNT_RDONLY | NTFS_MNT_RECOVER))) {
-			Printf("Trying to recover...\n");
-			vol = ntfs_mount(opt.volume,
+			if (opt.full_logfile) {
+				Printf("Retrying read-only to ignore"
+							" the log file...\n");
+				vol = ntfs_mount(opt.volume,
+					 new_mntflag | NTFS_MNT_RDONLY);
+			} else {
+				Printf("Trying to recover...\n");
+				vol = ntfs_mount(opt.volume,
 					new_mntflag | NTFS_MNT_RECOVER);
+			}
 			Printf("... %s\n",(vol ? "Successful" : "Failed"));
 		}
 		if (!vol)

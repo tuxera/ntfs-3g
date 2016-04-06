@@ -235,8 +235,11 @@ inconsistency are saved too.
 Do not wipe the timestamps, to be used only with the
 .B \-\-metadata
 option.
-
-
+.TP
+\fB\-\-full\-logfile\fR
+Include the Windows log file in the copy. This is only useful for
+extracting metadata, saving or cloning a file system which was not
+properly unmounted from Windows.
 .TP
 \fB\-\-new\-serial\fR, or
 .TP
