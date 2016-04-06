@@ -128,7 +128,7 @@ typedef enum {
 
 /* ntfsdoc p 39 (47), not in layout.h */
 
-typedef struct RESTART_PAGE_HEADER { /* size 32 */
+typedef struct { /* size 32 */
 	NTFS_RECORD head;
 	leLSN chkdsk_lsn;
 	le32 system_page_size;
@@ -141,7 +141,7 @@ typedef struct RESTART_PAGE_HEADER { /* size 32 */
 
 /* ntfsdoc p 40 (48), not in layout.h */
 
-struct RESTART_AREA { /* size 44 */
+typedef struct { /* size 44 */
 	leLSN current_lsn;
 	le16 log_clients;
 	le16 client_free_list;
@@ -155,9 +155,9 @@ struct RESTART_AREA { /* size 44 */
 	le16 record_length;
 	le16 log_page_data_offset;
 	le32 restart_log_open_count;
-} __attribute__((__packed__)) ;
+} __attribute__((__packed__)) RESTART_AREA;
 
-typedef struct RESTART_CLIENT { /* size 160 */
+typedef struct { /* size 160 */
 /*Ofs*/
 /*  0*/	leLSN oldest_lsn;	/* Oldest LSN needed by this client.  On create
 				   set to 0. */
@@ -194,7 +194,7 @@ typedef struct RESTART_CLIENT { /* size 160 */
 
 /* ntfsdoc p 41 (49), not in layout.h */
 
-struct RECORD_PAGE_HEADER { /* size 40 */
+typedef struct { /* size 40 */
 	NTFS_RECORD head;       /* the magic is "RCRD" */
 	union {
 		leLSN last_lsn;
@@ -206,13 +206,13 @@ struct RECORD_PAGE_HEADER { /* size 40 */
 	le16 next_record_offset;
 	le16 reserved4[3];
 	leLSN last_end_lsn;
-} __attribute__((__packed__)) ;
+} __attribute__((__packed__)) RECORD_PAGE_HEADER;
 
 /* ntfsdoc p 42 (50), not in layout.h */
 
 #define LOG_RECORD_HEAD_SZ 0x30 /* size of header of struct LOG_RECORD */
 
-typedef struct LOG_RECORD { /* size 80 */
+typedef struct { /* size 80 */
 	leLSN this_lsn;
 	leLSN client_previous_lsn;
 	leLSN client_undo_next_lsn;
@@ -259,8 +259,8 @@ struct BUFFER {
 	unsigned int headsz;
 	BOOL safe;
 	union {
-		struct RESTART_PAGE_HEADER restart;
-		struct RECORD_PAGE_HEADER record;
+		RESTART_PAGE_HEADER restart;
+		RECORD_PAGE_HEADER record;
 		char data[1];
 	} block;  /* variable length, keep at the end */
 } ;
@@ -270,7 +270,7 @@ struct ACTION_RECORD {
 	struct ACTION_RECORD *prev;
 	int num;
 	unsigned int flags;
-	struct LOG_RECORD record; /* variable length, keep at the end */
+	LOG_RECORD record; /* variable length, keep at the end */
 } ;
 
 enum {		/* Flag values for ACTION_RECORD */
@@ -336,19 +336,19 @@ extern u64 synced_lsn;
 extern u64 latest_lsn;
 extern u64 restart_lsn;
 
-extern struct RESTART_AREA restart;
-extern struct RESTART_CLIENT client;
+extern RESTART_AREA restart;
+extern LOG_CLIENT_RECORD client;
 
 const char *actionname(int op);
 const char *mftattrname(ATTR_TYPES attr);
 void showname(const char *prefix, const char *name, int cnt);
 int fixnamelen(const char *name, int len);
-BOOL within_lcn_range(const struct LOG_RECORD *logr);
+BOOL within_lcn_range(const LOG_RECORD *logr);
 struct ATTR *getattrentry(unsigned int key, unsigned int lth);
 void copy_attribute(struct ATTR *pa, const char *buf, int length);
-u32 get_undo_offset(const struct LOG_RECORD *logr);
-u32 get_redo_offset(const struct LOG_RECORD *logr);
-u32 get_extra_offset(const struct LOG_RECORD *logr);
+u32 get_undo_offset(const LOG_RECORD *logr);
+u32 get_redo_offset(const LOG_RECORD *logr);
+u32 get_extra_offset(const LOG_RECORD *logr);
 BOOL exception(int num);
 
 struct STORE;

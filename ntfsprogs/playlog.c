@@ -117,7 +117,7 @@ static void locate(const char *s, int n, const char *p, int m)
 }
 */
 
-static u64 inode_number(const struct LOG_RECORD *logr)
+static u64 inode_number(const LOG_RECORD *logr)
 {
 	u64 offset;
 
@@ -409,7 +409,7 @@ static int sanity_indx(ntfs_volume *vol, const char *buffer)
  *	With option -n reading is first attempted from the memory store
  */
 
-static char *read_raw(ntfs_volume *vol, const struct LOG_RECORD *logr)
+static char *read_raw(ntfs_volume *vol, const LOG_RECORD *logr)
 {
 	char *buffer;
 	char *target;
@@ -477,7 +477,7 @@ static char *read_raw(ntfs_volume *vol, const struct LOG_RECORD *logr)
  *	With option -n a copy of the buffer is kept in memory for later use.
  */
 
-static int write_raw(ntfs_volume *vol, const struct LOG_RECORD *logr,
+static int write_raw(ntfs_volume *vol, const LOG_RECORD *logr,
 					char *buffer)
 {
 	int err;
@@ -532,7 +532,7 @@ static int write_raw(ntfs_volume *vol, const struct LOG_RECORD *logr,
  *		Write a full set of raw clusters to mft_mirr
  */
 
-static int write_mirr(ntfs_volume *vol, const struct LOG_RECORD *logr,
+static int write_mirr(ntfs_volume *vol, const LOG_RECORD *logr,
 					char *buffer)
 {
 	int err;
@@ -566,7 +566,7 @@ static int write_mirr(ntfs_volume *vol, const struct LOG_RECORD *logr,
  *		Allocate a buffer and read a single protected record
  */
 
-static char *read_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
+static char *read_protected(ntfs_volume *vol, const LOG_RECORD *logr,
 			u32 size, BOOL warn)
 {
 	char *buffer;
@@ -614,7 +614,7 @@ static char *read_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
  *	than a cluster, have to read, merge and write.
  */
 
-static int write_protected(ntfs_volume *vol, const struct LOG_RECORD *logr,
+static int write_protected(ntfs_volume *vol, const LOG_RECORD *logr,
 				char *buffer, u32 size)
 {
 	MFT_RECORD *record;
