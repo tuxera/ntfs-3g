@@ -121,7 +121,7 @@ static u64 inode_number(const LOG_RECORD *logr)
 {
 	u64 offset;
 
-	offset = ((u64)le32_to_cpu(logr->target_vcn)
+	offset = ((u64)le64_to_cpu(logr->target_vcn)
 					<< clusterbits)
 		+ ((u32)le16_to_cpu(logr->cluster_index)
 					<< NTFS_BLOCK_SIZE_BITS);
@@ -548,7 +548,7 @@ static int write_mirr(ntfs_volume *vol, const LOG_RECORD *logr,
 	if (!optn) {
 		for (i=0; (i<count) && !err; i++) {
 			lcn = ntfs_attr_vcn_to_lcn(vol->mftmirr_na,
-				le32_to_cpu(logr->target_vcn) + i);
+				le64_to_cpu(logr->target_vcn) + i);
 			source = buffer + clustersz*i;
 			if ((lcn < 0)
 			    || (ntfs_pwrite(vol->dev, lcn << clusterbits,
@@ -640,15 +640,15 @@ static int write_protected(ntfs_volume *vol, const LOG_RECORD *logr,
 					"older" : "newer"),
 				(long long)sle64_to_cpu(logr->this_lsn));
 		if (optv > 1)
-			printf("mft vcn %ld index %d\n",
-				(long)le32_to_cpu(logr->target_vcn),
+			printf("mft vcn %lld index %d\n",
+				(long long)le64_to_cpu(logr->target_vcn),
 				(int)le16_to_cpu(logr->cluster_index));
 		err = sanity_mft(buffer);
 			/* Should set to some previous lsn for undos */
 		if (opts)
 			record->lsn = logr->this_lsn;
 		/* Duplicate on mftmirr if not overflowing its size */
-		mftmirr = (((u64)le32_to_cpu(logr->target_vcn)
+		mftmirr = (((u64)le64_to_cpu(logr->target_vcn)
 				+ le16_to_cpu(logr->lcns_to_follow))
 				<< clusterbits)
 			<= (((u64)vol->mftmirr_size) << mftrecbits);
@@ -1786,7 +1786,7 @@ static int create_indx(ntfs_volume *vol, const struct ACTION_RECORD *action,
 		indx->usa_ofs = const_cpu_to_le16(0x28);
 		indx->usa_count = const_cpu_to_le16(9);
 		indx->lsn = action->record.this_lsn;
-		vcn = le32_to_cpu(action->record.target_vcn);
+		vcn = le64_to_cpu(action->record.target_vcn);
 			/* beware of size change on big-endian cpus */
 		indx->index_block_vcn = cpu_to_sle64(vcn);
 			/* INDEX_HEADER */

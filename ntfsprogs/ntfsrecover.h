@@ -243,8 +243,7 @@ typedef struct { /* size 80 */
 			le16 attribute_offset;
 			le16 cluster_index;
 			ATTRIBUTE_FLAGS attribute_flags;
-			le32 target_vcn;
-			le32 reserved3;
+			leVCN target_vcn;
 			le64 lcn_list[0];
 		} __attribute__((__packed__));
 		struct {

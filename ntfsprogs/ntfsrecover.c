@@ -1320,7 +1320,7 @@ static void fixup(CONTEXT *ctx, const LOG_RECORD *logr, const char *buf,
 		}
 		printf("   new base MFT record, attr 0x%x (%s)\n",attr,attrname(attr));
 		printf("   inode      %lld\n",
-				(((long long)le32_to_cpu(logr->target_vcn)
+				(((long long)le64_to_cpu(logr->target_vcn)
 					<< clusterbits)
 				+ (le16_to_cpu(logr->cluster_index) << 9))
 					>> mftrecbits);
@@ -1369,7 +1369,7 @@ static void fixup(CONTEXT *ctx, const LOG_RECORD *logr, const char *buf,
 		printf("   free base MFT record, attr 0x%x (%s)\n",
 				attr,attrname(attr));
 		printf("   inode %lld\n",
-		    (((long long)le32_to_cpu(logr->target_vcn) << clusterbits)
+		    (((long long)le64_to_cpu(logr->target_vcn) << clusterbits)
 		    + (le16_to_cpu(logr->cluster_index) << 9)) >> mftrecbits);
 		break;
 	case CreateAttribute : /* 5 */
@@ -1877,20 +1877,18 @@ static void detaillogr(CONTEXT *ctx, const LOG_RECORD *logr)
 		printf("attribute_flags        %04x\n",
 			(int)le16_to_cpu(logr->attribute_flags));
 		if (mftrecbits && onmft)
-			printf("target_vcn             %08lx (inode %lld)\n",
-				(long)le32_to_cpu(logr->target_vcn),
-				(((long long)le32_to_cpu(logr->target_vcn)
+			printf("target_vcn             %016llx (inode %lld)\n",
+				(long long)le64_to_cpu(logr->target_vcn),
+				(((long long)le64_to_cpu(logr->target_vcn)
 					<< clusterbits)
 				+ (le16_to_cpu(logr->cluster_index) << 9))
 					 >> mftrecbits);
 		else
-			printf("target_vcn             %08lx\n",
-				(long)le32_to_cpu(logr->target_vcn));
-		printf("reserved3              %08lx\n",
-				(long)le32_to_cpu(logr->reserved3));
+			printf("target_vcn             %016llx\n",
+				(long long)le64_to_cpu(logr->target_vcn));
 			/* Compute a base for the current run of mft */
 		baselcn = le64_to_cpu(logr->lcn_list[0])
-					- le32_to_cpu(logr->target_vcn);
+					- le64_to_cpu(logr->target_vcn);
 		for (i=0; i<le16_to_cpu(logr->lcns_to_follow)
 						&& (i<SHOWLISTS); i++) {
 			lcn = le64_to_cpu(logr->lcn_list[i]);
