@@ -38,16 +38,6 @@
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
 
 /*
- *		Macro definitions needed to share code with secaudit
- */
-
-#define NTFS_FIND_USID(map,uid,buf) ntfs_find_usid(map,uid,buf)
-#define NTFS_FIND_GSID(map,gid,buf) ntfs_find_gsid(map,gid,buf)
-#define NTFS_FIND_USER(map,usid) ntfs_find_user(map,usid)
-#define NTFS_FIND_GROUP(map,gsid) ntfs_find_group(map,gsid)
-
-
-/*
  *		Matching of ntfs permissions to Linux permissions
  *	these constants are adapted to endianness
  *	when setting, set them all

@@ -22,10 +22,6 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-				/*
-				 * integration into ntfs-3g
-				 */
 #include "config.h"
 
 #ifdef HAVE_STDIO_H
@@ -58,55 +54,6 @@
 #include "security.h"
 #include "acls.h"
 #include "misc.h"
-#else
-
-				/*
-				 * integration into secaudit, check whether Win32,
-				 * may have to be adapted to compiler or something else
-				 */
-
-#ifndef WIN32
-#if defined(__WIN32) | defined(__WIN32__) | defined(WNSC)
-#define WIN32 1
-#endif
-#endif
-
-#include <stdio.h>
-#include <time.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <sys/types.h>
-#include <errno.h>
-
-				/*
-				 * integration into secaudit/Win32
-				 */
-#ifdef WIN32
-#include <fcntl.h>
-#include <windows.h>
-#define __LITTLE_ENDIAN 1234
-#define __BYTE_ORDER __LITTLE_ENDIAN
-#else
-				/*
-				 * integration into secaudit/STSC
-				 */
-#ifdef STSC
-#include <stat.h>
-#undef __BYTE_ORDER
-#define __BYTE_ORDER __BIG_ENDIAN
-#else
-				/*
-				 * integration into secaudit/Linux
-				 */
-#include <sys/stat.h>
-#include <endian.h>
-#include <unistd.h>
-#include <dlfcn.h>
-#endif /* STSC */
-#endif /* WIN32 */
-#include "secaudit.h"
-#endif /* HAVE_CONFIG_H */
 
 /*
  *	A few useful constants
@@ -1638,7 +1585,7 @@ static BOOL build_user_denials(ACL *pacl,
 		grants = OWNER_RIGHTS;
 	} else {
 		if (pxace->id) {
-			sid = NTFS_FIND_USID(mapping[MAPUSERS],
+			sid = ntfs_find_usid(mapping[MAPUSERS],
 				pxace->id, (SID*)&defsid);
 			grants = WORLD_RIGHTS;
 		} else {
@@ -1794,7 +1741,7 @@ static BOOL build_user_grants(ACL *pacl,
 		grants = OWNER_RIGHTS;
 	} else {
 		if (pxace->id) {
-			sid = NTFS_FIND_USID(mapping[MAPUSERS],
+			sid = ntfs_find_usid(mapping[MAPUSERS],
 				pxace->id, (SID*)&defsid);
 			if (sid)
 				sidsz = ntfs_sid_size(sid);
@@ -1880,7 +1827,7 @@ static BOOL build_group_denials_grant(ACL *pacl,
 		sid = gsid;
 	else
 		if (pxace->id)
-			sid = NTFS_FIND_GSID(mapping[MAPGROUPS],
+			sid = ntfs_find_gsid(mapping[MAPGROUPS],
 				pxace->id, (SID*)&defsid);
 		else {
 			sid = adminsid;
@@ -2185,7 +2132,7 @@ static int buildacls_posix(struct MAPPING* const mapping[],
 		case POSIX_ACL_USER :
 			pset->designates++;
 			if (pxace->id) {
-				sid = NTFS_FIND_USID(mapping[MAPUSERS],
+				sid = ntfs_find_usid(mapping[MAPUSERS],
 					pxace->id, (SID*)&defsid);
 				if (sid && ntfs_same_sid(sid,usid))
 					pset->selfuserperms |= pxace->perms;
@@ -2196,7 +2143,7 @@ static int buildacls_posix(struct MAPPING* const mapping[],
 		case POSIX_ACL_GROUP :
 			pset->designates++;
 			if (pxace->id) {
-				sid = NTFS_FIND_GSID(mapping[MAPUSERS],
+				sid = ntfs_find_gsid(mapping[MAPUSERS],
 					pxace->id, (SID*)&defsid);
 				if (sid && ntfs_same_sid(sid,gsid))
 					pset->selfgrpperms |= pxace->perms;
@@ -3647,7 +3594,7 @@ static uid_t find_tenant(struct MAPPING *const mapping[],
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if ((pace->type == ACCESS_ALLOWED_ACE_TYPE)
 		   && (pace->mask & DIR_WRITE)) {
-			xid = NTFS_FIND_USER(mapping[MAPUSERS], &pace->sid);
+			xid = ntfs_find_user(mapping[MAPUSERS], &pace->sid);
 			if (xid) tid = xid;
 		}
 		offace += le16_to_cpu(pace->size);
@@ -3782,13 +3729,13 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				} else {
 					if (ntfs_same_sid(&pace->sid,usid))
 						groupowns = TRUE;
-					gid = NTFS_FIND_GROUP(mapping[MAPGROUPS],&pace->sid);
+					gid = ntfs_find_group(mapping[MAPGROUPS],&pace->sid);
 					if (gid) {
 						pxace->tag = POSIX_ACL_GROUP;
 						pxace->id = gid;
 						pctx->prevgid = gid;
 					} else {
-					uid = NTFS_FIND_USER(mapping[MAPUSERS],&pace->sid);
+					uid = ntfs_find_user(mapping[MAPUSERS],&pace->sid);
 					if (uid) {
 						pxace->tag = POSIX_ACL_USER;
 						pxace->id = uid;
@@ -3811,7 +3758,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						pctx->gotowner = TRUE;
 					if (pctx->gotownermask && !pctx->gotowner) {
-						uid = NTFS_FIND_USER(mapping[MAPUSERS],&pace->sid);
+						uid = ntfs_find_user(mapping[MAPUSERS],&pace->sid);
 						pxace->id = uid;
 						pxace->tag = POSIX_ACL_USER;
 					} else
@@ -3843,7 +3790,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 					pctx->groupmasks++;
 			} else {
 				if (pctx->gotgroup || (pctx->groupmasks > 1)) {
-					gid = NTFS_FIND_GROUP(mapping[MAPGROUPS],&pace->sid);
+					gid = ntfs_find_group(mapping[MAPGROUPS],&pace->sid);
 					if (gid) {
 						pxace->id = gid;
 						pxace->tag = POSIX_ACL_GROUP;
@@ -3877,7 +3824,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 			pxace->id = -1;
 			pxace->tag = POSIX_ACL_SPECIAL;
 		} else {
-			uid = NTFS_FIND_USER(mapping[MAPUSERS],&pace->sid);
+			uid = ntfs_find_user(mapping[MAPUSERS],&pace->sid);
 			if (uid) {
 				if ((pace->type == ACCESS_DENIED_ACE_TYPE)
 				    && (pace->mask & WRITE_OWNER)
@@ -3890,7 +3837,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				}
 				pctx->prevuid = uid;
 			} else {
-				gid = NTFS_FIND_GROUP(mapping[MAPGROUPS],&pace->sid);
+				gid = ntfs_find_group(mapping[MAPGROUPS],&pace->sid);
 				if (gid) {
 					if ((pace->type == ACCESS_DENIED_ACE_TYPE)
 					    && (pace->mask & WRITE_OWNER)
