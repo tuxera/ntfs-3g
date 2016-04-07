@@ -1,11 +1,11 @@
-.\" Copyright (c) 2007-2009 Jean-Pierre André.
+.\" Copyright (c) 2007-2016 Jean-Pierre André.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G.USERMAP 8 "February 2010" "ntfs-3g.usermap 1.1.2"
+.TH NTFSUSERMAP 8 "February 2016" "ntfsusermap 1.2.0"
 .SH NAME
-ntfs-3g.usermap \- NTFS Building a User Mapping File
+ntfsusermap \- NTFS Building a User Mapping File
 .SH SYNOPSIS
-.B ntfs-3g.usermap
+.B ntfsusermap
 \fIwindows-system-device\fP
 \fB[\fIother-ntfs-device\fP...\fB]\fR
 .PP
@@ -15,13 +15,13 @@ whose users are to be mapped to current Linux system.
 And \fIother-ntfs-device\fP is another device containing files which are
 to be accessed both by the Windows mentioned above and current Linux system.
 .PP
-the ntfs-3g.usermap command must be started as root, and the designated devices
+the ntfsusermap command must be started as root, and the designated devices
 must not be mounted.
 .PP
-Typing ntfs-3g.usermap with no args will display a summary of command
+Typing ntfsusermap with no args will display a summary of command
 arguments.
 .SH DESCRIPTION
-\fBntfs-3g.usermap\fR
+\fBntfsusermap\fR
 creates the file defining the mapping of Windows accounts to Linux logins for
 users who owns files which should be visible from both Windows and
 Linux.
@@ -44,7 +44,7 @@ The mappings for standard Windows users, such as "Administrator" or
 "All Users" are defined implicitly. As a consequence a user mapping should
 never be defined as Linux root.
 .PP
-When there are no more significant files, ntfs-3g.usermap create the
+When there are no more significant files, ntfsusermap create the
 mapping file into the file UserMapping in the current directory. This
 file has to be moved to the hidden directory .NTFS-3G in the root of
 all the NTFS file systems to be shared between Windows and Linux. This
@@ -53,19 +53,19 @@ be taken into account if not present at mount time, which means the
 file system has to be unmounted and mounted again for the new mapping
 file to be taken into account.
 .SH OPTIONS
-No option is defined for ntfs-3g.usermap.
+No option is defined for ntfsusermap.
 .SH EXAMPLES
 Map the users defined on the Windows system present on /dev/sda1 :
 .RS
 .sp
-.B ntfs-3g.usermap /dev/sda1
+.B ntfsusermap /dev/sda1
 .sp
 .RE
 .PP
 A detailed example, with screen displays is available on
-http://pagesperso-orange.fr/b.andre/usermap.html
+http://jp-andre.pagesperso-orange.fr/ntfsusermap.html
 .SH EXIT CODES
-.B ntfs-3g.usermap
+.B ntfsusermap
 exits with a value of 0 when no error was detected, and with a value
 of 1 when an error was detected.
 .SH KNOWN ISSUES

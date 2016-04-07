@@ -668,11 +668,11 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfstruncate.8
 	ntfsprogs/ntfsfallocate.8
 	ntfsprogs/ntfsrecover.8
+	ntfsprogs/ntfsusermap.8
+	ntfsprogs/ntfssecaudit.8
 	src/Makefile
 	src/ntfs-3g.8
 	src/ntfs-3g.probe.8
-	src/ntfs-3g.usermap.8
-	src/ntfs-3g.secaudit.8
 ])
 AC_OUTPUT
 

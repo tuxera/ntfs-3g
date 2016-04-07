@@ -381,7 +381,7 @@ by Windows has to be collected. This will lead to a user mapping file like :
 .sp
 .RE
 .P
-The utility \fBntfs-3g.usermap\fP may be used to create such a user
+The utility \fBntfsusermap\fP may be used to create such a user
 mapping file.
 .SH EXAMPLES
 Mount /dev/sda1 to /mnt/windows:
