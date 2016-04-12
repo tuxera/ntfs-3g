@@ -59,12 +59,11 @@
 #include "logging.h"
 #include "misc.h"
 
-#define NOREVBOM 0  /* JPA rejecting U+FFFE and U+FFFF, open to debate */
-
-#ifndef ALLOW_BROKEN_SURROGATES
-/* Erik allowing broken UTF-16 surrogate pairs by default, open to debate. */
-#define ALLOW_BROKEN_SURROGATES 1
-#endif /* !defined(ALLOW_BROKEN_SURROGATES) */
+#ifndef ALLOW_BROKEN_UNICODE
+/* Erik allowing broken UTF-16 surrogate pairs and U+FFFE and U+FFFF by default,
+ * open to debate. */
+#define ALLOW_BROKEN_UNICODE 1
+#endif /* !defined(ALLOW_BROKEN_UNICODE) */
 
 /*
  * IMPORTANT
@@ -468,7 +467,7 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 				surrog = FALSE;
 				count += 4;
 			} else {
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 				/* The first UTF-16 unit of a surrogate pair has
 				 * a value between 0xd800 and 0xdc00. It can be
 				 * encoded as an individual UTF-8 sequence if we
@@ -481,7 +480,7 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 				continue;
 #else
 				goto fail;
-#endif /* ALLOW_BROKEN_SURROGATES */
+#endif /* ALLOW_BROKEN_UNICODE */
 			}
 		} else
 			if (c < 0x80)
@@ -492,15 +491,13 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 				count += 3;
 			else if (c < 0xdc00)
 				surrog = TRUE;
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 			else if (c < 0xe000)
 				count += 3;
-#endif /* ALLOW_BROKEN_SURROGATES */
-#if NOREVBOM
-			else if ((c >= 0xe000) && (c < 0xfffe))
-#else
 			else if (c >= 0xe000)
-#endif
+#else
+			else if ((c >= 0xe000) && (c < 0xfffe))
+#endif /* ALLOW_BROKEN_UNICODE */
 				count += 3;
 			else 
 				goto fail;
@@ -510,11 +507,11 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 		}
 	}
 	if (surrog) 
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 		count += 3; /* ending with a single surrogate */
 #else
 		goto fail;
-#endif /* ALLOW_BROKEN_SURROGATES */
+#endif /* ALLOW_BROKEN_UNICODE */
 
 	ret = count;
 out:
@@ -576,7 +573,7 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0x80 + (c & 63);
 				halfpair = 0;
 			} else {
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 				/* The first UTF-16 unit of a surrogate pair has
 				 * a value between 0xd800 and 0xdc00. It can be
 				 * encoded as an individual UTF-8 sequence if we
@@ -591,7 +588,7 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				continue;
 #else
 				goto fail;
-#endif /* ALLOW_BROKEN_SURROGATES */
+#endif /* ALLOW_BROKEN_UNICODE */
 			}
 		} else if (c < 0x80) {
 			*t++ = c;
@@ -605,13 +602,13 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 		        	*t++ = 0x80 | (c & 0x3f);
 			} else if (c < 0xdc00)
 				halfpair = c;
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 			else if (c < 0xe000) {
 				*t++ = 0xe0 | (c >> 12);
 				*t++ = 0x80 | ((c >> 6) & 0x3f);
 				*t++ = 0x80 | (c & 0x3f);
 			}
-#endif /* ALLOW_BROKEN_SURROGATES */
+#endif /* ALLOW_BROKEN_UNICODE */
 			else if (c >= 0xe000) {
 				*t++ = 0xe0 | (c >> 12);
 				*t++ = 0x80 | ((c >> 6) & 0x3f);
@@ -620,13 +617,13 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				goto fail;
 	        }
 	}
-#if ALLOW_BROKEN_SURROGATES
+#if ALLOW_BROKEN_UNICODE
 	if (halfpair) { /* ending with a single surrogate */
 		*t++ = 0xe0 | (halfpair >> 12);
 		*t++ = 0x80 | ((halfpair >> 6) & 0x3f);
 		*t++ = 0x80 | (halfpair & 0x3f);
 	}
-#endif /* ALLOW_BROKEN_SURROGATES */
+#endif /* ALLOW_BROKEN_UNICODE */
 	*t = '\0';
 	
 #if defined(__APPLE__) || defined(__DARWIN__)
@@ -748,21 +745,16 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 			    | ((u32)(s[1] & 0x3F) << 6)
 			    | ((u32)(s[2] & 0x3F));
 			/* Check valid ranges */
-#if NOREVBOM
+#if ALLOW_BROKEN_UNICODE
 			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
-#if ALLOW_BROKEN_SURROGATES
 			  || ((*wc >= 0xD800) && (*wc <= 0xDFFF))
-#endif /* ALLOW_BROKEN_SURROGATES */
-			  || ((*wc >= 0xe000) && (*wc <= 0xFFFD)))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFF)))
 				return 3;
 #else
 			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
-#if ALLOW_BROKEN_SURROGATES
-			  || ((*wc >= 0xD800) && (*wc <= 0xDFFF))
-#endif /* ALLOW_BROKEN_SURROGATES */
-			  || ((*wc >= 0xe000) && (*wc <= 0xFFFF)))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFD)))
 				return 3;
-#endif
+#endif /* ALLOW_BROKEN_UNICODE */
 		}
 		goto fail;
 					/* four-byte */
