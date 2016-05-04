@@ -971,10 +971,11 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 		marker = ' ';
 	cnt = attr[off+1] & 255;
 	auth = get6h(attr,off+2);
-	first = get4l(attr,off+8);
 	known = FALSE;
 	if ((attr[off] == 1) /* revision */
-	     && (auth < 100))
+	     && cnt
+	     && (auth < 100)) {
+		first = get4l(attr,off+8);
 		switch (cnt) {
 		case 0 : /* no level (error) */
 			break;
@@ -1105,6 +1106,7 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 				break;
 			}
 		}
+	}
 	if (!known)
 		printf("%*cUnknown SID\n",-level,marker);
 	printf("%*c%shex S-%d-",-level,marker,prefix,attr[off] & 255);
