@@ -146,6 +146,7 @@ BOOL optd; /* device argument present*/
 BOOL opth; /* show help */
 BOOL opti; /* show invalid (stale) records */
 BOOL optf; /* show full log */
+BOOL optk; /* kill fast restart */
 BOOL optn; /* do not apply modifications */
 BOOL optp; /* count of transaction sets to play */
 BOOL optr; /* show a range of blocks */
@@ -2894,6 +2895,7 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 {
 	const struct BUFFER *buf;
 	BOOL bad;
+	int major, minor;
 
 	bad = FALSE;
 	if (ctx->vol) {
@@ -2943,13 +2945,22 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 		}
 		if (!bad && !ctx->vol)
 			dorest(ctx, 0, &buf->block.restart, TRUE);
-		if ((buf->block.restart.major_ver != const_cpu_to_le16(1))
-		    || (buf->block.restart.minor_ver != const_cpu_to_le16(1))) {
-			printf("** Unsupported $LogFile version %d.%d\n",
-				le16_to_cpu(buf->block.restart.major_ver),
-				le16_to_cpu(buf->block.restart.minor_ver));
-			bad = TRUE;
-		}
+		major = le16_to_cpu(buf->block.restart.major_ver);
+		minor = le16_to_cpu(buf->block.restart.minor_ver);
+		if ((major == 2) && (minor == 0)) {
+			if (!optk) {
+				printf("** Fast restart mode detected,"
+						" data could be lost\n");
+				printf("   Use option --kill-fast-restart"
+						" to bypass\n");
+				bad = TRUE;
+			}
+		} else
+			if ((major != 1) || (minor != 1)) {
+				printf("** Unsupported $LogFile version %d.%d\n",
+					major, minor);
+				bad = TRUE;
+			}
 		if (bad) {
 			buf = (const struct BUFFER*)NULL;
 		}
@@ -2974,6 +2985,9 @@ static int reset_logfile(CONTEXT *ctx __attribute__((unused)))
 		restart.client_in_use_list = LOGFILE_NO_CLIENT;
 		restart.flags |= RESTART_VOLUME_IS_CLEAN;
 		client.oldest_lsn = cpu_to_sle64(restart_lsn);
+		/* Set $LogFile version to 1.1 so that volume can be mounted */
+		log_header.major_ver = const_cpu_to_le16(1);
+		log_header.minor_ver = const_cpu_to_le16(1);
 		memcpy(buffer, &log_header,
 					sizeof(RESTART_PAGE_HEADER));
 		off = le16_to_cpu(log_header.restart_area_offset);
@@ -3257,7 +3271,7 @@ static BOOL open_volume(CONTEXT *ctx, const char *device_name)
 		/* Not a log file, assume an ntfs device, mount it */
 		ctx->file = (FILE*)NULL;
 		ctx->vol = ntfs_mount(device_name,
-			((optp || optu || opts) && !optn
+			((optk || optp || optu || opts) && !optn
 				? NTFS_MNT_FORENSIC : NTFS_MNT_RDONLY));
 		if (ctx->vol) {
 			ok = getvolumedata(ctx, boot.buf);
@@ -3876,6 +3890,7 @@ static void usage(void)
 	fprintf(stderr,"	   -i : show invalid (stale) records\n");
 	fprintf(stderr,"	   -f : show the full log forward\n");
 	fprintf(stderr,"	   -h : show this help information\n");
+	fprintf(stderr,"	   -k : kill fast restart data\n");
 	fprintf(stderr,"	   -n : do not apply any modification\n");
 	fprintf(stderr,"	   -p : undo the latest count transaction sets and play one\n");
 	fprintf(stderr,"	   -r : show a range of log blocks forward\n");
@@ -3897,12 +3912,13 @@ static BOOL getoptions(int argc, char *argv[])
 	u32 xval;
 	char *endptr;
 	BOOL err;
-	static const char *sopt = "-bc:hifnp:r:stu:vVx:";
+	static const char *sopt = "-bc:hifknp:r:stu:vVx:";
 	static const struct option lopt[] = {
 		{ "backward",		no_argument,		NULL, 'b' },
 		{ "clusters",		required_argument,	NULL, 'c' },
 		{ "forward",		no_argument,		NULL, 'f' },
 		{ "help",		no_argument,		NULL, 'h' },
+		{ "kill-fast-restart",	no_argument,		NULL, 'k' },
 		{ "no-action",		no_argument,		NULL, 'n' },
 		{ "play",		required_argument,	NULL, 'p' },
 		{ "range",		required_argument,	NULL, 'r' },
@@ -3922,6 +3938,7 @@ static BOOL getoptions(int argc, char *argv[])
 	optf = FALSE;
 	opth = FALSE;
 	opti = FALSE;
+	optk = FALSE;
 	optn = FALSE;
 	optp = FALSE;
 	optr = FALSE;
@@ -3963,6 +3980,9 @@ static BOOL getoptions(int argc, char *argv[])
 		case '?':
 		case 'h':
 			opth = TRUE;
+			break;
+		case 'k':
+			optk = TRUE;
 			break;
 		case 'n':
 			optn = TRUE;
