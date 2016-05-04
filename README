@@ -61,6 +61,7 @@ typing :
 
 Below are a few specific options to ./configure :
 	--disable-ntfsprogs : do not build the ntfsprogs tools,
+	--enable-extras : build more ntfsprogs tools,
 	--disable-plugins : disable support for plugins
 	--enable-posix-acls : enable support for Posix ACLs
 	--enable-xattr-mappings : enable system extended attributes mappings
@@ -148,9 +149,16 @@ partition.  See man 8 ntfscluster for details.
 ntfsinfo - Show some information about an NTFS partition or one of the files
 or directories within it.  See man 8 ntfsinfo for details.
 
+ntfsrecover - Recover updates committed by Windows but interrupted before
+being synced.
+
 ntfsls - List information about files in a directory residing on an NTFS
 partition.  See man 8 ntfsls for details.
 
 ntfscat - Concatenate files and print their contents on the standard output.
 
 ntfscp - Overwrite files on an NTFS partition.
+
+ntfssecaudit : audit the security metadata.
+
+ntfsusermap : assistance for building a user mapping file.
