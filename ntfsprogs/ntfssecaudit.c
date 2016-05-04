@@ -972,6 +972,7 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 	cnt = attr[off+1] & 255;
 	auth = get6h(attr,off+2);
 	known = FALSE;
+	/* SID names taken from https://support.microsoft.com/en-us/kb/243330 */
 	if ((attr[off] == 1) /* revision */
 	     && cnt
 	     && (auth < 100)) {
@@ -1029,23 +1030,23 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 					break;
 				case 7 :
 					known = TRUE;
-					printf("%*cAnonymous logon SID\n",-level,marker);
+					printf("%*cAnonymous SID\n",-level,marker);
 					break;
 				case 11 :
 					known = TRUE;
-					printf("%*cAuthenticated user SID\n",-level,marker);
+					printf("%*cAuthenticated Users SID\n",-level,marker);
 					break;
 				case 13 :
 					known = TRUE;
-					printf("%*cLocal service SID\n",-level,marker);
+					printf("%*cTerminal Server Users SID\n",-level,marker);
 					break;
 				case 14 :
 					known = TRUE;
-					printf("%*cNetwork service SID\n",-level,marker);
+					printf("%*cRemote Interactive Logon SID\n",-level,marker);
 					break;
 				case 18 :
 					known = TRUE;
-					printf("%*cNT System SID\n",-level,marker);
+					printf("%*cLocal System SID\n",-level,marker);
 					break;
 				}
 				break;
@@ -1059,13 +1060,13 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 					known = TRUE;
 					switch (second) {
 					case 544 :
-						printf("%*cLocal admins SID\n",-level,marker);
+						printf("%*cAdministrators SID\n",-level,marker);
 						break;
 					case 545 :
-						printf("%*cLocal users SID\n",-level,marker);
+						printf("%*cUsers SID\n",-level,marker);
 						break;
 					case 546 :
-						printf("%*cLocal guests SID\n",-level,marker);
+						printf("%*cGuests SID\n",-level,marker);
 						break;
 					default :
 						printf("%*cSome domain SID\n",-level,marker);
@@ -1084,19 +1085,19 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 					known = TRUE;
 					switch (last) {
 					case 500 :
-						printf("%*cSystem admin SID\n",-level,marker);
+						printf("%*cAdministrator SID\n",-level,marker);
 						break;
 					case 501 :
 						printf("%*cGuest SID\n",-level,marker);
 						break;
 					case 512 :
-						printf("%*cLocal admins SID\n",-level,marker);
+						printf("%*cDomain Admins SID\n",-level,marker);
 						break;
 					case 513 :
-						printf("%*cLocal users SID\n",-level,marker);
+						printf("%*cDomain Users SID\n",-level,marker);
 						break;
 					case 514 :
-						printf("%*cLocal guests SID\n",-level,marker);
+						printf("%*cDomain Guests SID\n",-level,marker);
 						break;
 					default :
 						printf("%*cLocal user-%lu SID\n",-level,marker,last);
