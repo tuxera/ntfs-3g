@@ -1073,6 +1073,7 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 				}
 				break;
 			}
+			break;
 		default : /* three levels or more */
 			second = get4l(attr,off+12);
 			last = get4l(attr,off+4+4*cnt);
