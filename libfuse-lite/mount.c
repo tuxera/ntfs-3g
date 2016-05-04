@@ -380,10 +380,13 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
            then the filesystem is already unmounted */
         if (res == 1 && (pfd.revents & POLLERR))
             return;
+              /*
+               * Need to close file descriptor, otherwise synchronous umount
+               * would recurse into filesystem, and deadlock.
+               */
+        close(fd);
     }
 #ifndef __SOLARIS__
-    close(fd);
-
     fusermount(1, 0, 1, "", mountpoint);
 #else /* __SOLARIS__ */
     if (geteuid() == 0) {
