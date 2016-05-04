@@ -1109,12 +1109,12 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 	}
 	if (!known)
 		printf("%*cUnknown SID\n",-level,marker);
-	printf("%*c%shex S-%d-",-level,marker,prefix,attr[off] & 255);
+	printf("%*c%shex S-%x-",-level,marker,prefix,attr[off] & 255);
 	printf("%llx",(long long)auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lx",get4l(attr,off+8+4*i));
 	printf("\n");
-	printf("%*c%sdec S-%d-",-level,marker,prefix,attr[off] & 255);
+	printf("%*c%sdec S-%u-",-level,marker,prefix,attr[off] & 255);
 	printf("%llu",(long long)auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lu",get4l(attr,off+8+4*i));
