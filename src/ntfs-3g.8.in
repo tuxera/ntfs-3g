@@ -185,8 +185,8 @@ etc. designate the same file). All files are displayed with lower case in
 directory listings.
 .TP
 .B remove_hiberfile
-Unlike in case of read-only mount, the read-write mount is denied if 
-the NTFS volume is hibernated. One needs either to resume Windows and
+When the NTFS volume is hibernated, a read-write mount is denied and
+a read-only mount is forced. One needs either to resume Windows and
 shutdown it properly, or use this option which will remove the Windows
 hibernation file. Please note, this means that the saved Windows 
 session will be completely lost. Use this option under your own 
