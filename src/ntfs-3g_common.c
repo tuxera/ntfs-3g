@@ -47,6 +47,7 @@
 #include <getopt.h>
 #include <fuse.h>
 
+#include "compat.h"
 #include "inode.h"
 #include "dir.h"
 #include "security.h"
