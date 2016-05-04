@@ -3113,12 +3113,31 @@ static BOOL getlogfiledata(CONTEXT *ctx, const char *boot)
 	BOOL ok;
 	u32 off;
 	s64 size;
+	u32 system_page_size;
+	u32 log_page_size;
 
 	ok = FALSE;
 	fseek(ctx->file,0L,2);
 	size = ftell(ctx->file);
 	rph = (const RESTART_PAGE_HEADER*)boot;
 	off = le16_to_cpu(rph->restart_area_offset);
+	/*
+	 * If the system or log page sizes are smaller than the ntfs block size
+	 * or either is not a power of 2 we cannot handle this log file.
+	 */
+	system_page_size = le32_to_cpu(rph->system_page_size);
+	log_page_size = le32_to_cpu(rph->log_page_size);
+	if (system_page_size < NTFS_BLOCK_SIZE ||
+			log_page_size < NTFS_BLOCK_SIZE ||
+			system_page_size & (system_page_size - 1) ||
+			log_page_size & (log_page_size - 1)) {
+		printf("** Unsupported page size.\n");
+		goto out;
+	}
+	if (off & 7 || off > system_page_size) {
+		printf("** Inconsistent restart area offset.\n");
+		goto out;
+	}
 	rest = (const RESTART_AREA*)&boot[off];
 
 		/* estimate cluster size from log file size (unreliable) */
@@ -3142,6 +3161,7 @@ static BOOL getlogfiledata(CONTEXT *ctx, const char *boot)
 	mftrecsz = 0;
 	mftrecbits = 0;
 	ok = TRUE;
+out:
 	return (ok);
 }
 
@@ -3172,8 +3192,9 @@ static BOOL getvolumedata(CONTEXT *ctx, char *boot)
 		if (ctx->file
 		    && (!memcmp(boot,"RSTR",4) || !memcmp(boot,"CHKD",4))) {
 			printf("* Assuming a log file copy\n");
-			getlogfiledata(ctx, boot);
-			ok = TRUE;
+			ok = getlogfiledata(ctx, boot);
+			if (!ok)
+				goto out;
 		} else
 			fprintf(stderr,"** Not an NTFS image or log file\n");
 		}
@@ -3187,6 +3208,7 @@ static BOOL getvolumedata(CONTEXT *ctx, char *boot)
 		if (le16_to_cpu(rest->client_in_use_list) > 1)
 			printf("** multiple clients not implemented\n");
 	}
+out:
 	return (ok);
 }
 
@@ -3223,9 +3245,13 @@ static BOOL open_volume(CONTEXT *ctx, const char *device_name)
 			/* This appears to be a log file */
 			ctx->vol = (ntfs_volume*)NULL;
 			ok = getvolumedata(ctx, boot.buf);
-		}
-		if (!ok)
+			if (!ok) {
+				fclose(ctx->file);
+				goto out;
+			}
+		} else {
 			fclose(ctx->file);
+		}
 	}
 	if (!ok) {
 		/* Not a log file, assume an ntfs device, mount it */
@@ -3239,6 +3265,7 @@ static BOOL open_volume(CONTEXT *ctx, const char *device_name)
 				ntfs_umount(ctx->vol, TRUE);
 		}
 	}
+out:
 	return (ok);
 }
 
