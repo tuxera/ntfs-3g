@@ -1081,24 +1081,24 @@ static void showsid(const char *attr, int off, const char *prefix, int level)
 				if (first == 21) {
 					known = TRUE;
 					switch (last) {
-						case 500 :
-							printf("%*cSystem admin SID\n",-level,marker);
-							break;
-						case 501 :
-							printf("%*cGuest SID\n",-level,marker);
-							break;
-						case 512 :
-							printf("%*cLocal admins SID\n",-level,marker);
-							break;
-						case 513 :
-							printf("%*cLocal users SID\n",-level,marker);
-							break;
-						case 514 :
-							printf("%*cLocal guests SID\n",-level,marker);
-							break;
-						default :
-							printf("%*cLocal user-%lu SID\n",-level,marker,last);
-							break;
+					case 500 :
+						printf("%*cSystem admin SID\n",-level,marker);
+						break;
+					case 501 :
+						printf("%*cGuest SID\n",-level,marker);
+						break;
+					case 512 :
+						printf("%*cLocal admins SID\n",-level,marker);
+						break;
+					case 513 :
+						printf("%*cLocal users SID\n",-level,marker);
+						break;
+					case 514 :
+						printf("%*cLocal guests SID\n",-level,marker);
+						break;
+					default :
+						printf("%*cLocal user-%lu SID\n",-level,marker,last);
+						break;
 					}
 				}
 				break;
