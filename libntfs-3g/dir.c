@@ -40,9 +40,15 @@
 #include <sys/stat.h>
 #endif
 
+#if defined(__sun) && defined (__SVR4)
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+#else /* defined(__sun) && defined (__SVR4) */
 #ifdef HAVE_SYS_SYSMACROS_H
 #include <sys/sysmacros.h>
 #endif
+#endif /* defined(__sun) && defined (__SVR4) */
 
 #include "param.h"
 #include "types.h"
