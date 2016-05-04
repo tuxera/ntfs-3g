@@ -22,6 +22,12 @@
 #include <limits.h>
 #include <errno.h>
 
+#if defined(__sun) && defined (__SVR4)
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+#endif /* defined(__sun) && defined (__SVR4) */
+
 #define PARAM(inarg) (((const char *)(inarg)) + sizeof(*(inarg)))
 #define OFFSET_MAX 0x7fffffffffffffffLL
 
@@ -561,10 +567,13 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 
     if (req->f->op.mknod) {
 #if defined(__SOLARIS__) && defined(_LP64)
-	/* Must unpack the device, as arg->rdev is limited to 32 bits */
+	/*
+	 * Must unpack the device, as arg->rdev is limited to 32 bits,
+	 * and must have the same format in 32-bit and 64-bit builds.
+	 */
 	req->f->op.mknod(req, nodeid, name, arg->mode,
-		makedev((arg->rdev >> 18) & 0x3ffff,
-			arg->rdev & 0x3fff));
+		makedev((arg->rdev >> 18) & 0x3fff,
+			arg->rdev & 0x3ffff));
 #else
 	req->f->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
 #endif
