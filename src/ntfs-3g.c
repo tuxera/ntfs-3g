@@ -72,8 +72,11 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_SYS_MKDEV_H
+#ifdef MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
 #endif
 
 #if defined(__APPLE__) || defined(__DARWIN__)

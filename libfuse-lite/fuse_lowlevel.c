@@ -22,11 +22,15 @@
 #include <limits.h>
 #include <errno.h>
 
-#if defined(__sun) && defined (__SVR4)
-#ifdef HAVE_SYS_MKDEV_H
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
 #endif
-#endif /* defined(__sun) && defined (__SVR4) */
+#ifdef MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
+#endif
 
 #define PARAM(inarg) (((const char *)(inarg)) + sizeof(*(inarg)))
 #define OFFSET_MAX 0x7fffffffffffffffLL
