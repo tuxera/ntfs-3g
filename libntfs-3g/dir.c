@@ -1904,12 +1904,11 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 	if (!actx)
 		goto err_out;
 search:
-	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
-			0, NULL, 0, actx)) {
+	while (!(err = ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+					CASE_SENSITIVE, 0, NULL, 0, actx))) {
 		char *s;
 		IGNORE_CASE_BOOL case_sensitive = IGNORE_CASE;
 
-		errno = 0;
 		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
 				le16_to_cpu(actx->attr->value_offset));
 		s = ntfs_attr_name_get(fn->file_name, fn->file_name_length);
@@ -1958,7 +1957,7 @@ search:
 			break;
 		}
 	}
-	if (errno) {
+	if (err) {
 		/*
 		 * If case sensitive search failed, then try once again
 		 * ignoring case.
