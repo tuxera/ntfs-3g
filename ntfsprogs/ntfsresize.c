@@ -2377,6 +2377,7 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 {
 	ntfs_inode *base_ni;
 	ntfs_attr *na;
+	ntfs_attr_search_ctx *ctx;
 	s64 nr_clusters = resize->new_volume_size;
 	ntfs_volume *vol = resize->vol;
 
@@ -2390,7 +2391,16 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 		err_printf("Could not adjust the bad sector list\n");
 		exit(1);
 	}
-	na->ni->flags |= FILE_ATTR_SPARSE_FILE;
+		/* Clear the sparse flags, even if there are bad clusters */
+	na->ni->flags &= ~FILE_ATTR_SPARSE_FILE;
+	na->data_flags &= ~ATTR_IS_SPARSE;
+	ctx = resize->ctx;
+	ctx->attr->data_size = cpu_to_sle64(na->data_size);
+	ctx->attr->initialized_size = cpu_to_sle64(na->initialized_size);
+	ctx->attr->flags = cpu_to_le16(na->data_flags);
+	ctx->attr->compression_unit = 0;
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+	NInoFileNameSetDirty(na->ni);
 	NInoFileNameSetDirty(na->ni);
 
 	ntfs_attr_close(na);
