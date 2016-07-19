@@ -27,8 +27,8 @@
  *	add support for processing some type of reparse points.
  */
 
-#ifndef PLUGIN_H
-#define PLUGIN_H
+#ifndef _NTFS_PLUGIN_H
+#define _NTFS_PLUGIN_H
 
 struct fuse_file_info;
 
@@ -134,4 +134,4 @@ typedef struct plugin_operations {
 typedef const struct plugin_operations *(*plugin_init_t)(le32 tag);
 const struct plugin_operations *init(le32 tag);
 
-#endif /* PLUGIN_H */
+#endif /* _NTFS_PLUGIN_H */
