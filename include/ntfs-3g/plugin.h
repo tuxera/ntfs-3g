@@ -30,7 +30,11 @@
 #ifndef _NTFS_PLUGIN_H
 #define _NTFS_PLUGIN_H
 
+#include "inode.h"
+#include "layout.h"
+
 struct fuse_file_info;
+struct stat;
 
 	/*
 	 *	The plugin operations currently defined.
