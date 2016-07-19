@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2015 Jean-Pierre Andre
+ * Copyright (c) 2007-2016 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -546,6 +546,7 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 	unsigned int acecnt;
 	unsigned int acesz;
 	unsigned int nace;
+	unsigned int wantsz;
 	BOOL ok;
 
 	ok = TRUE;
@@ -560,9 +561,16 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 				&((const char*)pacl)[offace];
 			acesz = le16_to_cpu(pace->size);
 			if (((offace + acesz) > end)
-			   || !ntfs_valid_sid(&pace->sid)
-			   || ((ntfs_sid_size(&pace->sid) + 8) != (int)acesz))
+			   || !ntfs_valid_sid(&pace->sid))
 				 ok = FALSE;
+			else {
+				/* Win10 may insert garbage in the last ACE */
+				wantsz = ntfs_sid_size(&pace->sid) + 8;
+				if (((nace < (acecnt - 1))
+					&& (wantsz != acesz))
+				    || (wantsz > acesz))
+					ok = FALSE;
+			}
 			offace += acesz;
 		}
 	}
