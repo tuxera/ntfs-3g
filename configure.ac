@@ -543,6 +543,16 @@ AC_CHECK_FUNCS([ \
 ])
 AC_SYS_LARGEFILE
 
+# The dlopen API might be in libc or in libdl.  Check libc first, then
+# fall back to libdl.
+LIBDL=""
+if test "x${disable_plugins}" = "xno"; then
+	AC_CHECK_LIB(c, dlopen, ,
+		[AC_CHECK_LIB(dl, dlopen, [LIBDL="-ldl"],
+			[AC_MSG_ERROR(["Unable to find libdl (required for external plugin support)"])])])
+fi
+AC_SUBST([LIBDL])
+
 if test "$GCC" = "yes" ; then
 	# We add -Wall to enable some compiler warnings.
 	CFLAGS="${CFLAGS} -Wall"

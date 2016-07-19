@@ -23,7 +23,7 @@ rootbin_PROGRAMS = ntfs-3g lowntfs-3g
 rootsbin_DATA 	 = #Create directory
 man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8
 
-ntfs_3g_LDADD    = -ldl $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
+ntfs_3g_LDADD    = $(LIBDL) $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 ntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
@@ -35,7 +35,7 @@ ntfs_3g_CFLAGS   =			\
 	$(PLUGIN_CFLAGS)
 ntfs_3g_SOURCES  = ntfs-3g.c ntfs-3g_common.c
 
-lowntfs_3g_LDADD    = -ldl $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
+lowntfs_3g_LDADD    = $(LIBDL) $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 lowntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
