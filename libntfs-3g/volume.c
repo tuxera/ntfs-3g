@@ -74,6 +74,7 @@
 #include "cache.h"
 #include "realpath.h"
 #include "misc.h"
+#include "security.h"
 
 const char *ntfs_home = 
 "News, support and information:  http://tuxera.com\n";
@@ -206,6 +207,7 @@ static int __ntfs_volume_release(ntfs_volume *v)
 			ntfs_error_set(&err);
 	}
 
+	ntfs_close_secure(v);
 	ntfs_free_lru_caches(v);
 	free(v->vol_name);
 	free(v->upcase);
@@ -1234,6 +1236,11 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		ntfs_log_perror("Failed to close $AttrDef");
 		goto error_exit;
 	}
+
+	/* Open $Secure. */
+	if (ntfs_open_secure(vol))
+		goto error_exit;
+
 	/*
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.

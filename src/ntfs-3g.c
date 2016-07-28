@@ -3651,7 +3651,7 @@ static void ntfs_close(void)
 			         / ctx->seccache->head.p_reads % 10);
 			}
 		}
-		ntfs_close_secure(&security);
+		ntfs_destroy_security_context(&security);
 	}
 	
 	if (ntfs_umount(ctx->vol, FALSE))
@@ -4168,10 +4168,6 @@ int main(int argc, char *argv[])
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->vol->efs_raw = ctx->efs_raw;
 #endif /* HAVE_SETXATTR */
-		/* JPA open $Secure, (whatever NTFS version !) */
-		/* to initialize security data */
-	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
-		failed_secure = "Could not open file $Secure";
 	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path,
 		(ctx->vol->secure_flags
 			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_ACL)))

@@ -4466,55 +4466,75 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 
 
 /*
- *	Open $Secure once for all
+ *	Open the volume's security descriptor index ($Secure)
+ *
  *	returns zero if it succeeds
- *		non-zero if it fails. This is not an error (on NTFS v1.x)
+ *		non-zero if it fails and the NTFS version is at least v3.x
  */
-
-
 int ntfs_open_secure(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
-	int res;
+	ntfs_index_context *sii;
+	ntfs_index_context *sdh;
 
-	res = -1;
-	vol->secure_ni = (ntfs_inode*)NULL;
-	vol->secure_xsii = (ntfs_index_context*)NULL;
-	vol->secure_xsdh = (ntfs_index_context*)NULL;
-	if (vol->major_ver >= 3) {
-			/* make sure this is a genuine $Secure inode 9 */
-		ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
-		if (ni && (ni->mft_no == 9)) {
-			vol->secure_reentry = 0;
-			vol->secure_xsii = ntfs_index_ctx_get(ni,
-						sii_stream, 4);
-			vol->secure_xsdh = ntfs_index_ctx_get(ni,
-						sdh_stream, 4);
-			if (ni && vol->secure_xsii && vol->secure_xsdh) {
-				vol->secure_ni = ni;
-				res = 0;
-			}
-		}
+	if (vol->secure_ni) /* Already open? */
+		return 0;
+
+	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
+	if (!ni)
+		goto err;
+
+	/* Verify that $Secure has the expected inode number. */
+	if (ni->mft_no != FILE_Secure) {
+		errno = EINVAL;
+		goto err_close_ni;
 	}
-	return (res);
+
+	/* Allocate the needed index contexts. */
+	sii = ntfs_index_ctx_get(ni, sii_stream, 4);
+	if (!sii)
+		goto err_close_ni;
+
+	sdh = ntfs_index_ctx_get(ni, sdh_stream, 4);
+	if (!sdh)
+		goto err_close_sii;
+
+	vol->secure_ni = ni;
+	vol->secure_xsii = sii;
+	vol->secure_xsdh = sdh;
+	return 0;
+
+err_close_sii:
+	ntfs_index_ctx_put(sii);
+err_close_ni:
+	ntfs_inode_close(ni);
+err:
+	/* Failing on NTFS versions before 3.x is expected */
+	if (vol->major_ver < 3)
+		return 0;
+	ntfs_log_perror("error opening $Secure");
+	return -1;
 }
 
 /*
- *		Final cleaning
- *	Allocated memory is freed to facilitate the detection of memory leaks
+ *	Close the volume's security descriptor index ($Secure)
  */
-
-void ntfs_close_secure(struct SECURITY_CONTEXT *scx)
+void ntfs_close_secure(ntfs_volume *vol)
 {
-	ntfs_volume *vol;
-
-	vol = scx->vol;
 	if (vol->secure_ni) {
 		ntfs_index_ctx_put(vol->secure_xsii);
 		ntfs_index_ctx_put(vol->secure_xsdh);
 		ntfs_inode_close(vol->secure_ni);
-		
+		vol->secure_ni = NULL;
 	}
+}
+
+/*
+ *		Destroy a security context
+ *	Allocated memory is freed to facilitate the detection of memory leaks
+ */
+void ntfs_destroy_security_context(struct SECURITY_CONTEXT *scx)
+{
 	ntfs_free_mapping(scx->mapping);
 	free_caches(scx);
 }
@@ -5333,7 +5353,6 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				scx->vol->secure_flags = 0;
 					/* accept no mapping and no $Secure */
 				ntfs_build_mapping(scx,(const char*)NULL,TRUE);
-				ntfs_open_secure(vol);
 			} else {
 				if (scapi)
 					free(scapi);
@@ -5365,7 +5384,7 @@ BOOL ntfs_leave_file_security(struct SECURITY_API *scapi)
 	ok = FALSE;
 	if (scapi && (scapi->magic == MAGIC_API) && scapi->security.vol) {
 		vol = scapi->security.vol;
-		ntfs_close_secure(&scapi->security);
+		ntfs_destroy_security_context(&scapi->security);
 		free(scapi);
  		if (!ntfs_umount(vol, 0))
 			ok = TRUE;
