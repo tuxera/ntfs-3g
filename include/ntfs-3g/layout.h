@@ -161,6 +161,12 @@ typedef enum {
 #define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
 
+/*
+ * The size of a logical sector in bytes, used as the sequence number stride for
+ * multi-sector transfers.  This is intended to be less than or equal to the
+ * physical sector size, since if this were greater than the physical sector
+ * size, then incomplete multi-sector transfers may not be detected.
+ */
 #define NTFS_BLOCK_SIZE		512
 #define NTFS_BLOCK_SIZE_BITS	9
 
