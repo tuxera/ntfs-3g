@@ -36,9 +36,6 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
 
 #include "param.h"
 #include "compat.h"
@@ -57,6 +54,7 @@
 #include "ntfstime.h"
 #include "logging.h"
 #include "misc.h"
+#include "xattrs.h"
 
 ntfs_inode *ntfs_inode_base(ntfs_inode *ni)
 {
@@ -1446,8 +1444,6 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
 	return ret;
 }
 
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
-
 /*
  *		Get high precision NTFS times
  *
@@ -1604,5 +1600,3 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 			errno = EEXIST;
 	return (ret);
 }
-
-#endif /* HAVE_SETXATTR */

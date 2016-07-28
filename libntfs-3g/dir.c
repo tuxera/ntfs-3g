@@ -67,10 +67,7 @@
 #include "security.h"
 #include "reparse.h"
 #include "object_id.h"
-
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
+#include "xattrs.h"
 
 /*
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
@@ -2283,8 +2280,6 @@ ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
 	return (dir_ni);
 }
 
-#ifdef HAVE_SETXATTR
-
 #define MAX_DOS_NAME_LENGTH	 12
 
 /*
@@ -2793,5 +2788,3 @@ int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 	}
 	return (res);
 }
-
-#endif

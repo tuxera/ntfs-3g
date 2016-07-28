@@ -25,8 +25,6 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_SETXATTR /* extended attributes support required */
-
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -46,10 +44,6 @@
 #include <errno.h>
 #endif
 
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
-
 #include "types.h"
 #include "param.h"
 #include "layout.h"
@@ -59,6 +53,7 @@
 #include "ea.h"
 #include "misc.h"
 #include "logging.h"
+#include "xattrs.h"
 
 /*
  *		Create a needed attribute (EA or EA_INFORMATION)
@@ -398,5 +393,3 @@ int ntfs_remove_ntfs_ea(ntfs_inode *ni)
 	}
 	return (res ? -1 : 0);
 }
-
-#endif  /* HAVE_SETXATTR */

@@ -23,8 +23,6 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_SETXATTR /* extended attributes support required */
-
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -798,5 +796,3 @@ int ntfs_xattr_system_removexattr(struct SECURITY_CONTEXT *scx,
 	}
 	return (res);
 }
-
-#endif  /* HAVE_SETXATTR */

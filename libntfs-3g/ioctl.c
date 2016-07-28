@@ -49,11 +49,6 @@
 #include <limits.h>
 #endif
 #include <syslog.h>
-
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
-
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
