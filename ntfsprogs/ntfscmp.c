@@ -547,7 +547,7 @@ static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
 	/*
 	 *  FIXME: ia can be the same even if the bitmap sizes are different.
 	 */
-	if (cia1.bm_size != cia1.bm_size)
+	if (cia1.bm_size != cia2.bm_size)
 		goto out;
 
 	if (cmp_buffer(cia1.bitmap, cia2.bitmap, cia1.bm_size, na1))
