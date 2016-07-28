@@ -81,10 +81,6 @@ struct LE_POSIX_ACL {
 #endif
 #endif
 
-static const char xattr_ntfs_3g[] = "ntfs-3g.";
-static const char nf_ns_user_prefix[] = "user.";
-static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
-
 static const char nf_ns_xattr_ntfs_acl[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_attrib_be[] = "system.ntfs_attrib_be";
