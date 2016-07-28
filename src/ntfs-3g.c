@@ -332,6 +332,7 @@ static int ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		allowed = 1;
 	else
 #endif
+	{
 		if (dir_ni)
 			allowed = ntfs_real_allowed_access(scx, dir_ni,
 					accesstype);
@@ -374,6 +375,7 @@ static int ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 					ntfs_inode_close(ni2);
 			}
 		}
+	}
 	return (allowed);
 }
 
