@@ -143,14 +143,24 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
  * @name1_len:	length of first Unicode name to compare
  * @name2:	second Unicode name to compare
  * @name2_len:	length of second Unicode name to compare
- * @ic:		either CASE_SENSITIVE or IGNORE_CASE
- * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
- * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
+ * @ic:		either CASE_SENSITIVE or IGNORE_CASE (see below)
+ * @upcase:	upcase table
+ * @upcase_len:	upcase table size
  *
+ * If @ic is CASE_SENSITIVE, then the names are compared primarily ignoring
+ * case, but if the names are equal ignoring case, then they are compared
+ * case-sensitively.  As an example, "abc" would collate before "BCD" (since
+ * "abc" and "BCD" differ ignoring case and 'A' < 'B') but after "ABC" (since
+ * "ABC" and "abc" are equal ignoring case and 'A' < 'a').  This matches the
+ * collation order of filenames as indexed in NTFS directories.
+ *
+ * If @ic is IGNORE_CASE, then the names are only compared case-insensitively
+ * and are considered to match if and only if they are equal ignoring case.
+ *
+ * Returns:
  *  -1 if the first name collates before the second one,
- *   0 if the names match,
- *   1 if the second name collates before the first one, or
- *
+ *   0 if the names match, or
+ *   1 if the second name collates before the first one
  */
 int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
@@ -162,7 +172,7 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 	u16 u1, u2;
 
 #ifdef DEBUG
-	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
+	if (!name1 || !name2 || !upcase || !upcase_len) {
 		ntfs_log_debug("ntfs_names_collate received NULL pointer!\n");
 		exit(1);
 	}
@@ -205,9 +215,9 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 				return 1;
 		} else {
 			do {
-				u1 = c1 = le16_to_cpu(*name1);
+				u1 = le16_to_cpu(*name1);
 				name1++;
-				u2 = c2 = le16_to_cpu(*name2);
+				u2 = le16_to_cpu(*name2);
 				name2++;
 				if (u1 < upcase_len)
 					u1 = le16_to_cpu(upcase[u1]);

@@ -515,16 +515,15 @@ typedef enum {
  * enum COLLATION_RULES - The collation rules for sorting views/indexes/etc
  * (32-bit).
  *
- * COLLATION_UNICODE_STRING - Collate Unicode strings by comparing their binary
- *	Unicode values, except that when a character can be uppercased, the
- *	upper case value collates before the lower case one.
- * COLLATION_FILE_NAME - Collate file names as Unicode strings. The collation
- *	is done very much like COLLATION_UNICODE_STRING. In fact I have no idea
- *	what the difference is. Perhaps the difference is that file names
- *	would treat some special characters in an odd way (see
- *	unistr.c::ntfs_collate_names() and unistr.c::legal_ansi_char_array[]
- *	for what I mean but COLLATION_UNICODE_STRING would not give any special
- *	treatment to any characters at all, but this is speculation.
+ * COLLATION_BINARY - Collate by binary compare where the first byte is most
+ *	significant.
+ * COLLATION_FILE_NAME - Collate Unicode strings by comparing their 16-bit
+ *	coding units, primarily ignoring case using the volume's $UpCase table,
+ *	but falling back to a case-sensitive comparison if the names are equal
+ *	ignoring case.
+ * COLLATION_UNICODE_STRING - TODO: this is not yet implemented and still needs
+ *	to be properly documented --- is it really the same as
+ *	COLLATION_FILE_NAME?
  * COLLATION_NTOFS_ULONG - Sorting is done according to ascending le32 key
  *	values. E.g. used for $SII index in FILE_Secure, which sorts by
  *	security_id (le32).
@@ -549,17 +548,9 @@ typedef enum {
  *	equal then the second le32 values would be compared, etc.
  */
 typedef enum {
-	COLLATION_BINARY	 = const_cpu_to_le32(0), /* Collate by binary
-					compare where the first byte is most
-					significant. */
-	COLLATION_FILE_NAME	 = const_cpu_to_le32(1), /* Collate file names
-					as Unicode strings. */
-	COLLATION_UNICODE_STRING = const_cpu_to_le32(2), /* Collate Unicode
-					strings by comparing their binary
-					Unicode values, except that when a
-					character can be uppercased, the upper
-					case value collates before the lower
-					case one. */
+	COLLATION_BINARY		= const_cpu_to_le32(0),
+	COLLATION_FILE_NAME		= const_cpu_to_le32(1),
+	COLLATION_UNICODE_STRING	= const_cpu_to_le32(2),
 	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(16),
 	COLLATION_NTOFS_SID		= const_cpu_to_le32(17),
 	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(18),
