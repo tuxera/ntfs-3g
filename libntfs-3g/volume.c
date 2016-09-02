@@ -173,6 +173,9 @@ static int __ntfs_volume_release(ntfs_volume *v)
 {
 	int err = 0;
 
+	if (ntfs_close_secure(v))
+		ntfs_error_set(&err);
+
 	if (ntfs_inode_free(&v->vol_ni))
 		ntfs_error_set(&err);
 	/* 
@@ -207,7 +210,6 @@ static int __ntfs_volume_release(ntfs_volume *v)
 			ntfs_error_set(&err);
 	}
 
-	ntfs_close_secure(v);
 	ntfs_free_lru_caches(v);
 	free(v->vol_name);
 	free(v->upcase);

@@ -4468,8 +4468,8 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 /*
  *	Open the volume's security descriptor index ($Secure)
  *
- *	returns zero if it succeeds
- *		non-zero if it fails and the NTFS version is at least v3.x
+ *	returns  0 if it succeeds
+ *		-1 with errno set if it fails and the volume is NTFS v3.0+
  */
 int ntfs_open_secure(ntfs_volume *vol)
 {
@@ -4484,8 +4484,8 @@ int ntfs_open_secure(ntfs_volume *vol)
 	if (!ni)
 		goto err;
 
-	/* Verify that $Secure has the expected inode number. */
 	if (ni->mft_no != FILE_Secure) {
+		ntfs_log_error("$Secure does not have expected inode number!");
 		errno = EINVAL;
 		goto err_close_ni;
 	}
@@ -4499,9 +4499,9 @@ int ntfs_open_secure(ntfs_volume *vol)
 	if (!sdh)
 		goto err_close_sii;
 
-	vol->secure_ni = ni;
-	vol->secure_xsii = sii;
 	vol->secure_xsdh = sdh;
+	vol->secure_xsii = sii;
+	vol->secure_ni = ni;
 	return 0;
 
 err_close_sii:
@@ -4509,24 +4509,30 @@ err_close_sii:
 err_close_ni:
 	ntfs_inode_close(ni);
 err:
-	/* Failing on NTFS versions before 3.x is expected */
+	/* Failing on NTFS pre-v3.0 is expected. */
 	if (vol->major_ver < 3)
 		return 0;
-	ntfs_log_perror("error opening $Secure");
+	ntfs_log_perror("Failed to open $Secure");
 	return -1;
 }
 
 /*
  *	Close the volume's security descriptor index ($Secure)
+ *
+ *	returns  0 if it succeeds
+ *		-1 with errno set if it fails
  */
-void ntfs_close_secure(ntfs_volume *vol)
+int ntfs_close_secure(ntfs_volume *vol)
 {
+	int res = 0;
+
 	if (vol->secure_ni) {
-		ntfs_index_ctx_put(vol->secure_xsii);
 		ntfs_index_ctx_put(vol->secure_xsdh);
-		ntfs_inode_close(vol->secure_ni);
+		ntfs_index_ctx_put(vol->secure_xsii);
+		res = ntfs_inode_close(vol->secure_ni);
 		vol->secure_ni = NULL;
 	}
+	return res;
 }
 
 /*
