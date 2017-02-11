@@ -1568,7 +1568,7 @@ static void ntfs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 		REPARSE_POINT *reparse;
 		struct open_file *of;
 
-		of = (struct open_file*)fi;
+		of = (struct open_file*)(long)fi->fh;
 		res = CALL_REPARSE_PLUGIN(ni, read, buf, size, offset, &of->fi);
 		if (res >= 0) {
 			goto stamps;
@@ -1649,7 +1649,7 @@ static void ntfs_fuse_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		REPARSE_POINT *reparse;
 		struct open_file *of;
 
-		of = (struct open_file*)fi;
+		of = (struct open_file*)(long)fi->fh;
 		res = CALL_REPARSE_PLUGIN(ni, write, buf, size, offset,
 								&of->fi);
 		if (res >= 0) {
