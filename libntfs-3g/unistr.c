@@ -458,10 +458,15 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 */
  
 /* 
- * Return the amount of 8-bit elements in UTF-8 needed (without the terminating
- * null) to store a given UTF-16LE string.
+ * Return the number of bytes in UTF-8 needed (without the terminating null) to
+ * store the given UTF-16LE string.
  *
- * Return -1 with errno set if string has invalid byte sequence or too long.
+ * On error, -1 is returned, and errno is set to the error code. The following
+ * error codes can be expected:
+ *	EILSEQ		The input string is not valid UTF-16LE (only possible
+ *			if compiled without ALLOW_BROKEN_UNICODE).
+ *	ENAMETOOLONG	The length of the UTF-8 string in bytes (without the
+ *			terminating null) would exceed @outs_len.
  */
 static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_len)
 {
@@ -470,7 +475,7 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 	BOOL surrog;
 
 	surrog = FALSE;
-	for (i = 0; i < ins_len && ins[i]; i++) {
+	for (i = 0; i < ins_len && ins[i] && count <= outs_len; i++) {
 		unsigned short c = le16_to_cpu(ins[i]);
 		if (surrog) {
 			if ((c >= 0xdc00) && (c < 0xe000)) {
@@ -511,17 +516,20 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 				count += 3;
 			else 
 				goto fail;
-		if (count > outs_len) {
-			errno = ENAMETOOLONG;
-			goto out;
-		}
 	}
-	if (surrog) 
+
+	if (surrog && count <= outs_len) {
 #if ALLOW_BROKEN_UNICODE
 		count += 3; /* ending with a single surrogate */
 #else
 		goto fail;
 #endif /* ALLOW_BROKEN_UNICODE */
+	}
+
+	if (count > outs_len) {
+		errno = ENAMETOOLONG;
+		goto out;
+	}
 
 	ret = count;
 out:
