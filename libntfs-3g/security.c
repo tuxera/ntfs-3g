@@ -523,8 +523,7 @@ static int entersecurity_data(ntfs_volume *vol,
 			 */
 			res = ntfs_attr_shrink_size(vol->secure_ni,STREAM_SDS,
 				4, offs - gap + ALIGN_SDS_BLOCK + fullsz);
-		}
-		else
+		} else
 			errno = ENOSPC;
 		free(fullattr);
 	} else

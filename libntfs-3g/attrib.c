@@ -2215,7 +2215,7 @@ retry:
 				} else
 					written = ntfs_pwrite(vol->dev, wpos,
 						to_write, b);
-				}
+			}
 		} else
 			written = to_write;
 		/* If everything ok, update progress counters and continue. */
