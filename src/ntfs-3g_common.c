@@ -877,7 +877,8 @@ void close_reparse_plugins(ntfs_fuse_context_t *ctx)
  *	does not harm Windows).
  */
 
-BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx, ntfs_inode *ni)
+BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx __attribute__((unused)),
+			ntfs_inode *ni)
 {
 	u32 dt_type;
 	BOOL res;
@@ -903,10 +904,10 @@ BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx, ntfs_inode *ni)
 						    || S_ISDIR(stbuf.st_mode);
 				}
 				free(reparse);
+			}
 #else /* PLUGINS_DISABLED */
 			res = FALSE; /* mountpoints, symlinks, ... */
 #endif /* PLUGINS_DISABLED */
-			}
 		} else {
 				/* Metadata */
 			if (ni->mft_no < FILE_first_user)
