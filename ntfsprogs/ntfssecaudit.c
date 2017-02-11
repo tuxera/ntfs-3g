@@ -2083,6 +2083,7 @@ static void showhex(FILE *fd)
 	unsigned int off;
 	int i;
 	le32 *pattr;
+	BOOL acceptable;
 	BOOL isdump;
 	BOOL done;
 
@@ -2107,13 +2108,26 @@ static void showhex(FILE *fd)
 		isdump = ishexdump(line, first, lth);
 		if (isdump) off = getmsbhex(&line[first]);
 			/* line is not an hexadecimal dump */
-			/* display what we have in store */
-		if ((!isdump || !off) && pos && ntfs_valid_descr((char*)attr,pos)) {
+			/* display what we have in store if acceptable */
+		acceptable = ((!isdump || !off)
+				&& (pos >= 20))
+				&& (pos > get4l(attr,4))
+				&& (pos > get4l(attr,8))
+				&& (pos > get4l(attr,12))
+				&& (pos > get4l(attr,16))
+				&& (pos >= ntfs_attr_size(attr));
+		if (acceptable) {
 			printf("	Computed hash : 0x%08lx\n",
 				    (unsigned long)hash((le32*)attr,
 				    ntfs_attr_size(attr)));
 			isdir = guess_dir(attr);
-			printf("    Estimated type : %s\n",(isdir ? "directory" : "file"));
+			printf("    Estimated type : %s\n",
+					(isdir ? "directory" : "file"));
+			if (!ntfs_valid_descr((char*)attr,pos)) {
+				printf("**  Bad descriptor,"
+					" trying to display anyway\n");
+				errors++;
+			}
 			showheader(attr,4);
 			showusid(attr,4);
 			showgsid(attr,4);
@@ -2308,7 +2322,7 @@ static BOOL restore(FILE *fd)
 		isdump = ishexdump(line, first, lth);
 		if (isdump) off = getmsbhex(&line[first]);
 			/* line is not an hexadecimal dump */
-			/* apply what we have in store */
+			/* apply what we have in store, only if valid */
 		if ((!isdump || !off) && pos && ntfs_valid_descr((char*)attr,pos)) {
 			withattr = TRUE;
 			if (opt_v >= 2) {
