@@ -759,7 +759,7 @@ exit :
 
 #endif /* HAVE_SETXATTR */
 
-#ifndef PLUGINS_DISABLED
+#ifndef DISABLE_PLUGINS
 
 int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
 				const plugin_operations_t *ops, void *handle)
@@ -865,7 +865,7 @@ void close_reparse_plugins(ntfs_fuse_context_t *ctx)
 	}
 }
 
-#endif /* PLUGINS_DISABLED */
+#endif /* DISABLE_PLUGINS */
 
 #ifdef HAVE_SETXATTR
 
@@ -890,7 +890,7 @@ BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx __attribute__((unused)),
 	else {
 			/* Reparse point depends on kind, see plugin */
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
-#ifndef PLUGINS_DISABLED
+#ifndef DISABLE_PLUGINS
 			struct stat stbuf;
 			REPARSE_POINT *reparse;
 			const plugin_operations_t *ops;
@@ -905,9 +905,9 @@ BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx __attribute__((unused)),
 				}
 				free(reparse);
 			}
-#else /* PLUGINS_DISABLED */
+#else /* DISABLE_PLUGINS */
 			res = FALSE; /* mountpoints, symlinks, ... */
-#endif /* PLUGINS_DISABLED */
+#endif /* DISABLE_PLUGINS */
 		} else {
 				/* Metadata */
 			if (ni->mft_no < FILE_first_user)
