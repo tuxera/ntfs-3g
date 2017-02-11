@@ -125,7 +125,7 @@ AC_ARG_ENABLE(
 	[plugins],
 	[AS_HELP_STRING([--disable-plugins], [Disable external reparse point
 	 plugins for the ntfs-3g FUSE driver])],
-	,
+	[if test x${enableval} = "xyes"; then disable_plugins="no"; fi],
 	[disable_plugins="no"]
 )
 
