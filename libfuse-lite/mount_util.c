@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
+#include <paths.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #ifdef __SOLARIS__
