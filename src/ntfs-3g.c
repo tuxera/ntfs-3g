@@ -1945,9 +1945,12 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	/* Open parent directory. */
 	*--name = 0;
 	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, dir_path);
-	if (!dir_ni) {
+		/* Deny creating files in $Extend */
+	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		free(path);
 		res = -errno;
+		if (dir_ni->mft_no == FILE_Extend)
+			res = -EPERM;
 		goto exit;
 	}
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2290,8 +2293,11 @@ static int ntfs_fuse_rm(const char *org_path)
 	/* Open parent directory. */
 	*--name = 0;
 	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!dir_ni) {
+		/* deny unlinking metadata files from $Extend */
+	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		res = -errno;
+		if (dir_ni->mft_no == FILE_Extend)
+			res = -EPERM;
 		goto exit;
 	}
 	

@@ -2147,6 +2147,11 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 		res = -errno;
 		goto exit;
 	}
+	/* Deny creating into $Extend */
+	if (parent == FILE_Extend) {
+		res = -EPERM;
+		goto exit;
+	}
 	/* Open parent directory. */
 	dir_ni = ntfs_inode_open(ctx->vol, INODE(parent));
 	if (!dir_ni) {
@@ -2438,6 +2443,11 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 	struct SECURITY_CONTEXT security;
 #endif
 
+	/* Deny removing from $Extend */
+	if (parent == FILE_Extend) {
+		res = -EPERM;
+		goto exit;
+	}
 	/* Open parent directory. */
 	dir_ni = ntfs_inode_open(ctx->vol, INODE(parent));
 	if (!dir_ni) {
