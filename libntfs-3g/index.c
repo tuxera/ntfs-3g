@@ -143,7 +143,7 @@ static void ntfs_index_ctx_free(ntfs_index_context *icx)
 {
 	ntfs_log_trace("Entering\n");
 	
-	if (!icx->entry)
+	if (!icx->bad_index && !icx->entry)
 		return;
 
 	if (icx->actx)
@@ -719,7 +719,7 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 	ret = ntfs_ie_lookup(key, key_len, icx, &ir->index, &vcn, &ie);
 	if (ret == STATUS_ERROR) {
 		err = errno;
-		goto err_out;
+		goto err_lookup;
 	}
 	
 	icx->ir = ir;
@@ -780,6 +780,8 @@ descend_into_child_node:
 	
 	goto descend_into_child_node;
 err_out:
+	icx->bad_index = TRUE;	/* Force icx->* to be freed */
+err_lookup:
 	free(ib);
 	if (!err)
 		err = EIO;
