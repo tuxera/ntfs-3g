@@ -2428,11 +2428,11 @@ int ntfs_get_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			 */
 		ntfs_name_upcase(dosname, doslen,
 				ni->vol->upcase, ni->vol->upcase_len);
-		if (ntfs_ucstombs(dosname, doslen, &outname, size) < 0) {
+		outsize = ntfs_ucstombs(dosname, doslen, &outname, 0);
+		if (outsize < 0) {
 			ntfs_log_error("Cannot represent dosname in current locale.\n");
 			outsize = -errno;
 		} else {
-			outsize = strlen(outname);
 			if (value && (outsize <= (int)size))
 				memcpy(value, outname, outsize);
 			else
