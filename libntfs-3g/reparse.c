@@ -446,6 +446,11 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 	if (ok) {
 		switch (reparse_attr->reparse_tag) {
 		case IO_REPARSE_TAG_MOUNT_POINT :
+			if (size < sizeof(REPARSE_POINT) +
+				   sizeof(struct MOUNT_POINT_REPARSE_DATA)) {
+				ok = FALSE;
+				break;
+			}
 			mount_point_data = (const struct MOUNT_POINT_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
@@ -458,6 +463,11 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 				ok = FALSE;
 			break;
 		case IO_REPARSE_TAG_SYMLINK :
+			if (size < sizeof(REPARSE_POINT) +
+				   sizeof(struct SYMLINK_REPARSE_DATA)) {
+				ok = FALSE;
+				break;
+			}
 			symlink_data = (const struct SYMLINK_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(symlink_data->subst_name_offset);
