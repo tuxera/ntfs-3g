@@ -5142,6 +5142,10 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 	 */
 	if (na->type==AT_STANDARD_INFORMATION || na->type==AT_ATTRIBUTE_LIST) {
 		ntfs_attr_put_search_ctx(ctx);
+		if (!NInoAttrList(na->ni) && ntfs_inode_add_attrlist(na->ni)) {
+			ntfs_log_perror("Could not add attribute list");
+			return -1;
+		}
 		if (ntfs_inode_free_space(na->ni, offsetof(ATTR_RECORD,
 				non_resident_end) + 8)) {
 			ntfs_log_perror("Could not free space in MFT record");
