@@ -698,11 +698,10 @@ static int junction_getattr(ntfs_inode *ni,
 		struct stat *stbuf)
 {
 	char *target;
-	int attr_size;
 	int res;
 
 	errno = 0;
-	target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+	target = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 		/*
 		 * If the reparse point is not a valid
 		 * directory junction, and there is no error
@@ -805,10 +804,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			goto exit;
 #else /* DISABLE_PLUGINS */
 			char *target;
-			int attr_size;
 
 			errno = 0;
-			target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+			target = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 				/*
 				 * If the reparse point is not a valid
 				 * directory junction, and there is no error
@@ -1038,12 +1036,11 @@ static int junction_readlink(ntfs_inode *ni,
 			const REPARSE_POINT *reparse __attribute__((unused)),
 			char **pbuf)
 {
-	int attr_size;
 	int res;
 
 	errno = 0;
 	res = 0;
-	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 	if (!*pbuf) {
 		if (errno == EOPNOTSUPP) {
 			*pbuf = strdup(ntfs_bad_reparse);
@@ -1099,11 +1096,10 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		}
 #else /* DISABLE_PLUGINS */
 		char *target;
-		int attr_size;
 
 		errno = 0;
 		res = 0;
-		target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+		target = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 		if (target) {
 			strncpy(buf,target,buf_size);
 			free(target);

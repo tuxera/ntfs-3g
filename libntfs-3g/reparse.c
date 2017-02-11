@@ -724,8 +724,7 @@ static char *ntfs_get_rellink(ntfs_inode *ni, ntfschar *junction, int count)
  *			symbolic link or directory junction
  */
 
-char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
-			int *pattr_size)
+char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point)
 {
 	s64 attr_size = 0;
 	char *target;
@@ -820,7 +819,6 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 		}
 		free(reparse_attr);
 	}
-	*pattr_size = attr_size;
 	if (bad)
 		errno = EOPNOTSUPP;
 	return (target);

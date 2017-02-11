@@ -634,11 +634,10 @@ static int junction_getstat(ntfs_inode *ni,
 			struct stat *stbuf)
 {
 	char *target;
-	int attr_size;
 	int res;
 
 	errno = 0;
-	target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+	target = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 		/*
 		 * If the reparse point is not a valid
 		 * directory junction, and there is no error
@@ -713,11 +712,9 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 			goto ok;
 #else /* DISABLE_PLUGINS */
 			char *target;
-			int attr_size;
 
 			errno = 0;
-			target = ntfs_make_symlink(ni, ctx->abs_mnt_point,
-					&attr_size);
+			target = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 				/*
 				 * If the reparse point is not a valid
 				 * directory junction, and there is no error
@@ -1020,12 +1017,11 @@ static int junction_readlink(ntfs_inode *ni,
 			const REPARSE_POINT *reparse __attribute__((unused)),
 			char **pbuf)
 {
-	int attr_size;
 	int res;
 
 	errno = 0;
 	res = 0;
-	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 	if (!*pbuf) {
 		if (errno == EOPNOTSUPP) {
 			*pbuf = strdup(ntfs_bad_reparse);
@@ -1068,11 +1064,9 @@ static void ntfs_fuse_readlink(fuse_req_t req, fuse_ino_t ino)
 				res = -errno;
 		}
 #else /* DISABLE_PLUGINS */
-		int attr_size;
-
 		errno = 0;
 		res = 0;
-		buf = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
+		buf = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 		if (!buf) {
 			if (errno == EOPNOTSUPP)
 				buf = strdup(ntfs_bad_reparse);
