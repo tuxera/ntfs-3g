@@ -835,10 +835,12 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 				if (!ops)
 					dlclose(handle);
 			} else {
-				if (!(ctx->errors_logged & ERR_PLUGIN))
+				if (!(ctx->errors_logged & ERR_PLUGIN)) {
 					ntfs_log_perror(
 						"Could not load plugin %s",
 						name);
+					ntfs_log_error("Hint %s\n",dlerror());
+				}
 				ctx->errors_logged |= ERR_PLUGIN;
 			}
 		}
