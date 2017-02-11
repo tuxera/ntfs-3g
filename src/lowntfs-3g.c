@@ -645,11 +645,10 @@ static int junction_getstat(ntfs_inode *ni,
 		 * we still display as a symlink
 		 */
 	if (target || (errno == EOPNOTSUPP)) {
-			/* returning attribute size */
 		if (target)
-			stbuf->st_size = attr_size;
+			stbuf->st_size = strlen(target);
 		else
-			stbuf->st_size = sizeof(ntfs_bad_reparse);
+			stbuf->st_size = sizeof(ntfs_bad_reparse) - 1;
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_mode = S_IFLNK;
 		free(target);
@@ -705,7 +704,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 				apply_umask(stbuf);
 			} else {
 				stbuf->st_size =
-					sizeof(ntfs_bad_reparse);
+					sizeof(ntfs_bad_reparse) - 1;
 				stbuf->st_blocks =
 					(ni->allocated_size + 511) >> 9;
 				stbuf->st_mode = S_IFLNK;
@@ -725,12 +724,11 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 				 * we still display as a symlink
 				 */
 			if (target || (errno == EOPNOTSUPP)) {
-					/* returning attribute size */
 				if (target)
-					stbuf->st_size = attr_size;
+					stbuf->st_size = strlen(target);
 				else
 					stbuf->st_size = 
-						sizeof(ntfs_bad_reparse);
+						sizeof(ntfs_bad_reparse) - 1;
 				stbuf->st_blocks =
 					(ni->allocated_size + 511) >> 9;
 				stbuf->st_nlink =
@@ -837,8 +835,29 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 							le64_to_cpu(
 							intx_file->minor));
 				}
-				if (intx_file->magic == INTX_SYMBOLIC_LINK)
+				if (intx_file->magic == INTX_SYMBOLIC_LINK) {
+					char *target = NULL;
+					int len;
+
+					/* st_size should be set to length of
+					 * symlink target as multibyte string */
+					len = ntfs_ucstombs(
+							intx_file->target,
+							(na->data_size -
+							    offsetof(INTX_FILE,
+								     target)) /
+							       sizeof(ntfschar),
+							     &target, 0);
+					if (len < 0) {
+						res = -errno;
+						free(intx_file);
+						ntfs_attr_close(na);
+						goto exit;
+					}
+					free(target);
 					stbuf->st_mode = S_IFLNK;
+					stbuf->st_size = len;
+				}
 				free(intx_file);
 			}
 			ntfs_attr_close(na);
