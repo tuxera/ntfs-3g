@@ -544,7 +544,7 @@ fail:
  * @ins:	input utf16 string buffer
  * @ins_len:	length of input string in utf16 characters
  * @outs:	on return contains the (allocated) output multibyte string
- * @outs_len:	length of output buffer in bytes
+ * @outs_len:	length of output buffer in bytes (ignored if *@outs is NULL)
  *
  * Return -1 with errno set if string has invalid byte sequence or too long.
  */
@@ -563,10 +563,16 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 	int halfpair;
 
 	halfpair = 0;
-	if (!*outs)
+	if (!*outs) {
+		/* If no output buffer was provided, we will allocate one and
+		 * limit its length to PATH_MAX.  Note: we follow the standard
+		 * convention of PATH_MAX including the terminating null. */
 		outs_len = PATH_MAX;
+	}
 
-	size = utf16_to_utf8_size(ins, ins_len, outs_len);
+	/* The size *with* the terminating null is limited to @outs_len,
+	 * so the size *without* the terminating null is limited to one less. */
+	size = utf16_to_utf8_size(ins, ins_len, outs_len - 1);
 
 	if (size < 0)
 		goto out;
@@ -877,7 +883,7 @@ fail:
  * @ins:	input Unicode string buffer
  * @ins_len:	length of input string in Unicode characters
  * @outs:	on return contains the (allocated) output multibyte string
- * @outs_len:	length of output buffer in bytes
+ * @outs_len:	length of output buffer in bytes (ignored if *@outs is NULL)
  *
  * Convert the input little endian, 2-byte Unicode string @ins, of length
  * @ins_len into the multibyte string format dictated by the current locale.
