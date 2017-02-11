@@ -1103,6 +1103,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	if (arg->flags & FUSE_DONT_MASK)
 	    f->conn.capable |= FUSE_CAP_DONT_MASK;
+	if (arg->flags & FUSE_POSIX_ACL)
+	    f->conn.capable |= FUSE_CAP_POSIX_ACL;
 #endif
 	if (arg->flags & FUSE_BIG_WRITES)
 	    f->conn.capable |= FUSE_CAP_BIG_WRITES;
@@ -1143,6 +1145,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	    if (f->conn.want & FUSE_CAP_DONT_MASK)
 		outarg.flags |= FUSE_DONT_MASK;
+	    if (f->conn.want & FUSE_CAP_POSIX_ACL)
+		outarg.flags |= FUSE_POSIX_ACL;
 #endif
     } else {
 	/* Never use a version more recent than supported by the kernel */
@@ -1157,6 +1161,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	    if (f->conn.want & FUSE_CAP_DONT_MASK)
 		outarg.flags |= FUSE_DONT_MASK;
+	    if (f->conn.want & FUSE_CAP_POSIX_ACL)
+		outarg.flags |= FUSE_POSIX_ACL;
 #endif
     	}
     }

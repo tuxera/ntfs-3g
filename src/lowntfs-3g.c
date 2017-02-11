@@ -90,6 +90,10 @@
 #include <linux/fs.h>
 #endif
 
+#ifndef FUSE_CAP_POSIX_ACL  /* until defined in <fuse/fuse_common.h> */
+#define FUSE_CAP_POSIX_ACL (1 << 18)
+#endif /* FUSE_CAP_POSIX_ACL */
+
 #include "compat.h"
 #include "bitmap.h"
 #include "attrib.h"
@@ -140,13 +144,18 @@
 	 * FUSE cacheing is only usable with basic permissions
 	 * checked by the kernel with external fuse >= 2.8
 	 */
-#if KERNELACLS | !KERNELPERMS
+#if !KERNELPERMS
 #warning "Fuse cacheing is only usable with basic permissions checked by kernel"
 #endif
-#define ATTR_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
-#define ENTRY_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
+#if KERNELACLS
+#define ATTR_TIMEOUT 10.0
+#define ENTRY_TIMEOUT 10.0
+#else /* KERNELACLS */
+#define ATTR_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0)
+#define ENTRY_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0)
+#endif /* KERNELACLS */
 #endif /* defined(__sun) && defined (__SVR4) */
-#endif
+#endif /* !CACHEING */
 #define GHOSTLTH 40 /* max length of a ghost file name - see ghostformat */
 
 		/* sometimes the kernel cannot check access */
@@ -611,6 +620,10 @@ static void ntfs_init(void *userdata __attribute__((unused)),
 		/* request umask not to be enforced by fuse */
 	conn->want |= FUSE_CAP_DONT_MASK;
 #endif /* defined FUSE_CAP_DONT_MASK */
+#if POSIXACLS & KERNELACLS
+		/* request ACLs to be checked by kernel */
+	conn->want |= FUSE_CAP_POSIX_ACL;
+#endif /* POSIXACLS & KERNELACLS */
 #ifdef FUSE_CAP_BIG_WRITES
 	if (ctx->big_writes
 	    && ((ctx->vol->nr_clusters << ctx->vol->cluster_size_bits)

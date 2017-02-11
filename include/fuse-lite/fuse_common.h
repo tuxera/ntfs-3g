@@ -44,8 +44,10 @@ extern "C" {
 #ifdef POSIXACLS
 /*
  * FUSE_CAP_DONT_MASK: don't apply umask to file mode on create operations
+ * FUSE_CAP_POSIX_ACL: process Posix ACLs within the kernel
  */
 #define FUSE_CAP_DONT_MASK	(1 << 6)
+#define FUSE_CAP_POSIX_ACL	(1 << 18)
 #endif
 
 #define FUSE_CAP_BIG_WRITES	(1 << 5)

@@ -85,6 +85,10 @@
 #include <sys/param.h>
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 
+#ifndef FUSE_CAP_POSIX_ACL  /* until defined in <fuse/fuse_common.h> */
+#define FUSE_CAP_POSIX_ACL (1 << 18)
+#endif /* FUSE_CAP_POSIX_ACL */
+
 #include "compat.h"
 #include "attrib.h"
 #include "inode.h"
@@ -674,6 +678,10 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 		/* request umask not to be enforced by fuse */
 	conn->want |= FUSE_CAP_DONT_MASK;
 #endif /* defined FUSE_CAP_DONT_MASK */
+#if POSIXACLS & KERNELACLS
+		/* request ACLs to be checked by kernel */
+	conn->want |= FUSE_CAP_POSIX_ACL;
+#endif /* POSIXACLS & KERNELACLS */
 #ifdef FUSE_CAP_BIG_WRITES
 	if (ctx->big_writes
 	    && ((ctx->vol->nr_clusters << ctx->vol->cluster_size_bits)
