@@ -1477,10 +1477,14 @@ void ntfs_ucsfree(ntfschar *ucs)
  *		Check whether a name contains no chars forbidden
  *	for DOS or Win32 use
  *
+ *	If @strict is TRUE, then trailing dots and spaces are forbidden.
+ *	These names are technically allowed in the Win32 namespace, but
+ *	they can be problematic.  See comment for FILE_NAME_WIN32.
+ *
  *	If there is a bad char, errno is set to EINVAL
  */
 
-BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
+BOOL ntfs_forbidden_chars(const ntfschar *name, int len, BOOL strict)
 {
 	BOOL forbidden;
 	int ch;
@@ -1493,9 +1497,9 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('>' - 0x20))
 			| (1L << ('?' - 0x20));
 
-	forbidden = (len == 0)
-			|| (name[len-1] == const_cpu_to_le16(' '))
-			|| (name[len-1] == const_cpu_to_le16('.'));
+	forbidden = (len == 0) ||
+		    (strict && (name[len-1] == const_cpu_to_le16(' ') ||
+				name[len-1] == const_cpu_to_le16('.')));
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
 		if ((ch < 0x20)
@@ -1517,10 +1521,15 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
  *	The reserved names are CON, PRN, AUX, NUL, COM1..COM9, LPT1..LPT9
  *	with no suffix or any suffix.
  *
+ *	If @strict is TRUE, then trailing dots and spaces are forbidden.
+ *	These names are technically allowed in the Win32 namespace, but
+ *	they can be problematic.  See comment for FILE_NAME_WIN32.
+ *
  *	If the name is forbidden, errno is set to EINVAL
  */
 
-BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
+BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len,
+			  BOOL strict)
 {
 	BOOL forbidden;
 	int h;
@@ -1538,7 +1547,7 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 	static const ntfschar lpt[] = { const_cpu_to_le16('l'),
 			const_cpu_to_le16('p'), const_cpu_to_le16('t') };
 
-	forbidden = ntfs_forbidden_chars(name, len);
+	forbidden = ntfs_forbidden_chars(name, len, strict);
 	if (!forbidden && (len >= 3)) {
 		/*
 		 * Rough hash check to tell whether the first couple of chars

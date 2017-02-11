@@ -1068,12 +1068,17 @@ typedef enum {
 	FILE_NAME_WIN32			= 0x01,
 		/* The standard WinNT/2k NTFS long filenames. Case insensitive.
 		   All Unicode chars except: '\0', '"', '*', '/', ':', '<',
-		   '>', '?', '\' and '|'. Further, names cannot end with a '.'
-		   or a space. */
+		   '>', '?', '\' and '|'.  Trailing dots and spaces are allowed,
+		   even though on Windows a filename with such a suffix can only
+		   be created and accessed using a WinNT-style path, i.e.
+		   \\?\-prefixed.  (If a regular path is used, Windows will
+		   strip the trailing dots and spaces, which makes such
+		   filenames incompatible with most Windows software.) */
 	FILE_NAME_DOS			= 0x02,
 		/* The standard DOS filenames (8.3 format). Uppercase only.
 		   All 8-bit characters greater space, except: '"', '*', '+',
-		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'. */
+		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'.  Trailing
+		   dots and spaces are forbidden. */
 	FILE_NAME_WIN32_AND_DOS		= 0x03,
 		/* 3 means that both the Win32 and the DOS filenames are
 		   identical and hence have been saved in this single filename
