@@ -1322,7 +1322,7 @@ static void fixup(CONTEXT *ctx, const LOG_RECORD *logr, const char *buf,
 		}
 		printf("   new base MFT record, attr 0x%x (%s)\n",attr,attrname(attr));
 		printf("   inode      %lld\n",
-				(((long long)le64_to_cpu(logr->target_vcn)
+				(((long long)sle64_to_cpu(logr->target_vcn)
 					<< clusterbits)
 				+ (le16_to_cpu(logr->cluster_index) << 9))
 					>> mftrecbits);
@@ -1371,7 +1371,7 @@ static void fixup(CONTEXT *ctx, const LOG_RECORD *logr, const char *buf,
 		printf("   free base MFT record, attr 0x%x (%s)\n",
 				attr,attrname(attr));
 		printf("   inode %lld\n",
-		    (((long long)le64_to_cpu(logr->target_vcn) << clusterbits)
+		    (((long long)sle64_to_cpu(logr->target_vcn) << clusterbits)
 		    + (le16_to_cpu(logr->cluster_index) << 9)) >> mftrecbits);
 		break;
 	case CreateAttribute : /* 5 */
@@ -1880,20 +1880,20 @@ static void detaillogr(CONTEXT *ctx, const LOG_RECORD *logr)
 			(int)le16_to_cpu(logr->attribute_flags));
 		if (mftrecbits && onmft)
 			printf("target_vcn             %016llx (inode %lld)\n",
-				(long long)le64_to_cpu(logr->target_vcn),
-				(((long long)le64_to_cpu(logr->target_vcn)
+				(long long)sle64_to_cpu(logr->target_vcn),
+				(((long long)sle64_to_cpu(logr->target_vcn)
 					<< clusterbits)
 				+ (le16_to_cpu(logr->cluster_index) << 9))
 					 >> mftrecbits);
 		else
 			printf("target_vcn             %016llx\n",
-				(long long)le64_to_cpu(logr->target_vcn));
+				(long long)sle64_to_cpu(logr->target_vcn));
 			/* Compute a base for the current run of mft */
-		baselcn = le64_to_cpu(logr->lcn_list[0])
-					- le64_to_cpu(logr->target_vcn);
+		baselcn = sle64_to_cpu(logr->lcn_list[0])
+					- sle64_to_cpu(logr->target_vcn);
 		for (i=0; i<le16_to_cpu(logr->lcns_to_follow)
 						&& (i<SHOWLISTS); i++) {
-			lcn = le64_to_cpu(logr->lcn_list[i]);
+			lcn = sle64_to_cpu(logr->lcn_list[i]);
 			printf("  (%d offs 0x%x) lcn    %016llx",i,
 				(int)(8*i + sizeof(LOG_RECORD) - 8),
 				(long long)lcn);
@@ -1992,7 +1992,7 @@ static void detaillogr(CONTEXT *ctx, const LOG_RECORD *logr)
                   off = le16_to_cpu(logr->record_offset)
 					+ le16_to_cpu(logr->attribute_offset);
                   printf("redo data (new data) cluster 0x%llx pos 0x%x :\n",
-                        (long long)le64_to_cpu(logr->lcn_list[off
+                        (long long)sle64_to_cpu(logr->lcn_list[off
 						>> clusterbits]),
                         (int)(off & (clustersz - 1)));
                   }
@@ -2021,7 +2021,7 @@ static void detaillogr(CONTEXT *ctx, const LOG_RECORD *logr)
                    off = le16_to_cpu(logr->record_offset)
 					+ le16_to_cpu(logr->attribute_offset);
                    printf("undo data (old data) cluster 0x%llx pos 0x%x :\n",
-                         (long long)le64_to_cpu(logr->lcn_list[off
+                         (long long)sle64_to_cpu(logr->lcn_list[off
 							>> clusterbits]),
                          (int)(off & (clustersz - 1)));
                    }
@@ -2120,7 +2120,7 @@ BOOL within_lcn_range(const LOG_RECORD *logr)
    	switch (logr->record_type) {
       	case LOG_STANDARD :
          	for (i=0; i<le16_to_cpu(logr->lcns_to_follow); i++) {
-            		lcn = MREF(le64_to_cpu(logr->lcn_list[i]));
+			lcn = MREF(sle64_to_cpu(logr->lcn_list[i]));
 			if ((lcn >= firstlcn) && (lcn <= lastlcn))
 				within = TRUE;
 		}
@@ -2709,9 +2709,9 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 			printf("restart_area_offset         %04x\n",
 				(int)le16_to_cpu(rest->restart_area_offset));
 			printf("minor_vers             %d\n",
-				(int)le16_to_cpu(rest->minor_ver));
+				(int)sle16_to_cpu(rest->minor_ver));
 			printf("major_vers             %d\n",
-				(int)le16_to_cpu(rest->major_ver));
+				(int)sle16_to_cpu(rest->major_ver));
 			printf("usn                    %04x\n",
 				(int)le16_to_cpu(rest->usn));
 			printf("\n");
@@ -2740,7 +2740,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 			printf("client_array_offset    %04x\n",
 				(int)le16_to_cpu(resa->client_array_offset));
 			printf("file_size              %016llx\n",
-				(long long)le64_to_cpu(resa->file_size));
+				(long long)sle64_to_cpu(resa->file_size));
 			printf("last_lsn_data_len      %08lx\n",
 				(long)le32_to_cpu(resa->last_lsn_data_length));
 			printf("record_length          %04x\n",
@@ -2945,8 +2945,8 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 		}
 		if (!bad && !ctx->vol)
 			dorest(ctx, 0, &buf->block.restart, TRUE);
-		major = le16_to_cpu(buf->block.restart.major_ver);
-		minor = le16_to_cpu(buf->block.restart.minor_ver);
+		major = sle16_to_cpu(buf->block.restart.major_ver);
+		minor = sle16_to_cpu(buf->block.restart.minor_ver);
 		if ((major == 2) && (minor == 0)) {
 			if (!optk) {
 				printf("** Fast restart mode detected,"
@@ -2986,8 +2986,8 @@ static int reset_logfile(CONTEXT *ctx __attribute__((unused)))
 		restart.flags |= RESTART_VOLUME_IS_CLEAN;
 		client.oldest_lsn = cpu_to_sle64(restart_lsn);
 		/* Set $LogFile version to 1.1 so that volume can be mounted */
-		log_header.major_ver = const_cpu_to_le16(1);
-		log_header.minor_ver = const_cpu_to_le16(1);
+		log_header.major_ver = const_cpu_to_sle16(1);
+		log_header.minor_ver = const_cpu_to_sle16(1);
 		memcpy(buffer, &log_header,
 					sizeof(RESTART_PAGE_HEADER));
 		off = le16_to_cpu(log_header.restart_area_offset);
