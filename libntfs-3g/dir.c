@@ -40,7 +40,13 @@
 #include <sys/stat.h>
 #endif
 
-#ifdef HAVE_SYS_SYSMACROS_H
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
 #include <sys/sysmacros.h>
 #endif
 
@@ -61,10 +67,7 @@
 #include "security.h"
 #include "reparse.h"
 #include "object_id.h"
-
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
+#include "xattrs.h"
 
 /*
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
@@ -875,7 +878,7 @@ typedef enum {
  *	and most metadata files have such similar patters.
  */
 
-static u32 ntfs_interix_types(ntfs_inode *ni)
+u32 ntfs_interix_types(ntfs_inode *ni)
 {
 	ntfs_attr *na;
 	u32 dt_type;
@@ -884,8 +887,14 @@ static u32 ntfs_interix_types(ntfs_inode *ni)
 	dt_type = NTFS_DT_UNKNOWN;
 	na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
 	if (na) {
-		/* Unrecognized patterns (eg HID + SYST) are plain files */
-		dt_type = NTFS_DT_REG;
+		/*
+		 * Unrecognized patterns (eg HID + SYST for metadata)
+		 * are plain files or directories
+		 */
+		if (!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY))
+			dt_type = NTFS_DT_DIR;
+		else
+			dt_type = NTFS_DT_REG;
 		if (na->data_size <= 1) {
 			if (le32_andz(ni->flags, FILE_ATTR_HIDDEN))
 				dt_type = (na->data_size ?
@@ -1892,20 +1901,23 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 	if (!actx)
 		goto err_out;
 search:
-	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
-			0, NULL, 0, actx)) {
+	while (!(err = ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+					CASE_SENSITIVE, 0, NULL, 0, actx))) {
+	#ifdef DEBUG
 		char *s;
+	#endif
 		IGNORE_CASE_BOOL case_sensitive = IGNORE_CASE;
 
-		errno = 0;
 		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
 				le16_to_cpu(actx->attr->value_offset));
+	#ifdef DEBUG
 		s = ntfs_attr_name_get(fn->file_name, fn->file_name_length);
 		ntfs_log_trace("name: '%s'  type: %d  dos: %d  win32: %d  "
 			       "case: %d\n", s, fn->file_name_type,
 			       looking_for_dos_name, looking_for_win32_name,
 			       case_sensitive_match);
 		ntfs_attr_name_free(&s);
+	#endif
 		if (looking_for_dos_name) {
 			if (fn->file_name_type == FILE_NAME_DOS)
 				break;
@@ -1946,7 +1958,7 @@ search:
 			break;
 		}
 	}
-	if (errno) {
+	if (err) {
 		/*
 		 * If case sensitive search failed, then try once again
 		 * ignoring case.
@@ -2268,8 +2280,6 @@ ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
 	return (dir_ni);
 }
 
-#ifdef HAVE_SETXATTR
-
 #define MAX_DOS_NAME_LENGTH	 12
 
 /*
@@ -2418,11 +2428,11 @@ int ntfs_get_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			 */
 		ntfs_name_upcase(dosname, doslen,
 				ni->vol->upcase, ni->vol->upcase_len);
-		if (ntfs_ucstombs(dosname, doslen, &outname, size) < 0) {
+		outsize = ntfs_ucstombs(dosname, doslen, &outname, 0);
+		if (outsize < 0) {
 			ntfs_log_error("Cannot represent dosname in current locale.\n");
 			outsize = -errno;
 		} else {
-			outsize = strlen(outname);
 			if (value && (outsize <= (int)size))
 				memcpy(value, outname, outsize);
 			else
@@ -2644,9 +2654,12 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	shortlen = ntfs_mbstoucs(newname, &shortname);
 	if (shortlen > MAX_DOS_NAME_LENGTH)
 		shortlen = MAX_DOS_NAME_LENGTH;
-			/* make sure the short name has valid chars */
+
+	/* Make sure the short name has valid chars.
+	 * Note: the short name cannot end with dot or space, but the
+	 * corresponding long name can. */
 	if ((shortlen < 0)
-	    || ntfs_forbidden_names(ni->vol,shortname,shortlen)) {
+	    || ntfs_forbidden_names(ni->vol,shortname,shortlen,TRUE)) {
 		ntfs_inode_close_in_dir(ni,dir_ni);
 		ntfs_inode_close(dir_ni);
 		res = -errno;
@@ -2657,7 +2670,8 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	if (longlen > 0) {
 		oldlen = get_dos_name(ni, dnum, oldname);
 		if ((oldlen >= 0)
-		    && !ntfs_forbidden_names(ni->vol, longname, longlen)) {
+		    && !ntfs_forbidden_names(ni->vol, longname, longlen,
+					     FALSE)) {
 			if (oldlen > 0) {
 				if (flags & XATTR_CREATE) {
 					res = -1;
@@ -2778,5 +2792,3 @@ int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 	}
 	return (res);
 }
-
-#endif

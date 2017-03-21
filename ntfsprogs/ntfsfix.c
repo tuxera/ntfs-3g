@@ -341,6 +341,39 @@ static int empty_journal(ntfs_volume *vol)
 	return 0;
 }
 
+/*
+ *		Clear the sparse flag of an attribute
+ */
+
+static int clear_sparse(ntfs_attr *na, const char *name)
+{
+	ntfs_attr_search_ctx *ctx;
+	int res;
+
+	res = -1;
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (ctx) {
+		if (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				CASE_SENSITIVE,	0, NULL, 0, ctx)) {
+			na->data_flags = le16_and(na->data_flags, le16_not(ATTR_IS_SPARSE));
+			ctx->attr->data_size = cpu_to_sle64(na->data_size);
+			ctx->attr->initialized_size
+					= cpu_to_sle64(na->initialized_size);
+			ctx->attr->flags = cpu_to_le16(na->data_flags);
+			ctx->attr->compression_unit = 0;
+			ntfs_inode_mark_dirty(ctx->ntfs_ino);
+			NInoFileNameSetDirty(na->ni);
+			res = 0;
+		} else
+			ntfs_log_perror("Could not locate attribute for %s",
+						name);
+		ntfs_attr_put_search_ctx(ctx);
+	} else
+		ntfs_log_perror("Could not get a search context for %s",
+					name);
+	return (res);
+}
+
 /**
  *		Clear the bad cluster marks (option)
  */
@@ -372,15 +405,14 @@ static int clear_badclus(ntfs_volume *vol)
 			 * (which requires setting the data size according
 			 * to allocation), then reallocate a sparse stream
 			 * to full size of volume and reset the data size.
+			 * Note : the sparse flags should not be set.
 			 */
 				na->data_size = na->allocated_size;
 				na->initialized_size = na->allocated_size;
 				if (!ntfs_attr_truncate(na,0)
 				    && !ntfs_attr_truncate(na,vol->nr_clusters
 						<< vol->cluster_size_bits)) {
-					na->data_size = 0;
 					na->initialized_size = 0;
-					ni->flags = le32_or(ni->flags, FILE_ATTR_SPARSE_FILE);
 					NInoFileNameSetDirty(ni);
 					ok = TRUE;
 				} else {
@@ -389,6 +421,14 @@ static int clear_badclus(ntfs_volume *vol)
 			} else {
 				ntfs_log_info("No bad clusters...");
 				ok = TRUE;
+			}
+			/*
+			 * The sparse flags are not set after an initial
+			 * formatting, so do the same.
+			 */
+			if (ok) {
+				ni->flags = le32_and(ni->flags, le32_not(FILE_ATTR_SPARSE_FILE));
+				ok = !clear_sparse(na, "$BadClus::$Bad");
 			}
 			ntfs_attr_close(na);
 		} else {

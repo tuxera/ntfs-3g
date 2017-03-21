@@ -1,8 +1,8 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2015 Jean-Pierre Andre
- * 
+ * Copyright (c) 2007-2016 Jean-Pierre Andre
+ *
  *	Options :
  *		-a auditing security data
  *		-b backing up NTFS ACLs
@@ -16,43 +16,47 @@
  *		-t run internal tests (with no access to storage)
  *
  *	On Linux (being root, with volume not mounted) :
- *		secaudit -h [file]
+ *		ntfssecaudit -h [file]
  *			display the security descriptors found in file
- *		secaudit -a[rv] volume
+ *		ntfssecaudit -a[rv] volume
  *			audit the volume
- *		secaudit [-v] volume file
+ *		ntfssecaudit [-v] volume file
  *			display the security parameters of file
- *		secaudit -r[v] volume directory
+ *		ntfssecaudit -r[v] volume directory
  *			display the security parameters of files in directory
- *		secaudit -b[v] volume [directory]
+ *		ntfssecaudit -b[v] volume [directory]
  *			backup the security parameters of files in directory
- *		secaudit -s[ve] volume [backupfile]
+ *		ntfssecaudit -s[ve] volume [backupfile]
  *			set the security parameters as indicated in backup
  *			with -e set extra parameters (Windows attrib)
- *		secaudit volume perms file
+ *		ntfssecaudit volume perms file
  *			set the security parameters of file to perms (mode or acl)
- *		secaudit -r[v] volume perms directory
+ *		ntfssecaudit -r[v] volume perms directory
  *			set the security parameters of files in directory to perms
- *          special case, does not require being root :
- *		secaudit [-v] mounted-file
+ *          special cases, do not require being root :
+ *		ntfssecaudit [-v] mounted-file
  *			display the security parameters of mounted file
+ *		ntfssecaudit -u[v] mounted-file
+ *			display a user mapping proposal
  *
  *
  *	On Windows (the volume being part of file name)
- *		secaudit -h [file]
+ *		ntfssecaudit -h [file]
  *			display the security descriptors found in file
- *		secaudit [-v] file
+ *		ntfssecaudit -a[rv] volume
+ *			audit the volume
+ *		ntfssecaudit [-v] file
  *			display the security parameters of file
- *		secaudit -r[v] directory
+ *		ntfssecaudit -r[v] directory
  *			display the security parameters of files in directory
- *		secaudit -b[v] directory
+ *		ntfssecaudit -b[v] directory
  *			backup the security parameters of files in directory
- *		secaudit -s[v] [backupfile]
+ *		ntfssecaudit -s[v] volume [backupfile]
  *			set the security parameters as indicated in backup
  *			with -e set extra parameters (Windows attrib)
- *		secaudit perms file
+ *		ntfssecaudit perms file
  *			set the security parameters of file to perms (mode or acl)
- *		secaudit -r[v] perms directory
+ *		ntfssecaudit -r[v] perms directory
  *			set the security parameters of files in directory to perms
  */
 
@@ -221,6 +225,9 @@
  *
  *  May 2015, version 1.4.6
  *     - made to load shared library based on generic name
+ *
+ *  Mar 2016, Version 1.5.0
+ *     - reorganized to rely on libntfs-3g even on Windows
  */
 
 /*
@@ -244,312 +251,202 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.4.6"
+#define AUDT_VERSION "1.5.0"
 
-#define GET_FILE_SECURITY "ntfs_get_file_security"
-#define SET_FILE_SECURITY "ntfs_set_file_security"
-#define GET_FILE_ATTRIBUTES "ntfs_get_file_attributes"
-#define SET_FILE_ATTRIBUTES "ntfs_set_file_attributes"
-#define READ_DIRECTORY "ntfs_read_directory"
-#define READ_SDS "ntfs_read_sds"
-#define READ_SII "ntfs_read_sii"
-#define READ_SDH "ntfs_read_sdh"
-#define GET_USER "ntfs_get_user"
-#define GET_GROUP "ntfs_get_group"
-#define GET_USID "ntfs_get_usid"
-#define GET_GSID "ntfs_get_gsid"
-#define INIT_FILE_SECURITY "ntfs_initialize_file_security"
-#define LEAVE_FILE_SECURITY "ntfs_leave_file_security"
+#define SELFTESTS 0
+#define NOREVBOM 0 /* still unclear what this should be */
 
 /*
  *			External declarations
  */
 
-#include <stdio.h>
-#include <time.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <stdarg.h>
-
-				/*
-				 * integration into secaudit, check whether Win32,
-				 * may have to be adapted to compiler or something else
-				 */
-
-#ifndef WIN32
-#if defined(__WIN32) | defined(__WIN32__) | defined(WNSC)
-#define WIN32 1
-#endif
-#endif
-
-				/*
-				 * integration into secaudit/Win32
-				 */
-#ifdef WIN32
-#include <windows.h>
-#define __LITTLE_ENDIAN 1234
-#define __BYTE_ORDER __LITTLE_ENDIAN
-#else
-				/*
-				 * integration into secaudit/STSC
-				 */
-#ifdef STSC
-#include <stat.h>
-#undef __BYTE_ORDER
-#define __BYTE_ORDER __BIG_ENDIAN
-#else
-				/*
-				 * integration into secaudit/Linux
-				 */
-
-#include <sys/stat.h>
-#ifdef HAVE_ENDIAN_H
-#include <endian.h>
-#endif
-#ifdef HAVE_MACHINE_ENDIAN_H
-#include <machine/endian.h>
-#endif
-#include <unistd.h>
-#include <dlfcn.h>
-#endif /* STSC */
-#endif /* WIN32 */
-#include "secaudit.h"
-
-#ifndef WIN32
-
-#ifndef STSC
-
-#if !defined(HAVE_CONFIG_H) && POSIXACLS && !defined(__SVR4)
-      /* require <sys/xattr.h> if not integrated into ntfs-3g package */
-#define HAVE_SETXATTR 1
-#endif
-
-#ifdef HAVE_CONFIG_H
-#ifdef _FILE_OFFSET_BITS
-#undef _FILE_OFFSET_BITS  /* work around "_FILE_OFFSET_BITS" possibly already defined */
-#endif
-      /* <sys/xattr.h> according to config.h if integrated into ntfs-3g package */
 #include "config.h"
-#ifdef const /* work around "const" possibly redefined in config.h */
-#undef const
-#endif
-#ifndef POSIXACLS
-#define POSIXACLS 0
-#endif
-#endif /* HAVE_CONFIG_H */
 
+#ifdef HAVE_STDIO_H
+#include <stdio.h>
+#endif /* HAVE_STDIO_H */
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif /* HAVE_STDLIB_H */
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif /* HAVE_STRING_H */
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif /* HAVE_UNISTD_H */
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif /* HAVE_TIME_H */
+#ifdef HAVE_GETOPT_H
+#include <getopt.h>
+#endif /* HAVE_GETOPT_H */
+#ifdef HAVE_ERRNO_H
+#include <errno.h>
+#endif /* HAVE_ERRNO_H */
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif /* HAVE_FCNTL_H */
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif /* HAVE_SYS_TYPES_H */
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif /* HAVE_SYS_STAT_H */
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-#else
+#else /* HAVE_SETXATTR */
 #warning "The extended attribute package is not available"
 #endif /* HAVE_SETXATTR */
 
-#endif /* STSC */
-
-#define NTFS_MNT_NONE 0    /* no flag for mounting the device */
-#define NTFS_MNT_RDONLY 1  /* flag for mounting the device read-only */
+#include "types.h"
+#include "endians.h"
+#include "support.h"
+#include "layout.h"
+#include "param.h"
+#include "ntfstime.h"
+#include "device_io.h"
+#include "device.h"
+#include "logging.h"
+#include "runlist.h"
+#include "mft.h"
+#include "inode.h"
+#include "attrib.h"
+#include "bitmap.h"
+#include "index.h"
+#include "volume.h"
+#include "unistr.h"
+#include "mst.h"
+#include "security.h"
+#include "acls.h"
+#include "realpath.h"
+#include "utils.h"
+#include "misc.h"
 
 struct CALLBACK;
 
-typedef int (*dircallback)(struct CALLBACK *context, char *ntfsname,
-	int length, int type, long long pos, u64 mft_ref,
-	unsigned int dt_type);
+typedef int (*dircallback)(void *context, const ntfschar *ntfsname,
+	const int length, const int type, const s64 pos,
+	const MFT_REF mft_ref, const unsigned int dt_type);
+
+#if POSIXACLS
+
+static BOOL same_posix(struct POSIX_SECURITY *pxdesc1,
+			struct POSIX_SECURITY *pxdesc2);
+
+#endif /* POSIXACLS */
 
 #ifndef HAVE_SYSLOG_H
 void ntfs_log_early_error(const char *format, ...)
 			__attribute__((format(printf, 1, 2)));
-#endif
-
-#if USESTUBS | defined(STSC)
-
-int ntfs_get_file_security(void *scapi,
-		const char *path, DWORD selection,
-		char *buf, DWORD buflen, LPDWORD psize);
-BOOL ntfs_set_file_security(void *scapi,
-		const char *path, DWORD selection, const char *attr);
-int ntfs_get_file_attributes(void *scapi,
-		const char *path);
-BOOL ntfs_set_file_attributes(void *scapi,
-		const char *path, DWORD attrib);
-BOOL ntfs_read_directory(void *scapi,
-		const char *path, dircallback callback, void *context);
-int ntfs_read_sds(void *scapi,
-		char *buf, DWORD buflen, DWORD offset);
-void *ntfs_read_sii(void *scapi, void *entry);
-void *ntfs_read_sdh(void *scapi, void *entry);
-
-int ntfs_get_usid(void *scapi, uid_t uid, char *buf);
-int ntfs_get_gsid(void *scapi, gid_t gid, char *buf);
-int ntfs_get_user(void *scapi, const char *usid);
-int ntfs_get_group(void *scapi, const char *gsid);
-
-void *ntfs_initialize_file_security(const char *device, unsigned long flags);
-BOOL ntfs_leave_file_security(void *scapi);
-
-#else
-
-typedef int (*type_get_file_security)(void *scapi,
-		const char *path, DWORD selection,
-		char *buf, DWORD buflen, LPDWORD psize);
-typedef BOOL (*type_set_file_security)(void *scapi,
-		const char *path, DWORD selection, const char *attr);
-typedef int (*type_get_file_attributes)(void *scapi,
-		const char *path);
-typedef BOOL (*type_set_file_attributes)(void *scapi,
-		const char *path, DWORD attrib);
-typedef BOOL (*type_read_directory)(void *scapi,
-		const char *path, dircallback callback, void *context);
-typedef int (*type_read_sds)(void *scapi,
-		char *buf, DWORD buflen, DWORD offset);
-typedef void *(*type_read_sii)(void *scapi, void *entry);
-typedef void *(*type_read_sdh)(void *scapi, void *entry);
-
-typedef int (*type_get_usid)(void *scapi, uid_t uid, char *buf);
-typedef int (*type_get_gsid)(void *scapi, gid_t gid, char *buf);
-typedef int (*type_get_user)(void *scapi, const char *usid);
-typedef int (*type_get_group)(void *scapi, const char *gsid);
-
-typedef void *(*type_initialize_file_security)(const char *device,
-				unsigned long flags);
-typedef BOOL (*type_leave_file_security)(void *scapi);
-
-type_get_file_security ntfs_get_file_security;
-type_set_file_security ntfs_set_file_security;
-type_get_file_attributes ntfs_get_file_attributes;
-type_set_file_attributes ntfs_set_file_attributes;
-type_read_directory ntfs_read_directory;
-type_read_sds ntfs_read_sds;
-type_read_sii ntfs_read_sii;
-type_read_sdh ntfs_read_sdh;
-
-type_get_usid ntfs_get_usid;
-type_get_gsid ntfs_get_gsid;
-type_get_user ntfs_get_user;
-type_get_group ntfs_get_group;
-
-type_initialize_file_security ntfs_initialize_file_security;
-type_leave_file_security ntfs_leave_file_security;
-
-
-#endif /* USESTUBS | defined(STSC) */
-#endif /* WIN32 */
+#endif /* HAVE_SYSLOG_H */
 
 #define ACCOUNTSIZE 256  /* maximum size of an account name */
+#define MAXFILENAME 4096
+#define MAXATTRSZ 65536 /* Max sec attr size (16448 met for WinXP) */
+#define MAXLINE 80 /* maximum processed size of a line */
+#define BUFSZ 1024		/* buffer size to read mapping file */
+#define LINESZ 120		/* maximum useful size of a mapping line */
+
+typedef enum { RECSHOW, RECSET, RECSETPOSIX } RECURSE;
+typedef enum { MAPNONE, MAPEXTERN, MAPLOCAL, MAPDUMMY } MAPTYPE;
+typedef enum { CMD_AUDIT, CMD_BACKUP, CMD_HEX, CMD_HELP, CMD_SET,
+			CMD_TEST, CMD_USERMAP, CMD_VERSION, CMD_NONE } CMDS;
+
+
+#define MAXSECURID 262144
+#define SECBLKSZ 8
+#define MAPDIR ".NTFS-3G"
+#define MAPFILE "UserMapping"
+
+#ifdef HAVE_WINDOWS_H
+#define DIRSEP "\\"
+#else
+#define DIRSEP "/"
+#endif
+
+	/* standard owner (and administrator) rights */
+
+#define OWNER_RIGHTS le32_or(DELETE, le32_or(READ_CONTROL, le32_or(WRITE_DAC, le32_or(WRITE_OWNER, \
+			le32_or(SYNCHRONIZE, \
+			le32_or(FILE_READ_ATTRIBUTES, le32_or(FILE_WRITE_ATTRIBUTES, \
+			le32_or(FILE_READ_EA, FILE_WRITE_EA))))))))
+
+	/* standard world rights */
+
+#define WORLD_RIGHTS le32_or(READ_CONTROL, le32_or(FILE_READ_ATTRIBUTES, le32_or(FILE_READ_EA, \
+			SYNCHRONIZE)))
+
+	  /* inheritance flags for files and directories */
+
+#define FILE_INHERITANCE NO_PROPAGATE_INHERIT_ACE
+#define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
 
 /*
- *		Prototypes for local functions
+ *		To identify NTFS ACL meaning Posix ACL granted to root
+ *	we use rights always granted to anybody, so they have no impact
+ *	either on Windows or on Linux.
  */
 
-BOOL open_security_api(void);
-BOOL close_security_api(void);
-#ifndef WIN32
-BOOL open_volume(const char*, unsigned long flags);
-BOOL close_volume(const char*);
-#endif
-unsigned int get2l(const char*, int);
-unsigned long get4l(const char*, int);
-u64 get6l(const char*, int);
-u64 get6h(const char*, int);
-u64 get8l(const char*, int);
-void set2l(char*, unsigned int);
-void set4l(char*, unsigned long);
-void hexdump(const char*, int, int);
-u32 hash(const le32*, int);
-unsigned int utf8size(const char*, int);
-unsigned int makeutf8(char*, const char*, int);
-unsigned int utf16size(const char*);
-unsigned int makeutf16(char*, const char*);
-unsigned int utf16len(const char*);
-void printname(FILE*, const char*);
-void printerror(FILE*);
-BOOL guess_dir(const char*);
-void showsid(const char*, int, const char*, int);
-void showusid(const char*, int);
-void showgsid(const char*, int);
-void showownership(const char*);
-void showheader(const char*, int);
-void showace(const char*, int, int, int);
-void showacl(const char*, int, int, int);
-void showdacl(const char*, int, int);
-void showsacl(const char*, int, int);
-void showall(const char*, int);
-void showposix(const struct POSIX_SECURITY*);
-int linux_permissions(const char*, BOOL);
-uid_t linux_owner(const char*);
-gid_t linux_group(const char*);
-int basicread(void*, char*, size_t, off_t);
-int dummyread(void*, char*, size_t, off_t);
-int local_build_mapping(struct MAPPING *[], const char*);
-void newblock(s32);
-void freeblocks(void);
-u32 getmsbhex(const char*);
-u32 getlsbhex(const char*);
-BOOL ishexdump(const char*, int, int);
-void showhex(FILE*);
-void showfull(const char*, BOOL);
-BOOL applyattr(const char*, const char*, BOOL, int, s32);
-BOOL restore(FILE*);
-BOOL dorestore(const char*, FILE*);
-u32 merge_rights(const struct POSIX_SECURITY*, BOOL);
-void tryposix(struct POSIX_SECURITY*);
-void check_samples(void);
-void basictest(int, BOOL, const SID*, const SID*);
-void posixtest(int, BOOL, const SID*, const SID*);
-void selftests(void);
-unsigned int getfull(char*, const char*);
-BOOL updatefull(const char *name, DWORD flags, char *attr);
-BOOL setfull(const char*, int, BOOL);
-BOOL singleshow(const char*);
-BOOL proposal(const char*, const char*);
-BOOL showmounted(const char*);
-BOOL processmounted(const char*);
-BOOL recurseshow(const char*);
-BOOL singleset(const char*, int);
-BOOL recurseset(const char*, int);
-#ifdef WIN32
-BOOL backup(const char*);
-BOOL listfiles(const char*);
-#if POSIXACLS
-BOOL iterate(RECURSE, const char*, const struct POSIX_SECURITY*);
-#else
-BOOL iterate(RECURSE, const char*, mode_t);
-#endif
-#else
-BOOL backup(const char*, const char*);
-BOOL listfiles(const char*, const char*);
-BOOL mapproposal(const char*, const char*);
-#endif
-#if POSIXACLS
-BOOL setfull_posix(const char *, const struct POSIX_SECURITY*, BOOL);
-struct POSIX_SECURITY *linux_permissions_posix(const char*, BOOL);
-BOOL recurseset_posix(const char*, const struct POSIX_SECURITY*);
-BOOL singleset_posix(const char*, const struct POSIX_SECURITY*);
-struct POSIX_SECURITY *encode_posix_acl(const char*);
-#endif
-static void *stdmalloc(size_t);
-static void stdfree(void*);
+#define ROOT_OWNER_UNMARK SYNCHRONIZE	/* ACL granted to root as owner */
+#define ROOT_GROUP_UNMARK FILE_READ_EA	/* ACL granted to root as group */
 
-BOOL valid_sds(const char*, unsigned int, unsigned int,
-		unsigned int, u32, BOOL);
-BOOL valid_sii(const char*, u32);
-BOOL valid_sdh(const char*, u32, u32);
-int consist_sds(const char*, unsigned int, unsigned int, BOOL);
-int consist_sii(const char*);
-int consist_sdh(const char*);
-int audit_sds(BOOL);
-int audit_sii(void);
-int audit_sdh(void);
-void audit_summary(void);
-BOOL audit(const char*);
-int getoptions(int, char*[]);
+#define INSDS1 1
+#define INSDS2 2
+#define INSII 4
+#define INSDH 8
 
-#ifndef WIN32
+struct SII {		/* this is an image of an $SII index entry */
+	le16 offs;
+	le16 size;
+	le32 fill1;
+	le16 indexsz;
+	le16 indexksz;
+	le16 flags;
+	le16 fill2;
+	le32 keysecurid;
+
+	/* did not find official description for the following */
+	le32 hash;
+	le32 securid;
+	le32 dataoffsl; /* documented as badly aligned */
+	le32 dataoffsh;
+	le32 datasize;
+} ;
+
+struct SDH {		/* this is an image of an $SDH index entry */
+	le16 offs;
+	le16 size;
+	le32 fill1;
+	le16 indexsz;
+	le16 indexksz;
+	le16 flags;
+	le16 fill2;
+	le32 keyhash;
+	le32 keysecurid;
+
+	/* did not find official description for the following */
+	le32 hash;
+	le32 securid;
+	le32 dataoffsl;
+	le32 dataoffsh;
+	le32 datasize;
+	le32 fill3;
+	} ;
+
+#ifdef HAVE_WINDOWS_H
+/*
+ *	Including <windows.h> leads to numerous conflicts with layout.h
+ *	so define a few needed Windows calls unrelated to ntfs-3g
+ */
+BOOL WINAPI LookupAccountSidA(const char*, void*, char*, u32*,
+		char*, u32*, s32*);
+u32 WINAPI GetFileAttributesA(const char*);
+#endif /* HAVE_WINDOWS_H */
+
+#define INVALID_FILE_ATTRIBUTES (-1)/* error from ntfs_get_file_attributes() */
 
 /*
- *		Structures for collecting directory contents (Linux only)
+ *		Structures for collecting directory contents
  */
 
 struct LINK {
@@ -562,18 +459,27 @@ struct CALLBACK {
 	const char *dir;
 } ;
 
-int callback(struct CALLBACK *context, char *ntfsname,
-	int length, int type, long long pos, u64 mft_ref,
-	unsigned int dt_type);
-#endif
+static int callback(void *context, const ntfschar *ntfsname,
+	const int length, const int type, const s64 pos,
+	const MFT_REF mft_ref, const unsigned int dt_type);
+
+struct SECURITY_DATA {
+        u64 offset;
+        char *attr;
+        u32 hash;
+        u32 length;
+        unsigned int filecount:16;
+        unsigned int mode:12;
+        unsigned int flags:4;
+} ;
 
 /*
  *		  Global constants
  */
 
-#define BANNER "secaudit " AUDT_VERSION " : NTFS security data auditing"
+#define BANNER "ntfssecaudit " AUDT_VERSION " : NTFS security data auditing"
 
-#if SELFTESTS & !USESTUBS
+#ifdef SELFTESTS
 
 /*
  *		Dummy mapping file (self tests only)
@@ -591,43 +497,17 @@ char dummymapping[] =	"500::" DUMMYAUTH "1000\n"
 			"::"	DUMMYAUTH "10000\n";
 
 /*
- *		SID for world  (S-1-1-0)
- */
-
-static const char worldsidbytes[] = {
-		1,		/* revision */
-		1,		/* auth count */
-		0, 0, 0, 0, 0, 1,	/* base */
-		0, 0, 0, 0	/* 1st level */
-} ;
-static const SID *worldsid = (const SID*)worldsidbytes;
-
-/*	        
  *		SID for authenticated user (S-1-5-11)
  */
-	        
+
 static const char authsidbytes[] = {
-		1,		/* revision */ 
+		1,		/* revision */
 		1,		/* auth count */
 		0, 0, 0, 0, 0, 5,	/* base */
 		11, 0, 0, 0	/* 1st level */
 };
-  
+
 static const SID *authsid = (const SID*)authsidbytes;
-
-/*
- *		SID for administrator (S-1-5-32-544)
- */
-
-static const char adminsidbytes[] = {
-		1,		/* revision */
-		2,		/* auth count */
-		0, 0, 0, 0, 0, 5,	/* base */
-		32, 0, 0, 0,	/* 1st level */
-		32, 2, 0, 0	/* 2nd level */
-};
-
-static const SID *adminsid = (const SID*)adminsidbytes;
 
 /*
  *		SID for local users (S-1-5-32-545)
@@ -643,180 +523,101 @@ static const char localsidbytes[] = {
 
 static const SID *localsid = (const SID*)localsidbytes;
 
-/*	        
+/*
  *		SID for system (S-1-5-18)
  */
-	        
+
 static const char systemsidbytes[] = {
-		1,		/* revision */ 
+		1,		/* revision */
 		1,		/* auth count */
 		0, 0, 0, 0, 0, 5,	/* base */
 		18, 0, 0, 0	/* 1st level */
 	};
-  
+
 static const SID *systemsid = (const SID*)systemsidbytes;
 
-#endif
+#endif /* SELFTESTS */
 
 /*
  *		  Global variables
  */
 
-BOOL opt_a;	/* audit security data */
-BOOL opt_b;	/* backup NTFS ACLs */
 BOOL opt_e;	/* restore extra (currently windows attribs) */
-BOOL opt_h;	/* display an hexadecimal descriptor in a file */
 BOOL opt_r;	/* recursively apply to subdirectories */
-BOOL opt_s;	/* restore NTFS ACLs */
 BOOL opt_u;	/* user mapping proposal */
-#if SELFTESTS & !USESTUBS
-BOOL opt_t;	/* run self-tests */
-#endif
 int opt_v;  /* verbose or very verbose*/
+CMDS cmd; /* command to process */
 struct SECURITY_DATA *securdata[(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ)];
-#if FORCEMASK
-BOOL opt_m;	/* force a mask - dangerous */
-u32 forcemsk /* mask to force */
-#endif
 unsigned int errors; /* number of severe errors */
 unsigned int warnings; /* number of non-severe errors */
 
-struct CHKALLOC *firstalloc;
 struct SECURITY_CONTEXT context;
 MAPTYPE mappingtype;
-
-#ifdef STSC
-#define static
-#endif
-
-#ifndef WIN32
-
-void *ntfs_handle;
-void *ntfs_context = (void*)NULL;
+struct SECURITY_API *ntfs_context = (struct SECURITY_API*)NULL;
 
 /*
- *		Open and close the security API (platform dependent)
+ *		Open and close the security API (obsolete)
  */
 
-BOOL open_security_api(void)
+static BOOL open_security_api(void)
 {
-#if USESTUBS | defined(STSC)
 	return (TRUE);
-#else
-	char *error;
-	BOOL err;
-	const char *libfile;
-
-	err = TRUE;
-	libfile = getenv(ENVNTFS3G);
-	if (!libfile)
-		libfile = (sizeof(char*) == 8 ? LIBFILE64 : LIBFILE);
-#ifdef __SVR4
-		/* do not override library functions by caller ones */
-	ntfs_handle = dlopen(libfile,RTLD_LAZY | RTLD_GROUP);
-#else
-	ntfs_handle = dlopen(libfile,RTLD_LAZY);
-#endif
-	if (ntfs_handle) {
-		ntfs_initialize_file_security = (type_initialize_file_security)
-				dlsym(ntfs_handle,INIT_FILE_SECURITY);
-		error = dlerror();
-		if (error)
-			fprintf(stderr," %s\n",error);
-		else {
-			ntfs_leave_file_security = (type_leave_file_security)
-					dlsym(ntfs_handle,LEAVE_FILE_SECURITY);
-			ntfs_get_file_security = (type_get_file_security)
-					dlsym(ntfs_handle,GET_FILE_SECURITY);
-			ntfs_set_file_security = (type_set_file_security)
-					dlsym(ntfs_handle,SET_FILE_SECURITY);
-			ntfs_get_file_attributes = (type_get_file_attributes)
-					dlsym(ntfs_handle,GET_FILE_ATTRIBUTES);
-			ntfs_set_file_attributes = (type_set_file_attributes)
-					dlsym(ntfs_handle,SET_FILE_ATTRIBUTES);
-			ntfs_read_directory = (type_read_directory)
-					dlsym(ntfs_handle,READ_DIRECTORY);
-			ntfs_read_sds = (type_read_sds)
-					dlsym(ntfs_handle,READ_SDS);
-			ntfs_read_sii = (type_read_sii)
-					dlsym(ntfs_handle,READ_SII);
-			ntfs_read_sdh = (type_read_sdh)
-					dlsym(ntfs_handle,READ_SDH);
-			ntfs_get_user = (type_get_user)
-					dlsym(ntfs_handle,GET_USER);
-			ntfs_get_group = (type_get_group)
-					dlsym(ntfs_handle,GET_GROUP);
-			ntfs_get_usid = (type_get_usid)
-					dlsym(ntfs_handle,GET_USID);
-			ntfs_get_gsid = (type_get_gsid)
-					dlsym(ntfs_handle,GET_GSID);
-			err = !ntfs_initialize_file_security
-				|| !ntfs_leave_file_security
-				|| !ntfs_get_file_security
-				|| !ntfs_set_file_security
-				|| !ntfs_get_file_attributes
-				|| !ntfs_set_file_attributes
-				|| !ntfs_read_directory
-				|| !ntfs_read_sds
-				|| !ntfs_read_sii
-				|| !ntfs_read_sdh
-				|| !ntfs_get_user
-				|| !ntfs_get_group
-				|| !ntfs_get_usid
-				|| !ntfs_get_gsid;
-
-			if (error)
-				fprintf(stderr,"ntfs-3g API not available\n");
-		}
-	} else {
-		fprintf(stderr,"Could not open ntfs-3g library\n");
-		fprintf(stderr,"\nPlease set environment variable \"" ENVNTFS3G "\"\n");
-		fprintf(stderr,"to appropriate path and retry\n");
-	}
-	return (!err);
-#endif /* USESTUBS | defined(STSC) */
 }
 
-BOOL close_security_api(void)
+static BOOL close_security_api(void)
 {
-#if USESTUBS | defined(STSC)
 	return (0);
-#else
-	return (!dlclose(ntfs_handle));
-#endif /* USESTUBS | defined(STSC) */
 }
 
 /*
- *		Open and close a volume (platform dependent)
+ *		Open and close a volume
  *	Assumes a single volume is opened
  */
 
-BOOL open_volume(const char *volume, unsigned long flags)
+static BOOL open_volume(const char *volume, unsigned long flags)
 {
 	BOOL ok;
 
 	ok = FALSE;
 	if (!ntfs_context) {
-		ntfs_context = ntfs_initialize_file_security(volume,flags);
+		ntfs_context = ntfs_initialize_file_security(volume, flags);
 		if (ntfs_context) {
 			if (*(u32*)ntfs_context != MAGIC_API) {
-				fprintf(stderr,"Versions of ntfs-3g and secaudit"
+				fprintf(stderr,"Versions of ntfs-3g and ntfssecaudit"
 						" are not compatible\n");
 			} else {
-				fprintf(stderr,"\"%s\" opened\n",volume);
+				fprintf(stderr,"\"%s\" opened %s\n",volume,
+					(flags & NTFS_MNT_RDONLY
+						 ? "read-only" : "read-write"));
 				mappingtype = MAPEXTERN;
 				ok = TRUE;
 			}
 		} else {
 			fprintf(stderr,"Could not open \"%s\"\n",volume);
+#ifdef HAVE_WINDOWS_H
+			switch (errno) {
+			case EACCES :
+				fprintf(stderr,"You need Administrator rights to open \"%s\"\n",
+							volume);
+				break;
+			case EBUSY :
+				fprintf(stderr,"Looks like \"%s\" is mounted,\n",volume);
+				fprintf(stderr,"close all applications using it\n");
+				break;
+			default :
+				fprintf(stderr,"Close all applications using %s\n", volume);
+				fprintf(stderr,"to make sure it is not mounted\n");
+			}
+#else
 			fprintf(stderr,"Make sure \"%s\" is not mounted\n",volume);
+#endif
 		}
 	} else
 		fprintf(stderr,"A volume is already open\n");
 	return (ok);
 }
 
-BOOL close_volume(const char *volume)
+static BOOL close_volume(const char *volume)
 {
 	BOOL r;
 
@@ -825,17 +626,84 @@ BOOL close_volume(const char *volume)
 		fprintf(stderr,"\"%s\" closed\n",volume);
 	else
 		fprintf(stderr,"Could not close \"%s\"\n",volume);
-	ntfs_context = (void*)NULL;
+	ntfs_context = (struct SECURITY_API*)NULL;
 	return (r);
 }
 
-#endif /* WIN32 */
+#ifdef HAVE_WINDOWS_H
+
+/*
+ *		Make a path suitable for feeding to libntfs-3g
+ *
+ *	Use '/' as a directory separator and remove /../ and /./
+ */
+
+static int cleanpath(char *path)
+{
+	int err;
+	char *p;
+	char *s, *d;
+
+	err = 0;
+	for (p=path; *p; p++)
+		if (*p == '\\')
+			*p = '/';
+	do {
+		s = (char*)NULL;
+		p = strstr(path, "/./");
+		if (p) {
+			s = p + 3;
+			d = p + 1;
+		} else {
+			p = strstr(path, "/../");
+			if (p) {
+				d = p;
+				while ((d != path) && (*--d != '/'))
+					d--;
+				if ((d != p) && (*d == '/')) {
+					s = p + 3;
+				} else
+					err = 1;
+			}
+		}
+		if (s) {
+			while (*s)
+				*d++ = *s++;
+			*d = 0;
+		}
+	} while (s && !err);
+	return (err);
+}
+
+/*
+ *		Build a path with Unix-type separators
+ *
+ *	The path from the ntfs root is required for libntfs-3g calls
+ */
+
+static char *unixname(const char *name)
+{
+	char *uname;
+
+	uname = (char*)malloc(strlen(name) + 1);
+	if (uname) {
+		strcpy(uname, name);
+		if (cleanpath(uname)) {
+			fprintf(stderr,"Bad path %s\n",name);
+			free(uname);
+			uname = (char*)NULL;
+		}
+	}
+	return (uname);
+}
+
+#endif /* HAVE_WINDOWS_H */
 
 /*
  *		Extract small or big endian data from an array of bytes
  */
 
-unsigned int get2l(const char *attr, int p)
+static unsigned int get2l(const char *attr, int p)
 {
 	int i;
 	unsigned int v;
@@ -846,7 +714,7 @@ unsigned int get2l(const char *attr, int p)
 	return (v);
 }
 
-unsigned long get4l(const char *attr, int p)
+static unsigned long get4l(const char *attr, int p)
 {
 	int i;
 	unsigned long v;
@@ -857,18 +725,7 @@ unsigned long get4l(const char *attr, int p)
 	return (v);
 }
 
-u64 get6l(const char *attr, int p)
-{
-	int i;
-	u64 v;
-
-	v = 0;
-	for (i=0; i<6; i++)
-		v += ((long long)(attr[p+i] & 255)) << (8*i);
-	return (v);
-}
-
-u64 get6h(const char *attr, int p)
+static u64 get6h(const char *attr, int p)
 {
 	int i;
 	u64 v;
@@ -879,7 +736,7 @@ u64 get6h(const char *attr, int p)
 	return (v);
 }
 
-u64 get8l(const char *attr, int p)
+static u64 get8l(const char *attr, int p)
 {
 	int i;
 	u64 v;
@@ -894,7 +751,7 @@ u64 get8l(const char *attr, int p)
  *		Set small or big endian data into an array of bytes
  */
 
-void set2l(char *p, unsigned int v)
+static void set2l(char *p, unsigned int v)
 {
 	int i;
 
@@ -902,7 +759,7 @@ void set2l(char *p, unsigned int v)
 		p[i] = ((v >> 8*i) & 255);
 }
 
-void set4l(char *p, unsigned long v)
+static void set4l(char *p, unsigned long v)
 {
 	int i;
 
@@ -915,7 +772,7 @@ void set4l(char *p, unsigned long v)
  *		hexadecimal dump of an array of bytes
  */
 
-void hexdump(const char *attr, int size, int level)
+static void hexdump(const char *attr, int size, int level)
 {
 	int i,j;
 
@@ -929,7 +786,7 @@ void hexdump(const char *attr, int size, int level)
 	}
 }
 
-u32 hash(const le32 *buf, int size /* bytes */)
+static u32 hash(const le32 *buf, int size /* bytes */)
 {
 	u32 h;
 	int i;
@@ -946,50 +803,45 @@ u32 hash(const le32 *buf, int size /* bytes */)
  *	Returns 0 for invalid input
  */
 
-unsigned int utf8size(const char *utf16, int length)
+static unsigned int utf8size(const ntfschar *utf16, int length)
 {
 	int i;
-	unsigned int size;
-	enum { BASE, SURR, ERR } state;
+	int count = 0;
+	BOOL surrog;
+	BOOL fail;
 
-	size = 0;
-	state = BASE;
-	for (i=0; i<2*length; i+=2) {
-		switch (state) {
-		case BASE :
-			if (utf16[i+1] & 0xf8) {
-				if ((utf16[i+1] & 0xf8) == 0xd8)
-					state = (utf16[i+1] & 4 ? ERR : SURR);
-				else
+	surrog = FALSE;
+	fail = FALSE;
+	for (i = 0; i < length && !le16_cmpz(utf16[i]) && !fail; i++) {
+		unsigned short c = le16_to_cpu(utf16[i]);
+		if (surrog) {
+			if ((c >= 0xdc00) && (c < 0xe000)) {
+				surrog = FALSE;
+				count += 4;
+			} else 
+				fail = TRUE;
+		} else
+			if (c < 0x80)
+				count++;
+			else if (c < 0x800)
+				count += 2;
+			else if (c < 0xd800)
+				count += 3;
+			else if (c < 0xdc00)
+				surrog = TRUE;
 #if NOREVBOM
-					if (((utf16[i+1] & 0xff) == 0xff)
-					  && ((utf16[i] & 0xfe) == 0xfe))
-						state = ERR;
-					else
-						size += 3;
+			else if ((c >= 0xe000) && (c < 0xfffe))
 #else
-					size += 3;
+			else if (c >= 0xe000)
 #endif
-			} else
-				if ((utf16[i] & 0x80) || utf16[i+1])
-					size += 2;
-				else
-					size++;
-			break;
-		case SURR :
-			if ((utf16[i+1] & 0xfc) == 0xdc) {
-				state = BASE;
-				size += 4;
-			} else
-				state = ERR;
-			break;
-		case ERR :
-			break;
-		}
+				count += 3;
+			else 
+				fail = TRUE;
 	}
-	if (state != BASE)
-		size = 0;
-	return (size);
+	if (surrog) 
+		fail = TRUE;
+
+	return (fail ? 0 : count);
 }
 
 /*
@@ -999,368 +851,57 @@ unsigned int utf8size(const char *utf16, int length)
  *	Returns size or zero for invalid input
  */
 
-unsigned int makeutf8(char *utf8, const char *utf16, int length)
+static unsigned int makeutf8(char *utf8, const ntfschar *utf16, int length)
 {
-	int i;
-	unsigned int size;
-	unsigned int rem;
-	enum { BASE, SURR, ERR } state;
+	int size;
 
-	size = 0;
-	rem = 0;
-	state = BASE;
-	for (i=0; i<2*length; i+=2) {
-		switch (state) {
-		case BASE :
-			if (utf16[i+1] & 0xf8) {
-				if ((utf16[i+1] & 0xf8) == 0xd8) {
-					if (utf16[i+1] & 4)
-						state = ERR;
-					else {
-						utf8[size++] = 0xf0 + (utf16[i+1] & 7)
-                                                                    + ((utf16[i] & 0xc0) == 0xc0);
-						utf8[size++] = 0x80 + (((utf16[i] + 64) >> 2) & 63);
-						rem = utf16[i] & 3;
-						state = SURR;
-					}
-				} else {
-#if NOREVBOM
-					if (((utf16[i+1] & 0xff) == 0xff)
-					  && ((utf16[i] & 0xfe) == 0xfe))
-						state = ERR;
-					else {
-						utf8[size++] = 0xe0 + ((utf16[i+1] >> 4) & 15);
-						utf8[size++] = 0x80
-							+ ((utf16[i+1] & 15) << 2)
-							+ ((utf16[i] >> 6) & 3);
-						utf8[size++] = 0x80 + (utf16[i] & 63);
-					}
-#else
-					utf8[size++] = 0xe0 + ((utf16[i+1] >> 4) & 15);
-					utf8[size++] = 0x80
-						+ ((utf16[i+1] & 15) << 2)
-						+ ((utf16[i] >> 6) & 3);
-					utf8[size++] = 0x80 + (utf16[i] & 63);
-#endif
-				}
-			} else
-				if ((utf16[i] & 0x80) || utf16[i+1]) {
-					utf8[size++] = 0xc0
-						+ ((utf16[i+1] & 15) << 2)
-						+ ((utf16[i] >> 6) & 3);
-					utf8[size++] = 0x80 + (utf16[i] & 63);
-				} else
-					utf8[size++] = utf16[i];
-			break;
-		case SURR :
-			if ((utf16[i+1] & 0xfc) == 0xdc) {
-				utf8[size++] = 0x80 + (rem << 4)
-						 + ((utf16[i+1] & 3) << 2)
-						 + ((utf16[i] >> 6) & 3);
-				utf8[size++] = 0x80 + (utf16[i] & 63);
-				state = BASE;
-			} else
-				state = ERR;
-			break;
-		case ERR :
-			break;
-		}
-	}
-	utf8[size] = 0;
-	if (state != BASE)
-		state = ERR;
-	return (state == ERR ? 0 : size);
+	size = ntfs_ucstombs(utf16, length, &utf8, MAXFILENAME);
+	return (size < 0 ? 0 : size);
 }
-
-#ifdef WIN32
-
-/*
- *		Evaluate the size of UTF-16LE conversion of a UTF-8 text
- *	(basic conversions only)
- *	trailing '\0' not accounted for
- */
-
-unsigned int utf16size(const char *utf8)
-{
-	unsigned int size;
-	const char *p;
-	int c;
-	unsigned int code;
-	enum { BASE, TWO, THREE, THREE2, THREE3, FOUR, ERR } state;
-
-	p = utf8;
-	size = 0;
-	state = BASE;
-	while (*p) {
-		c = *p++ & 255;
-		switch (state) {
-		case BASE :
-			if (!(c & 0x80))
-				size++;
-			else
-				if (c < 0xc2)
-					state = ERR;
-				else
-					if (c < 0xe0)
-						state = TWO;
-					else
-						if (c < 0xf0) {
-							if (c == 0xe0)
-								state = THREE2;
-							else
-								if (c == 0xed)
-									state = THREE3;
-								else
-									state = THREE;
-						} else
-							if (c < 0xf8) {
-								state = FOUR;
-								code = c & 7;
-							} else
-								state = ERR;
-			break;
-		case TWO :
-			if ((c & 0xc0) != 0x80)
-				state = ERR;
-			else {
-				size++;
-				state = BASE;
-			}
-			break;
-		case THREE :
-			if ((c & 0xc0) != 0x80)
-				state = ERR;
-			else
-				state = TWO;
-			break;
-		case THREE2 :
-			if ((c & 0xe0) != 0xa0)
-				state = ERR;
-			else
-				state = TWO;
-			break;
-		case THREE3 :
-			if ((c & 0xe0) != 0x80)
-				state = ERR;
-			else
-				state = TWO;
-			break;
-		case FOUR :
-			if ((((code << 6) + (c & 63)) > 0x10f)
-			  || (((code << 6) + (c & 63)) < 0x10))
-				state = ERR;
-			else {
-				size++;
-				state = THREE;
-			}
-			break;
-		case ERR :
-			break;
-		}
-	}
-	if (state != BASE) size = 0;
-	return (size);
-}
-
-/*
- *		Convert a UTF8 text to UTF-16LE
- *	(basic conversions only)
- *	Note : mbstowcs() not used because on Linux it fails for characters
- *	not present in current locale
- */
-
-unsigned int makeutf16(char *target, const char *utf8)
-{
-	unsigned int size;
-	unsigned int code;
-	const char *p;
-	int c;
-	enum { BASE, TWO, THREE, THREE2, THREE3, FOUR, FOUR2, FOUR3, ERR } state;
-
-	p = utf8;
-	size = 0;
-	c = 0;
-	state = BASE;
-	while (*p) {
-		c = *p++ & 255;
-		switch (state) {
-		case BASE :
-			if (!(c & 0x80)) {
-				target[2*size] = c;
-				target[2*size + 1] = 0;
-				size++;
-			} else {
-				if (c < 0xc2)
-					state = ERR;
-				else
-					if (c < 0xe0) {
-						code = c & 31;
-						state = TWO;
-					} else
-						if (c < 0xf0) {
-							code = c & 15;
-							if (c == 0xe0)
-								state = THREE2;
-							else
-								if (c == 0xed)
-									state = THREE3;
-								else
-									state = THREE;
-						} else
-							if (c < 0xf8) {
-								code = c & 7;
-								state = FOUR;
-							} else
-								state = ERR;
-			}
-			break;
-		case TWO :
-#if NOREVBOM
-			if (((c & 0xc0) != 0x80)
-			  || ((code == 0x3ff) && (c >= 0xbe)))
-#else
-			if ((c & 0xc0) != 0x80)
-#endif
-				state = ERR;
-			else {
-				target[2*size] = ((code & 3) << 6) + (c & 63);
-				target[2*size + 1] = ((code >> 2) & 255);
-				size++;
-				state = BASE;
-			}
-			break;
-		case THREE :
-			if ((c & 0xc0) != 0x80)
-				state = ERR;
-			else {
-				code = ((code & 15) << 6) + (c & 63);
-				state = TWO;
-			}
-			break;
-		case THREE2 :
-			if ((c & 0xe0) != 0xa0)
-				state = ERR;
-			else {
-				code = ((code & 15) << 6) + (c & 63);
-				state = TWO;
-			}
-			break;
-		case THREE3 :
-			if ((c & 0xe0) != 0x80)
-				state = ERR;
-			else {
-				code = ((code & 15) << 6) + (c & 63);
-				state = TWO;
-			}
-			break;
-		case FOUR :
-			if ((c & 0xc0) != 0x80)
-				state = ERR;
-			else {
-				code = (code << 6) + (c & 63);
-				state = FOUR2;
-			}
-			break;
-		case FOUR2 :
-			if ((c & 0xc0) != 0x80)
-				state = ERR;
-			else {
-				code = (code << 6) + (c & 63);
-				state = FOUR3;
-			}
-			break;
-		case FOUR3 :
-			if ((code > 0x43ff)
-			 || (code < 0x400)
-			 || ((c & 0xc0) != 0x80))
-				state = ERR;
-			else {
-				target[2*size] = ((code - 0x400) >> 4) & 255;
-				target[2*size+1] = 0xd8 + (((code - 0x400) >> 12) & 3);
-				target[2*size+2] = ((code & 3) << 6) + (c & 63);
-				target[2*size+3] = 0xdc + ((code >> 2) & 3);
-				size += 2;
-				state = BASE;
-			}
-			break;
-		case ERR :
-			break;
-		}
-	}
-	if (state != BASE)
-		size = 0;
-	target[2*size] = 0;
-	target[2*size + 1] = 0;
-	return (size);
-}
-
-unsigned int utf16len(const char *str)
-{
-	unsigned int len;
-
-	len = 0;
-	while (str[2*len] || str[2*len+1]) len++;
-	return (len);
-}
-
-#endif
 
 /*
  *		Print a file name
  *	on Windows it prints UTF-16LE names as UTF-8
  */
 
-void printname(FILE *file, const char *name)
+static void printname(FILE *file, const char *name)
 {
-#ifdef WIN32
-	char utf8name[MAXFILENAME];
+#ifdef HAVE_WINDOWS_H
+	char *wname;
+	char *p;
 
-	makeutf8(utf8name,name,utf16len(name));
-	fprintf(file,"%s",utf8name);	
-#else
+	wname = (char*)malloc(strlen(name) + 1);
+	if (wname) {
+		strcpy(wname, name);
+		for (p=wname; *p; p++)
+			if (*p == '/')
+				*p = '\\';
+		fprintf(file,"%s", wname);
+		free(wname);
+	}
+#else /* HAVE_WINDOWS_H */
 	fprintf(file,"%s",name);
-#endif
+#endif /* HAVE_WINDOWS_H */
 }
 
 /*
  *		Print the last error code
  */
 
-void printerror(FILE *file)
+static void printerror(FILE *file)
 {
-#ifdef WIN32
-	int err;
-	const char *txt;
-
-	err = GetLastError();
-	switch (err) {
-	case 5 :
-		txt = "Access to security descriptor was denied";
+	if (errno)
+		fprintf(file,"Error code %d : %s\n",errno,strerror(errno));
+	switch (errno) {
+	case EACCES :
+		fprintf(file,"You probably need Administrator rights\n");
 		break;
-	case 1307 :
-		txt = "This SID may not be assigned as the owner of this object";
-		break;
-	case 1308 :
-		txt = "This SID may not be assigned as the group of this object";
-		break;
-	case 1314 :
-		txt = "You do not have the privilege to change this SID";
+	case EBUSY :
+		fprintf(file,"You probably try to write to a mounted device\n");
 		break;
 	default :
-		txt = (const char*)NULL;
 		break;
 	}
-	if (txt)
-		fprintf(file,"Error %d : %s\n",err,txt);
-	else
-		fprintf(file,"Error %d\n",err);
-#else
-#ifdef STSC
-	if (errno) fprintf(file,"Error code %d\n",errno);
-#else
-	if (errno) fprintf(file,"Error code %d : %s\n",errno,strerror(errno));
-#endif
-#endif
 }
 
 #ifndef HAVE_SYSLOG_H
@@ -1369,7 +910,7 @@ void printerror(FILE *file)
  *		Redefine early error messages in stand-alone situations
  */
 
-void ntfs_log_early_error(const char *format, ...)
+static void ntfs_log_early_error(const char *format, ...)
 {
 	va_list args;
 
@@ -1378,7 +919,7 @@ void ntfs_log_early_error(const char *format, ...)
 	va_end(args);
 }
 
-#endif
+#endif /* HAVE_SYSLOG_H */
 
 /*
  *	Guess whether a security attribute is intended for a directory
@@ -1386,7 +927,7 @@ void ntfs_log_early_error(const char *format, ...)
  *	(not 100% reliable)
  */
 
-BOOL guess_dir(const char *attr)
+static BOOL guess_dir(const char *attr)
 {
 	int off;
 	int isdir;
@@ -1413,7 +954,7 @@ BOOL guess_dir(const char *attr)
  *   See http://msdn2.microsoft.com/en-us/library/aa379649.aspx
  */
 
-void showsid(const char *attr, int off, const char *prefix, int level)
+static void showsid(const char *attr, int off, const char *prefix, int level)
 {
 	int cnt;
 	int i;
@@ -1424,16 +965,18 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 	unsigned long last;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
 	cnt = attr[off+1] & 255;
 	auth = get6h(attr,off+2);
-	first = get4l(attr,off+8);
 	known = FALSE;
+	/* SID names taken from https://support.microsoft.com/en-us/kb/243330 */
 	if ((attr[off] == 1) /* revision */
-	     && (auth < 100))
+	     && cnt
+	     && (auth < 100)) {
+		first = get4l(attr,off+8);
 		switch (cnt) {
 		case 0 : /* no level (error) */
 			break;
@@ -1487,23 +1030,23 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 					break;
 				case 7 :
 					known = TRUE;
-					printf("%*cAnonymous logon SID\n",-level,marker);
+					printf("%*cAnonymous SID\n",-level,marker);
 					break;
 				case 11 :
 					known = TRUE;
-					printf("%*cAuthenticated user SID\n",-level,marker);
+					printf("%*cAuthenticated Users SID\n",-level,marker);
 					break;
 				case 13 :
 					known = TRUE;
-					printf("%*cLocal service SID\n",-level,marker);
+					printf("%*cTerminal Server Users SID\n",-level,marker);
 					break;
 				case 14 :
 					known = TRUE;
-					printf("%*cNetwork service SID\n",-level,marker);
+					printf("%*cRemote Interactive Logon SID\n",-level,marker);
 					break;
 				case 18 :
 					known = TRUE;
-					printf("%*cNT System SID\n",-level,marker);
+					printf("%*cLocal System SID\n",-level,marker);
 					break;
 				}
 				break;
@@ -1517,13 +1060,13 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 					known = TRUE;
 					switch (second) {
 					case 544 :
-						printf("%*cLocal admins SID\n",-level,marker);
+						printf("%*cAdministrators SID\n",-level,marker);
 						break;
 					case 545 :
-						printf("%*cLocal users SID\n",-level,marker);
+						printf("%*cUsers SID\n",-level,marker);
 						break;
 					case 546 :
-						printf("%*cLocal guests SID\n",-level,marker);
+						printf("%*cGuests SID\n",-level,marker);
 						break;
 					default :
 						printf("%*cSome domain SID\n",-level,marker);
@@ -1532,6 +1075,7 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 				}
 				break;
 			}
+			break;
 		default : /* three levels or more */
 			second = get4l(attr,off+12);
 			last = get4l(attr,off+4+4*cnt);
@@ -1540,49 +1084,50 @@ void showsid(const char *attr, int off, const char *prefix, int level)
 				if (first == 21) {
 					known = TRUE;
 					switch (last) {
-						case 500 :
-							printf("%*cSystem admin SID\n",-level,marker);
-							break;
-						case 501 :
-							printf("%*cGuest SID\n",-level,marker);
-							break;
-						case 512 :
-							printf("%*cLocal admins SID\n",-level,marker);
-							break;
-						case 513 :
-							printf("%*cLocal users SID\n",-level,marker);
-							break;
-						case 514 :
-							printf("%*cLocal guests SID\n",-level,marker);
-							break;
-						default :
-							printf("%*cLocal user-%lu SID\n",-level,marker,last);
-							break;
+					case 500 :
+						printf("%*cAdministrator SID\n",-level,marker);
+						break;
+					case 501 :
+						printf("%*cGuest SID\n",-level,marker);
+						break;
+					case 512 :
+						printf("%*cDomain Admins SID\n",-level,marker);
+						break;
+					case 513 :
+						printf("%*cDomain Users SID\n",-level,marker);
+						break;
+					case 514 :
+						printf("%*cDomain Guests SID\n",-level,marker);
+						break;
+					default :
+						printf("%*cLocal user-%lu SID\n",-level,marker,last);
+						break;
 					}
 				}
 				break;
 			}
 		}
+	}
 	if (!known)
 		printf("%*cUnknown SID\n",-level,marker);
-	printf("%*c%shex S-%d-",-level,marker,prefix,attr[off] & 255);
-	printf("%llx",auth);
+	printf("%*c%shex S-%x-",-level,marker,prefix,attr[off] & 255);
+	printf("%llx",(long long)auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lx",get4l(attr,off+8+4*i));
 	printf("\n");
-	printf("%*c%sdec S-%d-",-level,marker,prefix,attr[off] & 255);
-	printf("%llu",auth);
+	printf("%*c%sdec S-%u-",-level,marker,prefix,attr[off] & 255);
+	printf("%llu",(long long)auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lu",get4l(attr,off+8+4*i));
 	printf("\n");
 }
 
-void showusid(const char *attr, int level)
+static void showusid(const char *attr, int level)
 {
 	int off;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1593,12 +1138,12 @@ void showusid(const char *attr, int level)
 	showsid(attr,off,"O:",level+4);
 }
 
-void showgsid(const char *attr, int level)
+static void showgsid(const char *attr, int level)
 {
 	int off;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1609,16 +1154,16 @@ void showgsid(const char *attr, int level)
 	showsid(attr,off,"G:",level+4);
 }
 
-void showownership(const char *attr)
+static void showownership(const char *attr)
 {
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 	char account[ACCOUNTSIZE];
 	BIGSID sidcopy;
-	SID_NAME_USE use;
-	unsigned long accountsz;
-	unsigned long domainsz;
-#endif
-	enum { SHOWOWN, SHOWGRP, SHOWINT } shown;
+	s32 use;
+	u32 accountsz;
+	u32 domainsz;
+#endif /* HAVE_WINDOWS_H */
+	enum { SHOWOWN, SHOWGRP, SHOWINT, SHOWDONE } shown;
 	const char *sid;
 	const char *prefix;
 	u64 auth;
@@ -1626,17 +1171,19 @@ void showownership(const char *attr)
 	int off;
 	int i;
 
-	for (shown=SHOWOWN; shown<=SHOWINT; shown++) {
+	for (shown=SHOWOWN; shown<SHOWDONE; ) {
 		switch (shown) {
 		case SHOWOWN :
 			off = get4l(attr,4);
 			sid = &attr[off];
 			prefix = "Windows owner";
+			shown = SHOWGRP;
 			break;
 		case SHOWGRP :
 			off = get4l(attr,8);
 			sid = &attr[off];
 			prefix = "Windows group";
+			shown = SHOWINT;
 			break;
 #if OWNERFROMACL
 		case SHOWINT :
@@ -1646,24 +1193,26 @@ void showownership(const char *attr)
 			if (ntfs_same_sid((const SID*)sid,
 						(const SID*)&attr[off]))
 				sid = (const char*)NULL;
+			shown = SHOWDONE;
 			break;
-#endif
+#endif /* OWNERFROMACL */
 		default :
 			sid = (const char*)NULL;
 			prefix = (const char*)NULL;
+			shown = SHOWDONE;
 			break;
 		}
 		if (sid) {
 			cnt = sid[1] & 255;
 			auth = get6h(sid,2);
-			if (opt_b)
+			if (cmd == CMD_BACKUP)
 				printf("# %s S-%d-",prefix,sid[0] & 255);
 			else
 				printf("%s S-%d-",prefix,sid[0] & 255);
-			printf("%llu",auth);
+			printf("%llu",(long long)auth);
 			for (i=0; i<cnt; i++)
 				printf("-%lu",get4l(sid,8+4*i));
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 			memcpy(sidcopy,sid,ntfs_sid_size((const SID*)sid));
 			accountsz = ACCOUNTSIZE;
 			domainsz = ACCOUNTSIZE;
@@ -1671,18 +1220,18 @@ void showownership(const char *attr)
 					account, &accountsz,
 					(char*)NULL, &domainsz, &use))
 				printf(" (%s)", account);
-#endif
+#endif /* HAVE_WINDOWS_H */
 			printf("\n");
 		}
 	}
 }
 
-void showheader(const char *attr, int level)
+static void showheader(const char *attr, int level)
 {
 	int flags;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1727,13 +1276,13 @@ void showheader(const char *attr, int level)
 	printf("%*cOff DACL 0x%x\n",-level-4,marker,(int)get4l(attr,16));
 }
 
-void showace(const char *attr, int off, int isdir, int level)
+static void showace(const char *attr, int off, int isdir, int level)
 {
 	int flags;
 	u32 rights;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1842,7 +1391,7 @@ void showace(const char *attr, int off, int isdir, int level)
 		printf(" grant");
 	if (attr[off] == 1)
 		printf(" deny");
-	if (rights & le32_to_cpu(FILE_GREAD | FILE_GWRITE | FILE_GEXEC)) {
+	if (rights & le32_to_cpu(le32_or(FILE_GREAD, le32_or(FILE_GWRITE, FILE_GEXEC)))) {
 		printf(" ");
 		if (rights & le32_to_cpu(FILE_GREAD))
 			printf("r");
@@ -1868,7 +1417,7 @@ void showace(const char *attr, int off, int isdir, int level)
 
 }
 
-void showacl(const char *attr, int off, int isdir, int level)
+static void showacl(const char *attr, int off, int isdir, int level)
 {
 	int i;
 	int cnt;
@@ -1876,7 +1425,7 @@ void showacl(const char *attr, int off, int isdir, int level)
 	int x;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1893,12 +1442,12 @@ void showacl(const char *attr, int off, int isdir, int level)
 	}
 }
 
-void showdacl(const char *attr, int isdir, int level)
+static void showdacl(const char *attr, int isdir, int level)
 {
 	int off;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1915,12 +1464,12 @@ void showdacl(const char *attr, int isdir, int level)
 	}
 }
 
-void showsacl(const char *attr, int isdir, int level)
+static void showsacl(const char *attr, int isdir, int level)
 {
 	int off;
 	char marker;
 
-	if (opt_b)
+	if (cmd == CMD_BACKUP)
 		marker = '#';
 	else
 		marker = ' ';
@@ -1938,7 +1487,7 @@ void showsacl(const char *attr, int isdir, int level)
 	}
 }
 
-void showall(const char *attr, int level)
+static void showall(const char *attr, int level)
 {
 	BOOL isdir;
 
@@ -1955,7 +1504,7 @@ void showall(const char *attr, int level)
  *		Display a Posix descriptor
  */
 
-void showposix(const struct POSIX_SECURITY *pxdesc)
+static void showposix(const struct POSIX_SECURITY *pxdesc)
 {
 	char txperm[4];
 	const char *txtag;
@@ -2043,42 +1592,16 @@ void showposix(const struct POSIX_SECURITY *pxdesc)
 
 #endif /* POSIXACLS */
 
-#if defined(WIN32) | defined(STSC)
-
-#else
-
-/*
- *		Relay to get usid as defined during mounting
- */
-
-const SID *relay_find_usid(const struct MAPPING *usermapping __attribute__((unused)),
-		uid_t uid, SID *defusid)
-{
-	return (ntfs_get_usid(ntfs_context,uid,(char*)defusid) ?
-			defusid : (SID*)NULL);
-}
-
-/*
- *		Relay to get gsid as defined during mounting
- */
-
-const SID *relay_find_gsid(const struct MAPPING *groupmapping __attribute__((unused)),
-		uid_t gid, SID *defgsid)
-{
-	return (ntfs_get_usid(ntfs_context,gid,(char*)defgsid) ?
-			defgsid : (SID*)NULL);
-}
-
 /*
  *		Relay to get uid as defined during mounting
  */
 
-uid_t relay_find_user(const struct MAPPING *mapping __attribute__((unused)),
+static uid_t relay_find_user(const struct MAPPING *mapping __attribute__((unused)),
 			const SID *usid)
 {
 	int uid;
 
-	uid = ntfs_get_user(ntfs_context,(const char*)usid);
+	uid = ntfs_get_user(ntfs_context, usid);
 	return (uid < 0 ? 0 : uid);
 }
 
@@ -2086,51 +1609,23 @@ uid_t relay_find_user(const struct MAPPING *mapping __attribute__((unused)),
  *		Relay to get gid as defined during mounting
  */
 
-gid_t relay_find_group(const struct MAPPING *mapping __attribute__((unused)),
+static gid_t relay_find_group(const struct MAPPING *mapping __attribute__((unused)),
 			const SID *gsid)
 {
 	int gid;
 
-	gid = ntfs_get_group(ntfs_context,(const char*)gsid);
+	gid = ntfs_get_group(ntfs_context, gsid);
 	return (gid < 0 ? 0 : gid);
 }
 
-#endif
-
-#if defined(WIN32) | defined(STSC)
-
-/*
- *		Dummy get uid from user name, out of a Linux environment
- */
-
-struct passwd *getpwnam(const char *user)
-{
-	ntfs_log_error("Cannot interpret id \"%s\"", user);
-	ntfs_log_error("please use numeric uids in UserMapping file\n");
-	return ((struct passwd*)NULL);
-}
-
-/*
- *		Dummy get gid from group name, out of a Linux environment
- */
-
-struct group *getgrnam(const char *group)
-{
-	ntfs_log_error("Cannot interpret id \"%s\"", group);
-	ntfs_log_error("please use numeric gids in UserMapping file\n");
-	return ((struct group*)NULL);
-}
-
-#endif /* defined(WIN32) | defined(STSC) */
-
 #if POSIXACLS
 
-struct POSIX_SECURITY *linux_permissions_posix(const char *attr, BOOL isdir)
+static struct POSIX_SECURITY *linux_permissions_posix(const char *attr, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 #if OWNERFROMACL
 	const SID *osid;
-#endif
+#endif /* OWNERFROMACL */
 	const SID *usid;
 	const SID *gsid;
 	struct POSIX_SECURITY *posix_desc;
@@ -2140,18 +1635,23 @@ struct POSIX_SECURITY *linux_permissions_posix(const char *attr, BOOL isdir)
 #if OWNERFROMACL
 	osid = (const SID*)&attr[le32_to_cpu(phead->owner)];
 	usid = ntfs_acl_owner((const char*)attr);
-#if SELFTESTS & !USESTUBS
-	if (!opt_t && !ntfs_same_sid(usid,osid))
-		printf("== Linux owner is different from Windows owner\n"); 
-#else
+#ifdef SELFTESTS
+	if ((cmd != CMD_TEST) && !ntfs_same_sid(usid,osid))
+		printf("== Linux owner is different from Windows owner\n");
+#else /* SELFTESTS */
 	if (!ntfs_same_sid(usid,osid))
-		printf("== Linux owner is different from Windows owner\n"); 
-#endif
-#else
+		printf("== Linux owner is different from Windows owner\n");
+#endif /* SELFTESTS */
+#else /* OWNERFROMACL */
 	usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
-#endif
-	posix_desc = ntfs_build_permissions_posix(context.mapping,
-			(const char*)attr, usid, gsid, isdir);
+#endif /* OWNERFROMACL */
+	if (mappingtype == MAPEXTERN)
+		posix_desc = ntfs_build_permissions_posix(
+				ntfs_context->security.mapping,
+				(const char*)attr, usid, gsid, isdir);
+	else
+		posix_desc = ntfs_build_permissions_posix(context.mapping,
+				(const char*)attr, usid, gsid, isdir);
 	if (!posix_desc) {
 		printf("** Failed to build a Posix descriptor\n");
 		errors++;
@@ -2161,12 +1661,12 @@ struct POSIX_SECURITY *linux_permissions_posix(const char *attr, BOOL isdir)
 
 #endif /* POSIXACLS */
 
-int linux_permissions(const char *attr, BOOL isdir)
+static int linux_permissions(const char *attr, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 #if OWNERFROMACL
 	const SID *osid;
-#endif
+#endif /* OWNERFROMACL */
 	const SID *usid;
 	const SID *gsid;
 	int perm;
@@ -2176,16 +1676,16 @@ int linux_permissions(const char *attr, BOOL isdir)
 #if OWNERFROMACL
 	osid = (const SID*)&attr[le32_to_cpu(phead->owner)];
 	usid = ntfs_acl_owner((const char*)attr);
-#if SELFTESTS & !USESTUBS
-	if (!opt_t && !ntfs_same_sid(usid,osid))
-		printf("== Linux owner is different from Windows owner\n"); 
-#else
+#ifdef SELFTESTS
+	if ((cmd != CMD_TEST) && !ntfs_same_sid(usid,osid))
+		printf("== Linux owner is different from Windows owner\n");
+#else /* SELFTESTS */
 	if (!ntfs_same_sid(usid,osid))
-		printf("== Linux owner is different from Windows owner\n"); 
-#endif
-#else
+		printf("== Linux owner is different from Windows owner\n");
+#endif /* SELFTESTS */
+#else /* OWNERFROMACL */
 	usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
-#endif
+#endif /* OWNERFROMACL */
 	perm = ntfs_build_permissions((const char*)attr, usid, gsid, isdir);
 	if (perm < 0) {
 		printf("** Failed to build permissions\n");
@@ -2194,31 +1694,31 @@ int linux_permissions(const char *attr, BOOL isdir)
 	return (perm);
 }
 
-uid_t linux_owner(const char *attr)
+static uid_t linux_owner(const char *attr)
 {
 	const SID *usid;
 	uid_t uid;
 
 #if OWNERFROMACL
 	usid = ntfs_acl_owner((const char*)attr);
-#else
+#else /* OWNERFROMACL */
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 	usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
-#endif
-#if defined(WIN32) | defined(STSC)
+#endif /* OWNERFROMACL */
+#ifdef HAVE_WINDOWS_H
 	uid = ntfs_find_user(context.mapping[MAPUSERS],usid);
-#else
+#else /* defined(HAVE_WINDOWS_H) */
 	if (mappingtype == MAPEXTERN)
 		uid = relay_find_user(context.mapping[MAPUSERS],usid);
 	else
 		uid = ntfs_find_user(context.mapping[MAPUSERS],usid);
-#endif
+#endif /* defined(HAVE_WINDOWS_H) */
 	return (uid);
 }
 
-gid_t linux_group(const char *attr)
+static gid_t linux_group(const char *attr)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const SID *gsid;
@@ -2226,18 +1726,18 @@ gid_t linux_group(const char *attr)
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 	gsid = (const SID*)&attr[le32_to_cpu(phead->group)];
-#if defined(WIN32) | defined(STSC)
+#ifdef HAVE_WINDOWS_H
 	gid = ntfs_find_group(context.mapping[MAPGROUPS],gsid);
-#else
+#else /* defined(HAVE_WINDOWS_H) */
 	if (mappingtype == MAPEXTERN)
 		gid = relay_find_group(context.mapping[MAPGROUPS],gsid);
 	else
 		gid = ntfs_find_group(context.mapping[MAPGROUPS],gsid);
-#endif
+#endif /* defined(HAVE_WINDOWS_H) */
 	return (gid);
 }
 
-void newblock(s32 key)
+static void newblock(s32 key)
 {
 	struct SECURITY_DATA *psecurdata;
 	int i;
@@ -2256,7 +1756,7 @@ void newblock(s32 key)
 	}
 }
 
-void freeblocks(void)
+static void freeblocks(void)
 {
 	int i,j;
 	struct SECURITY_DATA *psecurdata;
@@ -2276,19 +1776,19 @@ void freeblocks(void)
  *		Basic read from a user mapping file (Win32)
  */
 
-int basicread(void *fileid, char *buf, size_t size,
+static int basicread(void *fileid, char *buf, size_t size,
 		off_t pos __attribute__((unused)))
 {
 	return (read(*(int*)fileid, buf, size));
 }
 
-#if SELFTESTS & !USESTUBS
+#ifdef SELFTESTS
 
 /*
  *		Read a dummy mapping file for tests
  */
 
-int dummyread(void *fileid  __attribute__((unused)),
+static int dummyread(void *fileid  __attribute__((unused)),
 		char *buf, size_t size, off_t pos)
 {
 	size_t sz;
@@ -2305,7 +1805,7 @@ int dummyread(void *fileid  __attribute__((unused)),
 	return (sz);
 }
 
-#endif /* POSIXACLS & SELFTESTS & !USESTUBS */
+#endif /* SELFTESTS */
 
 /*
  *		Apply default single user mapping
@@ -2323,24 +1823,12 @@ static int do_default_mapping(struct MAPPING *mapping[],
 
 	res = -1;
 	sidsz = ntfs_sid_size(usid);
-#if USESTUBS
-	sid = (SID*)stdmalloc(sidsz); /* will be freed within the library */
-#else
 	sid = (SID*)ntfs_malloc(sidsz);
-#endif
 	if (sid) {
 		memcpy(sid,usid,sidsz);
-#if USESTUBS
-		usermapping = (struct MAPPING*)stdmalloc(sizeof(struct MAPPING));
-#else
 		usermapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
-#endif
 		if (usermapping) {
-#if USESTUBS
-			groupmapping = (struct MAPPING*)stdmalloc(sizeof(struct MAPPING));
-#else
 			groupmapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
-#endif
 			if (groupmapping) {
 				usermapping->sid = sid;
 				usermapping->xid = 0;
@@ -2369,15 +1857,15 @@ static int do_default_mapping(struct MAPPING *mapping[],
  *	(failure should not be interpreted as an error)
  */
 
-int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
+static int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 {
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 	char mapfile[sizeof(MAPDIR) + sizeof(MAPFILE) + 6];
-	char currpath[261];
-#else
+	char currpath[MAXFILENAME];
+#else /* HAVE_WINDOWS_H */
 	char *mapfile;
 	char *p;
-#endif
+#endif /* HAVE_WINDOWS_H */
 	int fd;
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem = (struct MAPLIST*)NULL;
@@ -2405,28 +1893,32 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 	mapping[MAPGROUPS] = (struct MAPPING*)NULL;
 
 	if (usermap_path) {
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 /* TODO : check whether the device can store acls */
 		strcpy(mapfile,"x:\\" MAPDIR "\\" MAPFILE);
 		if (((const le16*)usermap_path)[1] == ':')
   			mapfile[0] = usermap_path[0];
 		else {
-			GetModuleFileName(NULL, currpath, 261);
+			getcwd(currpath,MAXFILENAME);
 			mapfile[0] = currpath[0];
 		}
 		fd = open(mapfile,O_RDONLY);
-#else
+#else /* HAVE_WINDOWS_H */
 		fd = 0;
 		mapfile = (char*)malloc(MAXFILENAME);
 		if (mapfile) {
 			/* build a full path to locate the mapping file */
+/*
 			if ((usermap_path[0] != '/')
 			   && getcwd(mapfile,MAXFILENAME)) {
 				strcat(mapfile,"/");
 				strcat(mapfile,usermap_path);
 			} else
 				strcpy(mapfile,usermap_path);
-			p = strrchr(mapfile,'/');
+*/
+			p = ntfs_realpath(usermap_path, mapfile);
+			if (p)
+				p = strrchr(mapfile,'/');
 			if (p)
 				do {
 					strcpy(p,"/" MAPDIR "/" MAPFILE);
@@ -2446,15 +1938,15 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 				errors++;
 			}
 		}
-#endif
+#endif /* HAVE_WINDOWS_H */
 		if (fd > 0) {
 			firstitem = ntfs_read_mapping(basicread, (void*)&fd);
 			close(fd);
 		}
 	} else {
-#if SELFTESTS & !USESTUBS
+#ifdef SELFTESTS
 		firstitem = ntfs_read_mapping(dummyread, (void*)NULL);
-#endif
+#endif /* SELFTESTS */
 	}
 
 	if (firstitem) {
@@ -2469,11 +1961,7 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 		/* and rely on internal representation */
 		while (firstitem) {
 			item = firstitem->next;
-#if USESTUBS
-			stdfree(firstitem); /* allocated within library */
-#else
 			free(firstitem);
-#endif
 			firstitem = item;
 		}
 	} else {
@@ -2488,7 +1976,7 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
  *		Get an hexadecimal number (source with MSB first)
  */
 
-u32 getmsbhex(const char *text)
+static u32 getmsbhex(const char *text)
 {
 	u32 v;
 	int b;
@@ -2517,7 +2005,7 @@ u32 getmsbhex(const char *text)
  *	An odd number of digits might yield a strange result
  */
 
-u32 getlsbhex(const char *text)
+static u32 getlsbhex(const char *text)
 {
 	u32 v;
 	int b;
@@ -2548,7 +2036,7 @@ u32 getlsbhex(const char *text)
  *		Check whether a line looks like an hex dump
  */
 
-BOOL ishexdump(const char *line, int first, int lth)
+static BOOL ishexdump(const char *line, int first, int lth)
 {
 	BOOL ok;
 	int i;
@@ -2578,13 +2066,13 @@ BOOL ishexdump(const char *line, int first, int lth)
  *	This is typically to convert a verbose output to a very verbose one
  */
 
-void showhex(FILE *fd)
+static void showhex(FILE *fd)
 {
 	static char attr[MAXATTRSZ];
 	char line[MAXLINE+1];
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
-#endif
+#endif /* POSIXACLS */
 	int lth;
 	int first;
 	unsigned int pos;
@@ -2595,6 +2083,7 @@ void showhex(FILE *fd)
 	unsigned int off;
 	int i;
 	le32 *pattr;
+	BOOL acceptable;
 	BOOL isdump;
 	BOOL done;
 
@@ -2619,13 +2108,26 @@ void showhex(FILE *fd)
 		isdump = ishexdump(line, first, lth);
 		if (isdump) off = getmsbhex(&line[first]);
 			/* line is not an hexadecimal dump */
-			/* display what we have in store */
-		if ((!isdump || !off) && pos && ntfs_valid_descr((char*)attr,pos)) {
+			/* display what we have in store if acceptable */
+		acceptable = ((!isdump || !off)
+				&& (pos >= 20))
+				&& (pos > get4l(attr,4))
+				&& (pos > get4l(attr,8))
+				&& (pos > get4l(attr,12))
+				&& (pos > get4l(attr,16))
+				&& (pos >= ntfs_attr_size(attr));
+		if (acceptable) {
 			printf("	Computed hash : 0x%08lx\n",
 				    (unsigned long)hash((le32*)attr,
 				    ntfs_attr_size(attr)));
 			isdir = guess_dir(attr);
-			printf("    Estimated type : %s\n",(isdir ? "directory" : "file"));
+			printf("    Estimated type : %s\n",
+					(isdir ? "directory" : "file"));
+			if (!ntfs_valid_descr((char*)attr,pos)) {
+				printf("**  Bad descriptor,"
+					" trying to display anyway\n");
+				errors++;
+			}
 			showheader(attr,4);
 			showusid(attr,4);
 			showgsid(attr,4);
@@ -2646,7 +2148,7 @@ void showhex(FILE *fd)
 					free(pxdesc);
 				}
 			}
-#endif
+#endif /* POSIXACLS */
 			pos = 0;
 		}
 		if (isdump && !off)
@@ -2677,7 +2179,7 @@ void showhex(FILE *fd)
 	} while (!done);
 }
 
-BOOL applyattr(const char *fullname, const char *attr,
+static BOOL applyattr(const char *fullname, const char *attr,
 			BOOL withattr, int attrib, s32 key)
 {
 	struct SECURITY_DATA *psecurdata;
@@ -2687,10 +2189,6 @@ BOOL applyattr(const char *fullname, const char *attr,
 	BOOL bad;
 	BOOL badattrib;
 	BOOL err;
-#ifdef WIN32
-	HANDLE htoken;
-	TOKEN_PRIVILEGES tkp;
-#endif
 
 	err = FALSE;
 	psecurdata = (struct SECURITY_DATA*)NULL;
@@ -2708,11 +2206,7 @@ BOOL applyattr(const char *fullname, const char *attr,
 			/* If we have a usable attrib value. Try applying */
 	badattrib = FALSE;
 	if (opt_e && (attrib != INVALID_FILE_ATTRIBUTES)) {
-#ifdef WIN32
-		badattrib = !SetFileAttributesW((LPCWSTR)fullname, attrib);
-#else
 		badattrib = !ntfs_set_file_attributes(ntfs_context, fullname, attrib);
-#endif
 		if (badattrib) {
 			printf("** Could not set Windows attrib of ");
 			printname(stdout,fullname);
@@ -2738,58 +2232,15 @@ BOOL applyattr(const char *fullname, const char *attr,
 		 */
 		if (psecurdata)
 			curattr = psecurdata->attr;
-       
+
 
 	if (curattr) {
-#ifdef WIN32
-		selection = OWNER_SECURITY_INFORMATION
-			| GROUP_SECURITY_INFORMATION
-			| DACL_SECURITY_INFORMATION;
-		if (OpenProcessToken(GetCurrentProcess(), 
-				TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &htoken)) {
-			if (LookupPrivilegeValue(NULL, SE_SECURITY_NAME,
-					&tkp.Privileges[0].Luid)) {
-				tkp.PrivilegeCount = 1;
-				tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-				if (AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0)) {
-					selection |= SACL_SECURITY_INFORMATION;
-				}
-			}
-		}
-		/* const missing from stupid prototype */
-		bad = !SetFileSecurityW((LPCWSTR)fullname,
-			selection, (PSECURITY_DESCRIPTOR)(LONG_PTR)curattr);
-		if (bad)
-			switch (GetLastError()) {
-			case 1307 :
-			case 1314 :
-				printf("** Could not set owner or SACL of ");
-				printname(stdout,fullname);
-				printf(", retrying with no owner or SACL setting\n");
-				warnings++;
-				/* const missing from stupid prototype */
-				bad = !SetFileSecurityW((LPCWSTR)fullname,
-					selection & ~OWNER_SECURITY_INFORMATION
-					& ~SACL_SECURITY_INFORMATION,
-					(PSECURITY_DESCRIPTOR)
-							(LONG_PTR)curattr);
-				break;
-			default :
-				break;
-			}
-		/* Release privileges once we are done*/
-		if (selection ^ SACL_SECURITY_INFORMATION) {
-			tkp.Privileges[0].Attributes = 0;
-			AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0);
-		}
-#else
 		selection = OWNER_SECURITY_INFORMATION
 			| GROUP_SECURITY_INFORMATION
 			| DACL_SECURITY_INFORMATION
 			| SACL_SECURITY_INFORMATION;
 		bad = !ntfs_set_file_security(ntfs_context,fullname,
 			selection, (const char*)curattr);
-#endif
 		if (bad) {
 			printf("** Could not set the ACL of ");
 			printname(stdout,fullname);
@@ -2819,7 +2270,7 @@ BOOL applyattr(const char *fullname, const char *attr,
  *		Restore security descriptors from a file
  */
 
-BOOL restore(FILE *fd)
+static BOOL restore(FILE *fd)
 {
 	static char attr[MAXATTRSZ];
 	char line[MAXFILENAME+25];
@@ -2871,7 +2322,7 @@ BOOL restore(FILE *fd)
 		isdump = ishexdump(line, first, lth);
 		if (isdump) off = getmsbhex(&line[first]);
 			/* line is not an hexadecimal dump */
-			/* apply what we have in store */
+			/* apply what we have in store, only if valid */
 		if ((!isdump || !off) && pos && ntfs_valid_descr((char*)attr,pos)) {
 			withattr = TRUE;
 			if (opt_v >= 2) {
@@ -2948,8 +2399,8 @@ BOOL restore(FILE *fd)
 				if (fullname[0]) {
 					phead = (SECURITY_DESCRIPTOR_RELATIVE*)attr;
 					/* set the request for auto-inheritance */
-					if (phead->control & SE_DACL_AUTO_INHERITED)
-						phead->control |= SE_DACL_AUTO_INHERIT_REQ;
+					if (!le16_andz(phead->control, SE_DACL_AUTO_INHERITED))
+						phead->control = le16_or(phead->control, SE_DACL_AUTO_INHERIT_REQ);
 					if (!applyattr(fullname,attr,withattr,
 							attrib,key))
 						errors++;
@@ -2962,17 +2413,13 @@ BOOL restore(FILE *fd)
 			oldhash = 0;
 			attrib = INVALID_FILE_ATTRIBUTES;
 			if (!done) {
-#ifdef WIN32
-				if (!strncmp(line,"File ",5))
-					makeutf16(fullname,&line[5]);
-				else
-					makeutf16(fullname,&line[10]);
-#else
 				if (!strncmp(line,"File ",5))
 					strcpy(fullname,&line[5]);
 				else
 					strcpy(fullname,&line[10]);
-#endif
+#ifdef HAVE_WINDOWS_H
+				cleanpath(fullname);
+#endif /* HAVE_WINDOWS_H */
 			}
 		}
 	} while (!done);
@@ -2980,13 +2427,7 @@ BOOL restore(FILE *fd)
 	return (FALSE);
 }
 
-/*
- *		Open the security API in rw mode for an ACL restoration
- */
-
-#ifdef WIN32
-#else
-BOOL dorestore(const char *volume, FILE *fd)
+static BOOL dorestore(const char *volume, FILE *fd)
 {
 	BOOL err;
 
@@ -3013,9 +2454,8 @@ BOOL dorestore(const char *volume, FILE *fd)
 	}
 	return (err);
 }
-#endif /* WIN32 */
 
-#if POSIXACLS & SELFTESTS & !USESTUBS
+#if POSIXACLS
 
 /*
  *		Merge Posix ACL rights into an u32 (self test only)
@@ -3025,7 +2465,7 @@ BOOL dorestore(const char *volume, FILE *fd)
  *
  *	Only two users (U1, U2) and two groups (G1, G2) taken into account
  */
-u32 merge_rights(const struct POSIX_SECURITY *pxdesc, BOOL def)
+static u32 merge_rights(const struct POSIX_SECURITY *pxdesc, BOOL def)
 {
 	const struct POSIX_ACE *pxace;
 	int i;
@@ -3077,21 +2517,55 @@ u32 merge_rights(const struct POSIX_SECURITY *pxdesc, BOOL def)
 	return (rights);
 }
 
-void tryposix(struct POSIX_SECURITY *pxdesc)
+static BOOL same_posix(struct POSIX_SECURITY *pxdesc1,
+			struct POSIX_SECURITY *pxdesc2)
+{
+	BOOL same;
+	int i;
+
+	same = pxdesc1
+		&& pxdesc2
+		&& (pxdesc1->mode == pxdesc2->mode)
+		&& (pxdesc1->acccnt == pxdesc2->acccnt)
+		&& (pxdesc1->defcnt == pxdesc2->defcnt)
+		&& (pxdesc1->firstdef == pxdesc2->firstdef)
+		&& (pxdesc1->tagsset == pxdesc2->tagsset)
+		&& (pxdesc1->acl.version == pxdesc2->acl.version)
+		&& (pxdesc1->acl.flags == pxdesc2->acl.flags);
+	i = 0;
+	while (same && (i < pxdesc1->acccnt)) {
+		same = (pxdesc1->acl.ace[i].tag == pxdesc2->acl.ace[i].tag)
+		   && (pxdesc1->acl.ace[i].perms == pxdesc2->acl.ace[i].perms)
+		   && (pxdesc1->acl.ace[i].id == pxdesc2->acl.ace[i].id);
+		i++;
+	}
+	i = pxdesc1->firstdef;
+	while (same && (i < pxdesc1->firstdef + pxdesc1->defcnt)) {
+		same = (pxdesc1->acl.ace[i].tag == pxdesc2->acl.ace[i].tag)
+		   && (pxdesc1->acl.ace[i].perms == pxdesc2->acl.ace[i].perms)
+		   && (pxdesc1->acl.ace[i].id == pxdesc2->acl.ace[i].id);
+		i++;
+	}
+	return (same);
+}
+
+#endif /* POSIXACLS */
+
+#if POSIXACLS & SELFTESTS
+
+static void tryposix(struct POSIX_SECURITY *pxdesc)
 {
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(1016)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(513)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 
 	char *attr;
@@ -3137,41 +2611,9 @@ void tryposix(struct POSIX_SECURITY *pxdesc)
 	}
 }
 
-static BOOL same_posix(struct POSIX_SECURITY *pxdesc1,
-			struct POSIX_SECURITY *pxdesc2)
-{
-	BOOL same;
-	int i;
+#endif /* POSIXACLS & SELFTESTS */
 
-	same = pxdesc1
-		&& pxdesc2
-		&& (pxdesc1->mode == pxdesc2->mode)
-		&& (pxdesc1->acccnt == pxdesc2->acccnt)
-		&& (pxdesc1->defcnt == pxdesc2->defcnt)
-		&& (pxdesc1->firstdef == pxdesc2->firstdef)
-		&& (pxdesc1->tagsset == pxdesc2->tagsset)
-		&& (pxdesc1->acl.version == pxdesc2->acl.version)
-		&& (pxdesc1->acl.flags == pxdesc2->acl.flags);
-	i = 0;
-	while (same && (i < pxdesc1->acccnt)) {
-		same = (pxdesc1->acl.ace[i].tag == pxdesc2->acl.ace[i].tag)
-		   && (pxdesc1->acl.ace[i].perms == pxdesc2->acl.ace[i].perms)
-		   && (pxdesc1->acl.ace[i].id == pxdesc2->acl.ace[i].id);
-		i++;
-	}
-	i = pxdesc1->firstdef;
-	while (same && (i < pxdesc1->firstdef + pxdesc1->defcnt)) {
-		same = (pxdesc1->acl.ace[i].tag == pxdesc2->acl.ace[i].tag)
-		   && (pxdesc1->acl.ace[i].perms == pxdesc2->acl.ace[i].perms)
-		   && (pxdesc1->acl.ace[i].id == pxdesc2->acl.ace[i].id);
-		i++;
-	}
-	return (same);
-}
-
-#endif /* POSIXACLS & SELFTESTS & !USESTUBS */
-
-#if SELFTESTS & !USESTUBS
+#ifdef SELFTESTS
 
 /*
  *		Build a dummy security descriptor
@@ -3180,7 +2622,7 @@ static BOOL same_posix(struct POSIX_SECURITY *pxdesc1,
 
 static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 			const SID *usid, const SID *gsid,
-			int cnt, 
+			int cnt,
 			 /* seq of int allow, SID *sid, int flags, u32 mask */
 			...)
 {
@@ -3228,8 +2670,8 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 			 * The flag SE_DACL_PROTECTED prevents the ACL
 			 * to be changed in an inheritance after creation
 			 */
-		pnhead->control = SE_DACL_PRESENT | SE_DACL_PROTECTED
-				    | SE_SELF_RELATIVE;
+		pnhead->control = le16_or(SE_DACL_PRESENT, le16_or(SE_DACL_PROTECTED,
+				    SE_SELF_RELATIVE));
 			/*
 			 * Windows prefers ACL first, do the same to
 			 * get the same hash value and avoid duplication
@@ -3239,9 +2681,9 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 		pacl = (ACL*)&attr[pos];
 		pacl->revision = ACL_REVISION;
 		pacl->alignment1 = 0;
-		pacl->size = const_cpu_to_le16(0); /* fixed later */
+		pacl->size = cpu_to_le16(0); /* fixed later */
 		pacl->ace_count = cpu_to_le16(cnt);
-		pacl->alignment2 = const_cpu_to_le16(0);
+		pacl->alignment2 = cpu_to_le16(0);
 
 		/* enter the ACEs */
 
@@ -3268,8 +2710,8 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 
 		/* append usid and gsid if defined */
 		/* positions of ACL, USID and GSID into header */
-		pnhead->owner = const_cpu_to_le32(0);
-		pnhead->group = const_cpu_to_le32(0);
+		pnhead->owner = cpu_to_le32(0);
+		pnhead->group = cpu_to_le32(0);
 		if (usid) {
 			memcpy(&attr[pos], usid, usidsz);
 			pnhead->owner = cpu_to_le32(pos);
@@ -3279,14 +2721,13 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
 			pnhead->group = cpu_to_le32(pos + usidsz);
 		}
 		/* positions of DACL and SACL into header */
-		pnhead->sacl = const_cpu_to_le32(0);
+		pnhead->sacl = cpu_to_le32(0);
 		if (cnt) {
 			pacl->size = cpu_to_le16(aclsz);
 			pnhead->dacl =
-				const_cpu_to_le32(sizeof(
-				SECURITY_DESCRIPTOR_RELATIVE));
+			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		} else
-			pnhead->dacl = const_cpu_to_le32(0);
+			pnhead->dacl = cpu_to_le32(0);
 		if (!ntfs_valid_descr(attr,pos+usidsz+gsidsz)) {
 			printf("** Bad sample descriptor\n");
 			free(attr);
@@ -3302,7 +2743,7 @@ static char *build_dummy_descr(BOOL isdir __attribute__((unused)),
  *		Check a few samples with special conditions
  */
 
-void check_samples()
+static void check_samples(void)
 {
 	char *descr = (char*)NULL;
 	BOOL isdir = FALSE;
@@ -3318,41 +2759,36 @@ void check_samples()
 	struct POSIX_SECURITY *pxdesc;
 	struct POSIX_SECURITY *pxsample;
 	const char *txsample;
-#endif
+#endif /* POSIXACLS */
 	le32 owner1[] = /* S-1-5-21-1833069642-4243175381-1340018762-1003 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(1833069642),
-		const_cpu_to_le32(4243175381), const_cpu_to_le32(1340018762),
-		const_cpu_to_le32(1003)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(1833069642), cpu_to_le32(4243175381U),
+		cpu_to_le32(1340018762), cpu_to_le32(1003)
 		} ;
 	le32 group1[] = /* S-1-5-21-1833069642-4243175381-1340018762-513 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(1833069642),
-		const_cpu_to_le32(4243175381), const_cpu_to_le32(1340018762),
-		const_cpu_to_le32(513)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(1833069642), cpu_to_le32(4243175381U),
+		cpu_to_le32(1340018762), cpu_to_le32(513)
 		} ;
 	le32 group2[] = /* S-1-5-21-1607551490-981732888-1819828000-513 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(1607551490),
-		const_cpu_to_le32(981732888), const_cpu_to_le32(1819828000),
-		const_cpu_to_le32(513)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(1607551490), cpu_to_le32(981732888),
+		cpu_to_le32(1819828000), cpu_to_le32(513)
 		} ;
 	le32 owner3[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(1016)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group3[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(513)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 
 #if POSIXACLS
@@ -3361,7 +2797,7 @@ void check_samples()
 		struct POSIX_ACE ace[4];
 	} sampletry1 =
 	{
-		{ 0645, 4, 0, 4, 0x35,
+		{ 0645, 4, 0, 4, 0x35, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3377,7 +2813,7 @@ void check_samples()
 		struct POSIX_ACE ace[6];
 	} sampletry3 =
 	{
-		{ 0100, 6, 0, 6, 0x3f,
+		{ 0100, 6, 0, 6, 0x3f, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3395,7 +2831,7 @@ void check_samples()
 		struct POSIX_ACE ace[8];
 	} sampletry4 =
 	{
-		{ 0140, 8, 0, 8, 0x3f,
+		{ 0140, 8, 0, 8, 0x3f, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3415,7 +2851,7 @@ void check_samples()
 		struct POSIX_ACE ace[6];
 	} sampletry5 =
 	{
-		{ 0454, 6, 0, 6, 0x3f,
+		{ 0454, 6, 0, 6, 0x3f, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3433,7 +2869,7 @@ void check_samples()
 		struct POSIX_ACE ace[8];
 	} sampletry6 =
 	{
-		{ 0332, 8, 0, 8, 0x3f,
+		{ 0332, 8, 0, 8, 0x3f, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3453,7 +2889,7 @@ void check_samples()
 		struct POSIX_ACE ace[4];
 	} sampletry8 =
 	{
-		{ 0677, 4, 0, 4, 0x35,
+		{ 0677, 4, 0, 4, 0x35, 0,
 			{ POSIX_VERSION, 0, 0 }
 		},
 		{
@@ -3536,10 +2972,12 @@ void check_samples()
 		else
 			pxdesc = (struct POSIX_SECURITY*)NULL;
 		if (!descr || !pxdesc || !same_posix(pxsample,pxdesc)) {
-			printf("** Error in %s\n",txsample);
+			printf("** Error in %s (errno %d)\n",txsample,errno);
 			showposix(pxsample);
-			showall(descr,0);
-			showposix(pxdesc);
+			if (descr)
+				showall(descr,0);
+			if (pxdesc)
+				showposix(pxdesc);
 			errors++;
 		}
 		free(descr);
@@ -3562,7 +3000,7 @@ void check_samples()
 				(const SID*)owner1, (const SID*)group1,
 				1,
 				(int)TRUE, worldsid, (int)0x3, (u32)0x1f01ff);
-			expectacc = expect = 0777;
+			expect = expectacc = 0777;
 			expectdef = 0;
 			break;
 		case 2 :  /* swsetup */
@@ -3586,12 +3024,12 @@ void check_samples()
 			descr = build_dummy_descr(isdir,
 				(const SID*)owner3, (const SID*)group3,
 				4,
-				(int)TRUE, (const SID*)owner3, 0, 
-					le32_to_cpu(FILE_READ_DATA | OWNER_RIGHTS),
+				(int)TRUE, (const SID*)owner3, 0,
+					le32_to_cpu(le32_or(FILE_READ_DATA, OWNER_RIGHTS)),
 				(int)TRUE, (const SID*)group3, 0,
 					le32_to_cpu(FILE_WRITE_DATA),
 				(int)TRUE, (const SID*)group2, 0,
-					le32_to_cpu(FILE_WRITE_DATA | FILE_READ_DATA),
+					le32_to_cpu(le32_or(FILE_WRITE_DATA, FILE_READ_DATA)),
 				(int)TRUE, (const SID*)worldsid, 0,
 					le32_to_cpu(FILE_EXECUTE));
 			expect = 0731;
@@ -3623,8 +3061,7 @@ void check_samples()
 				(int)TRUE, adminsid,  (int)0xb, (u32)0x1f01ff,
 				(int)TRUE, owner3,    (int)0x3, (u32)0x1200a9);
 			expectacc = 0500070700;
-			expectdef = 0700;
-			expect = 0700;
+			expectdef = expect = 0700;
 			break;
 		case 7 :  /* WinXP/JP */
 			isdir = TRUE;
@@ -3710,11 +3147,10 @@ void check_samples()
 							(long)defrights,(long)expectdef);
 						showall(descr,0);
 						showposix(pxdesc);
-exit(1);
 					}
 					free(pxdesc);
 				}
-#endif
+#endif /* POSIXACLS */
 			}
 		free(descr);
 		}
@@ -3727,7 +3163,7 @@ exit(1);
  *	back exactly as set
  */
 
-void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
+static void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 {
 	char *attr;
 	mode_t perm;
@@ -3761,7 +3197,7 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 	u32 pxcount;
 	u32 pxacecount;
 	u32 pxglobhash;
-#endif
+#endif /* POSIXACLS */
 
 	count = 0;
 	acecount = 0;
@@ -3770,7 +3206,7 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 	pxcount = 0;
 	pxacecount = 0;
 	pxglobhash = 0;
-#endif
+#endif /* POSIXACLS */
 	for (perm=0; (perm<=07777) && (errors < 10); perm++) {
 		err = ERRNO;
 		/* file owned by plain user and group */
@@ -3820,7 +3256,7 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 				free(attr);
 			}
 			free(pxdesc);
-#else
+#else /* POSIXACLS */
 			gotback = linux_permissions(attr, isdir);
 			if (gotback != perm)
 				err = ERRAM;
@@ -3868,7 +3304,7 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
 			break;
 		case ERRAP :
 			/* continued */
-#else
+#else /* POSIXACLS */
 		case ERRAM :
 		case ERRAP :
 #endif /* POSIXACLS */
@@ -3930,7 +3366,7 @@ void basictest(int kind, BOOL isdir, const SID *owner, const SID *group)
  *	back exactly as set
  */
 
-void posixtest(int kind, BOOL isdir,
+static void posixtest(int kind, BOOL isdir,
 			const SID *owner, const SID *group)
 {
 	struct POSIX_SECURITY *pxdesc;
@@ -3956,23 +3392,8 @@ void posixtest(int kind, BOOL isdir,
 	enum { ERRNO,
 		ERRMA, ERRPA, /* error converting mode or Posix ACL to NTFS */
 		ERRAM, ERRAP, /* error converting NTFS to mode or Posix ACL */
-	} err;
+	} ;
 	u32 expectcnt[] = {
-#ifdef STSC
-		32400, 34992,
-		25920, 28512,
-		25920, 28512,
-		25920, 28512,
-		26460, 29052,
-		0, 0,
-		0, 0,
-		0, 0,
-		24516, 27108,
-		20736, 23328,
-		20736, 23328,
-		20736, 23328,
-		21060, 23652,
-#else
 		252720, 273456,
 		199584, 220320,
 		199584, 220320,
@@ -3986,7 +3407,6 @@ void posixtest(int kind, BOOL isdir,
 		165888, 186624,
 		165888, 186624,
 		168480, 189216,
-#endif
 		0, 0,
 		0, 0,
 		0, 0,
@@ -3997,21 +3417,6 @@ void posixtest(int kind, BOOL isdir,
 		14640, 0
 	} ;
 	u32 expecthash[] = {
-#ifdef STSC
-		0xf9f82115, 0x40666647,
-		0xde826d30, 0xa181b660,
-		0x952d4500, 0x8ac49450,
-		0xf80acee0, 0xbd9ec6c0,
-		0xfe09b868, 0xde24e84d,
-		0, 0,
-		0, 0,
-		0, 0,
-		0x2381438d, 0x3ab42dc6,
-		0x7cccf6f8, 0x108ad430,
-		0x5e448840, 0x83ab6c40,
-		0x9b037100, 0x8f7c3b40,
-		0x04a359dc, 0xa4619609,
-#else
 		0x1808a6cd, 0xd82f7c60,
 		0x5ad29e85, 0x518c7620,
 		0x188ce270, 0x7e44e590,
@@ -4025,7 +3430,6 @@ void posixtest(int kind, BOOL isdir,
 		0xf9685700, 0x44d16700,
 		0x587ebe90, 0xf7c51480,
 		0x2cb1b518, 0x52408df6,
-#endif
 		0, 0,
 		0, 0,
 		0, 0,
@@ -4080,13 +3484,8 @@ void posixtest(int kind, BOOL isdir,
 
 	mindes = 3;
 	maxdes = (kind & 32 ? mindes : 6);
-#ifdef STSC
-	minmsk = (kind & 32 ? 0 : 3);
-	maxmsk = (kind & 32 ? 7 : 3);
-#else
 	minmsk = 0;
 	maxmsk = 7;
-#endif
 	for (mask=minmsk; mask<=maxmsk; mask++)
 	for (ownobj=1; ownobj<7; ownobj++)
 	for (grpobj=1; grpobj<7; grpobj++)
@@ -4110,7 +3509,6 @@ void posixtest(int kind, BOOL isdir,
 			pxdesc->acl.ace[5].perms = wrld;
 		}
 
-		err = ERRNO;
 		gotback = (struct POSIX_SECURITY*)NULL;
 		pxattr = ntfs_build_descr_posix(context.mapping,
 				pxdesc,isdir,owner,group);
@@ -4136,7 +3534,6 @@ void posixtest(int kind, BOOL isdir,
 						printf("gotback ACL\n");
 						showposix(gotback);
 						errors++;
-exit(1);
 					}
 				} else {
 					printf("Got back an invalid Posix ACL\n");
@@ -4184,32 +3581,24 @@ exit(1);
 
 #endif /* POSIXACLS */
 
-void selftests(void)
+static void selftests(void)
 {
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(1016)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
-		const_cpu_to_le32(0x501), const_cpu_to_le32(0x05000000),
-		const_cpu_to_le32(21), const_cpu_to_le32(DEFSECAUTH1),
-		const_cpu_to_le32(DEFSECAUTH2), const_cpu_to_le32(DEFSECAUTH3),
-		const_cpu_to_le32(513)
+		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 #if POSIXACLS
-#ifdef STSC
-	unsigned char kindlist[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-			   16, 17, 18, 20, 22, 24,
-			   32, 33, 36, 40 } ;
-#else
 	unsigned char kindlist[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 			   16, 17, 18, 20, 22, 24, 19, 21, 23, 25,
 			   32, 33, 36, 40 } ;
-#endif
 	unsigned int k;
 #endif /* POSIXACLS */
 	int kind;
@@ -4219,11 +3608,10 @@ void selftests(void)
 
 #if POSIXACLS
 	local_build_mapping(context.mapping, (const char*)NULL);
-#endif
+#endif /* POSIXACLS */
 			/* first check samples */
 	mappingtype = MAPDUMMY;
 	check_samples();
-if (errors) exit(1);
 		/*
 		 * kind is oring of :
 		 *   1 : directory
@@ -4254,202 +3642,17 @@ if (errors) exit(1);
 		posixtest(kind, isdir, owner, group);
 	}
 	ntfs_free_mapping(context.mapping);
-#endif
+#endif /* POSIXACLS */
 	if (errors >= 10)
 		printf("** too many errors, test aborted\n");
 }
-#endif /* SELFTESTS & !USESTUBS */
-
-#ifdef WIN32
+#endif /* SELFTESTS */
 
 /*
- *		   Get the security descriptor of a file (Windows version)
+ *		   Get the security descriptor of a file
  */
 
-unsigned int getfull(char *attr, const char *fullname)
-{
-	static char part[MAXATTRSZ];
-	BIGSID ownsid;
-	int xowner;
-	int ownersz;
-	u16 ownerfl;
-	ULONG attrsz;
-	ULONG partsz;
-	BOOL overflow;
-	HANDLE htoken;
-	TOKEN_PRIVILEGES tkp;
-	BOOL saclsuccess;
-
-	attrsz = 0;
-	partsz = 0;
-	overflow = FALSE;
-	if (GetFileSecurityW((LPCWSTR)fullname,OWNER_SECURITY_INFORMATION,
-				(char*)part,MAXATTRSZ,&partsz)) {
-		xowner = get4l(part,4);
-		if (xowner) {
-			ownerfl = get2l(part,2);
-			ownersz = ntfs_sid_size((SID*)&part[xowner]);
-			if (ownersz <= (int)sizeof(BIGSID))
-				memcpy(ownsid,&part[xowner],ownersz);
-			else
-				overflow = TRUE;
-		} else {
-			ownerfl = 0;
-			ownersz = 0;
-		}
-			/*
-			 *  SACL : just feed in or clean
-			 *  This requires the SE_SECURITY_NAME privilege
-			 */
-		saclsuccess = FALSE;
-		if (OpenProcessToken(GetCurrentProcess(), 
-				TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &htoken)) {
-			if (LookupPrivilegeValue(NULL, SE_SECURITY_NAME,
-					&tkp.Privileges[0].Luid)) {
-				tkp.PrivilegeCount = 1;
-				tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-				if (AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0)) {
-					if (GetFileSecurityW((LPCWSTR)fullname,
-							SACL_SECURITY_INFORMATION,
-							(char*)attr,MAXATTRSZ,&attrsz)) {
-						saclsuccess = TRUE;
-					}
-					tkp.Privileges[0].Attributes = 0;
-					AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0);
-				}
-			}
-		}		
-		if (!saclsuccess) {
-			attrsz = 20;
-			set4l(attr,0);
-			attr[0] = SECURITY_DESCRIPTOR_REVISION;
-			set4l(&attr[12],0);
-			if (opt_v >= 2)
-				printf("   No SACL\n");
-		}
-			/*
-			 *  append DACL and merge its flags
-			 */
-		partsz = 0;
-		set4l(&attr[16],0);
-		if (GetFileSecurityW((LPCWSTR)fullname,DACL_SECURITY_INFORMATION,
-			    (char*)part,MAXATTRSZ,&partsz)) {
-			if ((attrsz + partsz - 20) <= MAXATTRSZ) {
-				memcpy(&attr[attrsz],&part[20],partsz-20);
-				set4l(&attr[16],(partsz > 20 ? attrsz : 0));
-				set2l(&attr[2],get2l(attr,2) | (get2l(part,2)
-					& const_le16_to_cpu(SE_DACL_PROTECTED
-						   | SE_DACL_AUTO_INHERITED
-						   | SE_DACL_PRESENT)));
-				attrsz += partsz - 20;
-			} else
-				overflow = TRUE;
-		} else
-			if (partsz > MAXATTRSZ)
-				overflow = TRUE;
-			else {
-				if (opt_b)
-					printf("#   No discretionary access control list\n");
-				else
-					printf("   No discretionary access control list\n");
-				warnings++;
-			}
-
-			/*
-			 *  append owner and merge its flag
-			 */
-		if (xowner && !overflow) {
-			memcpy(&attr[attrsz],ownsid,ownersz);
-			set4l(&attr[4],attrsz);
-			set2l(&attr[2],get2l(attr,2)
-			   | (ownerfl & const_le16_to_cpu(SE_OWNER_DEFAULTED)));
-			attrsz += ownersz;
-		} else
-			set4l(&attr[4],0);
-			/*
-			 * append group
-			 */
-		partsz = 0;
-		set4l(&attr[8],0);
-		if (GetFileSecurityW((LPCWSTR)fullname,GROUP_SECURITY_INFORMATION,
-			    (char*)part,MAXATTRSZ,&partsz)) {
-			if ((attrsz + partsz - 20) <= MAXATTRSZ) {
-				memcpy(&attr[attrsz],&part[20],partsz-20);
-				set4l(&attr[8],(partsz > 20 ? attrsz : 0));
-				set2l(&attr[2],get2l(attr,2) | (get2l(part,2)
-					& const_le16_to_cpu(SE_GROUP_DEFAULTED)));
-				attrsz += partsz - 20;
-			} else
-				overflow = TRUE;
-		} else
-			if (partsz > MAXATTRSZ)
-				overflow = TRUE;
-			else {
-				printf("**   No group SID\n");
-				warnings++;
-			}
-		set2l(&attr[2],get2l(attr,2)
-					| const_le16_to_cpu(SE_SELF_RELATIVE));
-		if (overflow) {
-			printf("** Descriptor was too long (> %d)\n",MAXATTRSZ);
-			warnings++;
-			attrsz = 0;
-		} else
-			if (!ntfs_valid_descr((char*)attr,attrsz)) {
-				printf("** Descriptor for ");
-				printname(stdout,fullname);
-				printf(" is not valid\n");
-				errors++;
-				attrsz = 0;
-			}
-
-	} else {
-		printf("** Could not get owner of ");
-		printname(stdout,fullname);
-		printf(", partsz %d\n",partsz);
-		printerror(stdout);
-		warnings++;
-		attrsz = 0;		
-	}
-	return (attrsz);
-}
-
-/*
- *		Update a security descriptor (Windows version)
- */
-
-BOOL updatefull(const char *name, DWORD flags, char *attr)
-{
-	BOOL bad;
-
-	bad = !SetFileSecurityW((LPCWSTR)name, flags, attr);
-	if (bad
-	  && (flags & OWNER_SECURITY_INFORMATION)
-	  && (GetLastError() == 1307)) {
-		printf("** Could not set owner of ");
-		printname(stdout,name);
-		printf(", retrying with no owner setting\n");
-		warnings++;
-		bad = !SetFileSecurityW((LPCWSTR)name,
-			flags & ~OWNER_SECURITY_INFORMATION, (char*)attr);
-	}
-	if (bad) {
-		printf("** Could not change attributes of ");
-		printname(stdout,name);
-		printf("\n");
-		printerror(stdout);
-		errors++;
-	}
-	return (!bad);
-}
-
-#else
-
-/*
- *		   Get the security descriptor of a file (Linux version)
- */
-
-unsigned int getfull(char *attr, const char *fullname)
+static unsigned int getfull(char *attr, const char *fullname)
 {
 	static char part[MAXATTRSZ];
 	BIGSID ownsid;
@@ -4503,9 +3706,9 @@ unsigned int getfull(char *attr, const char *fullname)
 				memcpy(&attr[attrsz],&part[20],partsz-20);
 				set4l(&attr[16],(partsz > 20 ? attrsz : 0));
 				set2l(&attr[2],get2l(attr,2) | (get2l(part,2)
-					& const_le16_to_cpu(SE_DACL_PROTECTED
-						   | SE_DACL_AUTO_INHERITED
-						   | SE_DACL_PRESENT)));
+					& const_le16_to_cpu(le16_or(SE_DACL_PROTECTED,
+						   le16_or(SE_DACL_AUTO_INHERITED,
+						   SE_DACL_PRESENT)))));
 				attrsz += partsz - 20;
 			} else
 				overflow = TRUE;
@@ -4513,7 +3716,7 @@ unsigned int getfull(char *attr, const char *fullname)
 			if (partsz > MAXATTRSZ)
 				overflow = TRUE;
 			else {
-				if (opt_b)
+				if (cmd == CMD_BACKUP)
 					printf("#   No discretionary access control list\n");
 				else
 					printf("   No discretionary access control list\n");
@@ -4568,30 +3771,29 @@ unsigned int getfull(char *attr, const char *fullname)
 	} else {
 		printf("** Could not get owner of %s\n",fullname);
 		warnings++;
-		attrsz = 0;		
+		attrsz = 0;
 	}
 	return (attrsz);
 }
 
 /*
- *		Update a security descriptor (Linux version)
+ *		Update a security descriptor
  */
 
-BOOL updatefull(const char *name, DWORD flags, char *attr)
+static BOOL updatefull(const char *name, u32 flags, char *attr)
 {
-	BOOL ok;
+	BOOL err;
 
-	ok = !ntfs_set_file_security(ntfs_context, name, flags, attr);
-	if (ok) {
+// Why was the error not seen before ?
+	err = !ntfs_set_file_security(ntfs_context, name, flags, attr);
+	if (err) {
 		printf("** Could not change attributes of %s\n",name);
 		printerror(stdout);
 		errors++;
 	}
-	return (ok);
+	return (!err);
 }
 
-
-#endif
 
 #if POSIXACLS
 
@@ -4599,7 +3801,7 @@ BOOL updatefull(const char *name, DWORD flags, char *attr)
  *		   Set all the parameters associated to a file
  */
 
-BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
+static BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
 			BOOL isdir)
 {
 	static char attr[MAXATTRSZ];
@@ -4614,7 +3816,7 @@ BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
 	const SID *gsid;
 #if OWNERFROMACL
 	const SID *osid;
-#endif
+#endif /* OWNERFROMACL */
 
 	printf("%s ",(isdir ? "Directory" : "File"));
 	printname(stdout,fullname);
@@ -4658,12 +3860,18 @@ BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
 			osid = (const SID*)&attr[le32_to_cpu(phead->owner)];
 			usid = ntfs_acl_owner((const char*)attr);
 			if (!ntfs_same_sid(usid,osid))
-				printf("== Windows owner might change\n"); 
-#else
+				printf("== Windows owner might change\n");
+#else /* OWNERFROMACL */
 			usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
-#endif
-			newattr = ntfs_build_descr_posix(context.mapping,
-				newpxdesc,isdir,usid,gsid);
+#endif /* OWNERFROMACL */
+			if (mappingtype == MAPEXTERN)
+				newattr = ntfs_build_descr_posix(
+					ntfs_context->security.mapping,
+					newpxdesc,isdir,usid,gsid);
+			else
+				newattr = ntfs_build_descr_posix(
+					context.mapping,
+					newpxdesc,isdir,usid,gsid);
 			free(newpxdesc);
 		} else
 			newattr = (char*)NULL;
@@ -4683,23 +3891,11 @@ BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
 				showsacl(newattr,isdir,0);
 			}
 
-#ifdef WIN32
-			/*
-			 * avoid getting a set owner error on Windows
-			 * owner should not be changed anyway
-			 */
 			if (!updatefull(fullname,
 				DACL_SECURITY_INFORMATION
 				| GROUP_SECURITY_INFORMATION
 				| OWNER_SECURITY_INFORMATION,
 					newattr))
-#else
-			if (!updatefull(fullname,
-				DACL_SECURITY_INFORMATION
-				| GROUP_SECURITY_INFORMATION
-				| OWNER_SECURITY_INFORMATION,
-					newattr))
-#endif
 				err = TRUE;
 /*
 {
@@ -4718,9 +3914,9 @@ free(interp);
 	return (!err);
 }
 
-#endif
+#else /* POSIXACLS */
 
-BOOL setfull(const char *fullname, int mode, BOOL isdir)
+static BOOL setfull(const char *fullname, int mode, BOOL isdir)
 {
 	static char attr[MAXATTRSZ];
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -4732,7 +3928,7 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 	const SID *gsid;
 #if OWNERFROMACL
 	const SID *osid;
-#endif
+#endif /* OWNERFROMACL */
 
 	printf("%s ",(isdir ? "Directory" : "File"));
 	printname(stdout,fullname);
@@ -4746,10 +3942,10 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 		osid = (const SID*)&attr[le32_to_cpu(phead->owner)];
 		usid = ntfs_acl_owner((const char*)attr);
 		if (!ntfs_same_sid(usid,osid))
-			printf("== Windows owner might change\n"); 
-#else
+			printf("== Windows owner might change\n");
+#else /* OWNERFROMACL */
 		usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
-#endif
+#endif /* OWNERFROMACL */
 		newattr = ntfs_build_descr(mode,isdir,usid,gsid);
 		if (newattr) {
 			newattrsz = ntfs_attr_size(newattr);
@@ -4767,33 +3963,23 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 				showsacl(newattr,isdir,0);
 			}
 
-#ifdef WIN32
-			/*
-			 * avoid getting a set owner error on Windows
-			 * owner should not be changed anyway
-			 */
 			if (!updatefull(fullname,
 				DACL_SECURITY_INFORMATION
 				| GROUP_SECURITY_INFORMATION
 				| OWNER_SECURITY_INFORMATION,
 					newattr))
-#else
-			if (!updatefull(fullname,
-				DACL_SECURITY_INFORMATION
-				| GROUP_SECURITY_INFORMATION
-				| OWNER_SECURITY_INFORMATION,
-					newattr))
-#endif
 				err = TRUE;
 			free(newattr);
 		}
-		
+
 	} else
 		err = TRUE;
 	return (err);
 }
 
-BOOL proposal(const char *name, const char *attr)
+#endif /* POSIXACLS */
+
+static BOOL proposal(const char *name, const char *attr)
 {
 	char fullname[MAXFILENAME];
 	int uoff, goff;
@@ -4802,20 +3988,20 @@ BOOL proposal(const char *name, const char *attr)
 	int ucnt, gcnt;
 	int uid, gid;
 	BOOL err;
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 	char driveletter;
-#else
+#else /* HAVE_WINDOWS_H */
 	struct stat st;
 	char *p,*q;
-#endif
+#endif /* HAVE_WINDOWS_H */
 
 	err = FALSE;
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 	uid = gid = 0;
-#else
+#else /* HAVE_WINDOWS_H */
 	uid = getuid();
 	gid = getgid();
-#endif
+#endif /* HAVE_WINDOWS_H */
 	uoff = get4l(attr,4);
 	uauth = get6h(attr,uoff+2);
 	ucnt = attr[uoff+1] & 255;
@@ -4832,7 +4018,7 @@ BOOL proposal(const char *name, const char *attr)
 			printf("%d::",uid);
 		else
 			printf("user::");
-		printf("S-%d-%llu",attr[uoff] & 255,uauth);
+		printf("S-%d-%llu",attr[uoff] & 255,(long long)uauth);
 		for (i=0; i<ucnt; i++)
 			printf("-%lu",get4l(attr,uoff+8+4*i));
 		printf("\n");
@@ -4840,12 +4026,12 @@ BOOL proposal(const char *name, const char *attr)
 			printf(":%d:",gid);
 		else
 			printf(":group:");
-		printf("S-%d-%llu",attr[goff] & 255,gauth);
+		printf("S-%d-%llu",attr[goff] & 255,(long long)gauth);
 		for (i=0; i<gcnt; i++)
 			printf("-%lu",get4l(attr,goff+8+4*i));
 		printf("\n");
 			/* generic rule, based on group */
-		printf("::S-%d-%llu",attr[goff] & 255,gauth);
+		printf("::S-%d-%llu",attr[goff] & 255,(long long)gauth);
 		for (i=0; i<gcnt-1; i++)
 			printf("-%lu",get4l(attr,goff+8+4*i));
 		printf("-10000\n");
@@ -4858,7 +4044,7 @@ BOOL proposal(const char *name, const char *attr)
 			printf("# insert the modified lines into .NTFS-3G/UserMapping, with .NTFS-3G\n");
 		} else
 			printf("# Insert the above lines into .NTFS-3G/UserMapping, with .NTFS-3G\n");
-#ifdef WIN32
+#ifdef HAVE_WINDOWS_H
 		printf("# being a directory of the root of the NTFS file system.\n");
 
 		/* Get the drive letter to the file system */
@@ -4868,7 +4054,7 @@ BOOL proposal(const char *name, const char *attr)
 		    && (name[1] == ':'))
 			driveletter = name[0];
 		else {
-			if (GetCurrentDirectoryA(MAXFILENAME, fullname)
+			if (getcwd(fullname, MAXFILENAME)
 					&& (fullname[1] == ':'))
 				driveletter = fullname[0];
 		}
@@ -4876,10 +4062,11 @@ BOOL proposal(const char *name, const char *attr)
 			printf("# Example : %c:\\.NTFS-3G\\UserMapping\n",
 				driveletter);
 		}
-#else
+#else /* HAVE_WINDOWS_H */
 		printf("# being a hidden subdirectory of the root of the NTFS file system.\n");
 
 		/* Get the path to the root of the file system */
+/*
 		if (name[0] != '/') {
 			p = getcwd(fullname,MAXFILENAME);
 			if (p) {
@@ -4890,8 +4077,10 @@ BOOL proposal(const char *name, const char *attr)
 			strcpy(fullname,name);
 			p = fullname;
 		}
+*/
+		p = ntfs_realpath(name, fullname);
 		if (p) {
-			/* go down the path to inode 5 (fails on symlinks) */
+			/* go down the path to inode 5 */
 			do {
 				lstat(fullname,&st);
 				q = strrchr(p,'/');
@@ -4904,7 +4093,7 @@ BOOL proposal(const char *name, const char *attr)
 			printname(stdout,p);
 			printf("/.NTFS-3G/UserMapping\n");
 		}
-#endif
+#endif /* HAVE_WINDOWS_H */
 	} else {
 		printf("** Not possible : ");
 		printname(stdout,name);
@@ -4914,403 +4103,17 @@ BOOL proposal(const char *name, const char *attr)
 	return (err);
 }
 
-#ifdef WIN32
-
 /*
- *		Check whether a directory with reparse data is a junction
- *	or a symbolic link
+ *		   Display all the parameters associated to a file
  */
 
-BOOL islink(const char *filename)
-{
-	WIN32_FIND_DATAW found;
-	HANDLE search;
-	BOOL link;
-
-	link = FALSE;
-	search = FindFirstFileW((LPCWSTR)filename, &found);
-	if (search != INVALID_HANDLE_VALUE) {
-		link = (found.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT)
-		   || (found.dwReserved0 == IO_REPARSE_TAG_SYMLINK);
-		FindClose(search);
-	}
-	return (link);
-}
-
-#if POSIXACLS
-BOOL iterate(RECURSE call, const char *fullname, const struct POSIX_SECURITY *pxdesc)
-#else
-BOOL iterate(RECURSE call, const char *fullname, mode_t mode)
-#endif
-{
-	WIN32_FIND_DATAW found;
-	HANDLE search;
-	BOOL err;
-	unsigned int len;
-	char *filter;
-	char *inner;
-
-	err = FALSE;
-	filter = (char*)malloc(MAXFILENAME);
-	inner = (char*)malloc(MAXFILENAME);
-	if (filter && inner) {
-		len = utf16len(fullname);
-		memcpy(filter, fullname, 2*len);
-		makeutf16(&filter[2*len],"\\*.*");
-		search = FindFirstFileW((LPCWSTR)filter, &found);
-		if (search != INVALID_HANDLE_VALUE) {
-			do {
-				if (found.cFileName[0] != UNICODE('.')) {
-					memcpy(inner, fullname, 2*len);
-					inner[2*len] = '\\';
-					inner[2*len+1] = 0;
-					memcpy(&inner[2*len+2],found.cFileName,
-						2*utf16len((char*)found.cFileName)+2);
-					if (opt_v)
-						if (opt_b)
-							printf("#\n#\n");
-						else
-							printf("\n\n");
-					switch (call) {
-					case RECSHOW :
-						if (recurseshow(inner))
-							err = TRUE;
-						break;
-#if POSIXACLS
-					case RECSETPOSIX :
-						if (recurseset_posix(inner,pxdesc))
-							err = TRUE;
-						break;
-#else
-					case RECSET :
-						if (recurseset(inner,mode))
-							err = TRUE;
-						break;
-#endif
-					default :
-						err = TRUE;
-					}
-				}
-			} while (FindNextFileW(search, &found));
-			FindClose(search);
-		}
-		free(filter);
-		free(inner);
-	} else {
-		printf("** Cannot process deeper : not enough memory\n");
-		errors++;
-		err = TRUE;
-	}
-	return (err);
-}
-
-
-
-/*
- *		   Display all the parameters associated to a file (Windows version)
- */
-
-void showfull(const char *fullname, BOOL isdir)
-{
-	static char attr[MAXATTRSZ];
-#if POSIXACLS
-	struct POSIX_SECURITY *pxdesc;
-#endif
-	ULONG attrsz;
-	int mode;
-	uid_t uid;
-	gid_t gid;
-	int attrib;
-	int level;
-
-	printf("%s ",(isdir ? "Directory" : "File"));
-	printname(stdout,fullname);
-	printf("\n");
-
-       /* get individual parameters, as when trying to get them */
-       /* all, and one (typically SACL) is missing, we get none, */
-       /* and concatenate them, to be able to compute the hash code */
-
-	attrsz = getfull(attr, fullname);
-	if (attrsz) {
-			if (opt_v || opt_b) {
-				hexdump(attr,attrsz,8);
-				printf("Computed hash : 0x%08lx\n",
-					(unsigned long)hash((le32*)attr,attrsz));
-			}
-			if (opt_v && opt_b) {
-				printf("# %s ",(isdir ? "Directory" : "File"));
-				printname(stdout,fullname);
-				printf(" hash 0x%lx\n",
-					(unsigned long)hash((le32*)attr,attrsz));
-			}
-			attrib = GetFileAttributesW((LPCWSTR)fullname);
-			if (attrib == INVALID_FILE_ATTRIBUTES) {
-				printf("** Could not get file attrib\n");
-				errors++;
-			} else
-				printf("Windows attrib : 0x%x\n",attrib);
-			if (ntfs_valid_descr(attr,attrsz)) {
-#if POSIXACLS
-				pxdesc = linux_permissions_posix(attr,isdir);
-				if (pxdesc)
-					mode = pxdesc->mode;
-				else
-					mode = 0;
-#else
-				mode = linux_permissions(attr,isdir);
-#endif
-				if (opt_v >= 2) {
-					level = (opt_b ? 4 : 0);
-					showheader(attr,level);
-					showusid(attr,level);
-					showgsid(attr,level);
-					showdacl(attr,isdir,level);
-					showsacl(attr,isdir,level);
-				}
-				uid = linux_owner(attr);
-				gid = linux_group(attr);
-				if (opt_b) {
-				        showownership(attr);
-					printf("# Interpreted Unix owner %d, group %d, mode 0%03o\n",
-						(int)uid,(int)gid,mode);
-				} else {
-				        showownership(attr);
-					printf("Interpreted Unix owner %d, group %d, mode 0%03o\n",
-						(int)uid,(int)gid,mode);
-				}
-#if POSIXACLS
-				if (pxdesc) {
-					if (!opt_b
-					    && (pxdesc->defcnt
-						|| (pxdesc->tagsset
-						    & (POSIX_ACL_USER
-							| POSIX_ACL_GROUP
-							| POSIX_ACL_MASK))))
-						showposix(pxdesc);
-					free(pxdesc);
-				}
-#endif
-			} else
-				if (opt_b)
-					printf("# Descriptor fails sanity check\n");
-				else
-					printf("Descriptor fails sanity check\n");
-	}
-}
-
-BOOL recurseshow(const char *fullname)
-{
-	int attrib;
-	int err;
-	BOOL isdir;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)fullname);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		showfull(fullname,isdir);
-		if (isdir
-		   && !((attrib & FILE_ATTRIBUTE_REPARSE_POINT)
-			&& islink(fullname))) {
-#if POSIXACLS
-			err = iterate(RECSHOW, fullname, (struct POSIX_SECURITY*)NULL);
-#else
-			err = iterate(RECSHOW, fullname, 0);
-#endif
-		}
-	} else {
-		printf("** Could not access ");
-		printname(stdout,fullname);
-		printf("\n");
-		printerror(stdout);
-		errors++;
-		err = TRUE;
-	}
-	return (err);
-}
-
-
-BOOL singleshow(const char *fullname)
-{
-	int attrib;
-	int err;
-	BOOL isdir;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)fullname);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		showfull(fullname,isdir);
-	} else { 
-		printf("** Could not access ");
-		printname(stdout,fullname);
-		printf("\n");
-		printerror(stdout);
-		errors++;
-		err = TRUE;
-	}
-	return (err);
-}
-
-BOOL mapproposal(const char *fullname)
-{
-	char attr[256];
-	ULONG attrsz;
-	int attrib;
-	int err;
-
-	err = FALSE;
-	attrsz = 0;
-	attrib = GetFileAttributesW((LPCWSTR)fullname);
-	if ((attrib != INVALID_FILE_ATTRIBUTES)
-	    && GetFileSecurityW((LPCWSTR)fullname,
-				OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION,
-				(char*)attr,256,&attrsz)) {
-		err = proposal(fullname,attr);
-	} else { 
-		printf("** Could not access ");
-		printname(stdout,fullname);
-		printf("\n");
-		printerror(stdout);
-		err = TRUE;
-	}
-	return (err);
-}
-
-#if POSIXACLS
-
-BOOL recurseset_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc)
-{
-	int attrib;
-	int err;
-	BOOL isdir;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)fullname);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		err = !setfull_posix(fullname,pxdesc,isdir);
-		if (err) {
-			printf("** Failed to update ");
-			printname(stdout,fullname);
-			printf("\n");
-			errors++;
-		} else
-			if (isdir
-			   && !((attrib & FILE_ATTRIBUTE_REPARSE_POINT)
-				&& islink(fullname)))
-				iterate(RECSETPOSIX, fullname, pxdesc);
-	} else { 
-		err = GetLastError();
-		printf("** Could not access ");
-		printname(stdout,fullname);
-		printf("\n");
-		printerror(stdout);
-		err = TRUE;
-		errors++;
-	}
-	return (err);
-}
-
-#else
-
-BOOL recurseset(const char *fullname, int mode)
-{
-	int attrib;
-	int err;
-	BOOL isdir;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)fullname);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
-		setfull(fullname,mode,isdir);
-		if (isdir
-		   && !((attrib & FILE_ATTRIBUTE_REPARSE_POINT)
-			&& islink(fullname)))
-			iterate(RECSETPOSIX, fullname, mode);
-	} else { 
-		err = GetLastError();
-		printf("** Could not access ");
-		printname(stdout,fullname);
-		printf("\n");
-		printerror(stdout);
-		err = TRUE;
-		errors++;
-	}
-	return (err);
-}
-
-#endif
-
-#if POSIXACLS
-
-BOOL singleset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
-{
-	BOOL isdir;
-	BOOL err;
-	int attrib;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)path);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY);
-		err = !setfull_posix(path,pxdesc,isdir);
-		if (err) {
-			printf("** Failed to update ");
-			printname(stdout,path);
-			printf("\n");
-			errors++;
-		}
-	} else {
-		printf("** Could not access ");
-		printname(stdout,path);
-		printf("\n");
-		printerror(stdout);
-		errors++;
-		err = TRUE;
-	}
-	return (!err);
-}
-
-#endif
-
-BOOL singleset(const char *path, int mode)
-{
-	BOOL isdir;
-	BOOL err;
-	int attrib;
-
-	err = FALSE;
-	attrib = GetFileAttributesW((LPCWSTR)path);
-	if (attrib != INVALID_FILE_ATTRIBUTES) {
-		isdir = (attrib & FILE_ATTRIBUTE_DIRECTORY);
-		setfull(path,mode,isdir);
-	} else {
-		printf("** Could not access ");
-		printname(stdout,path);
-		printf("\n");
-		printerror(stdout);
-		errors++;
-		err = TRUE;
-	}
-	return (!err);
-}
-
-#else
-
-/*
- *		   Display all the parameters associated to a file (Linux version)
- */
-
-void showfull(const char *fullname, BOOL isdir)
+static void showfull(const char *fullname, BOOL isdir)
 {
 	static char attr[MAXATTRSZ];
 	static char part[MAXATTRSZ];
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
-#endif
+#endif /* POSIXACLS */
 	struct SECURITY_DATA *psecurdata;
 	char *newattr;
 	int securindex;
@@ -5322,8 +4125,11 @@ void showfull(const char *fullname, BOOL isdir)
 	uid_t uid;
 	gid_t gid;
 
-	if (opt_v || opt_b)
-		printf("%s %s\n",(isdir ? "Directory" : "File"),fullname);
+	if (opt_v || (cmd == CMD_BACKUP)) {
+		printf("%s ",(isdir ? "Directory" : "File"));
+		printname(stdout, fullname);
+		printf("\n");
+	}
 
        /* get individual parameters, as when trying to get them */
        /* all, and one (typically SACL) is missing, we get none */
@@ -5342,11 +4148,11 @@ void showfull(const char *fullname, BOOL isdir)
 	if ((securindex < 0)
 	    || (securindex >= MAXSECURID)
 	    || ((securindex > 0)
-		&& ((!opt_r && !opt_b)
+		&& ((!opt_r && (cmd != CMD_BACKUP))
 		   || !securdata[securindex >> SECBLKSZ]
 		   || !securdata[securindex >> SECBLKSZ][securindex & ((1 << SECBLKSZ) - 1)].filecount)))
 		{
-		if (opt_v || opt_b) {
+		if (opt_v || (cmd == CMD_BACKUP)) {
 			if ((securindex < -1) || (securindex >= MAXSECURID))
 				printf("Security key : 0x%x out of range\n",securindex);
 			else
@@ -5355,9 +4161,10 @@ void showfull(const char *fullname, BOOL isdir)
 				else
 					printf("Security key : 0x%x\n",securindex);
 		} else {
-			printf("%s %s",(isdir ? "Directory" : "File"),fullname);
+			printf("%s ",(isdir ? "Directory" : "File"));
+			printname(stdout, fullname);
 			if ((securindex < -1) || (securindex >= MAXSECURID))
-					printf(" : key 0x%x out of range\n",securindex);
+				printf(" : key 0x%x out of range\n",securindex);
 			else
 				if (securindex == -1)
 					printf(" : no key\n");
@@ -5375,17 +4182,19 @@ void showfull(const char *fullname, BOOL isdir)
 					psecurdata = &securdata[securindex >> SECBLKSZ]
 					   [securindex & ((1 << SECBLKSZ) - 1)];
 			}
-			if (opt_v && (opt_a || opt_b) && psecurdata) {
+			if (((cmd == CMD_AUDIT) || (cmd == CMD_BACKUP))
+			    && opt_v && psecurdata) {
 				newattr = (char*)malloc(attrsz);
-				printf("# %s %s hash 0x%lx\n",(isdir ? "Directory" : "File"),
-					fullname,
+				printf("# %s ",(isdir ? "Directory" : "File"));
+				printname(stdout, fullname);
+				printf(" hash 0x%lx\n",
 					(unsigned long)hash((le32*)attr,attrsz));
 				if (newattr) {
 					memcpy(newattr,attr,attrsz);
 					psecurdata->attr = newattr;
 				}
 			}
-			if ((opt_v || opt_b)
+			if ((opt_v || (cmd == CMD_BACKUP))
 				&& ((securindex >= MAXSECURID)
 				   || (securindex <= 0)
 				   || !psecurdata
@@ -5402,12 +4211,12 @@ void showfull(const char *fullname, BOOL isdir)
 					mode = pxdesc->mode;
 				else
 					mode = 0;
-#else
+#else /* POSIXACLS */
 				mode = linux_permissions(attr,isdir);
-#endif
+#endif /* POSIXACLS */
 				attrib = ntfs_get_file_attributes(ntfs_context,fullname);
 				if (opt_v >= 2) {
-					level = (opt_b ? 4 : 0);
+					level = (cmd == CMD_BACKUP ? 4 : 0);
 					showheader(attr,level);
 					showusid(attr,level);
 					showgsid(attr,level);
@@ -5418,7 +4227,7 @@ void showfull(const char *fullname, BOOL isdir)
 					printf("Windows attrib : 0x%x\n",attrib);
 				uid = linux_owner(attr);
 				gid = linux_group(attr);
-				if (opt_b) {
+				if (cmd == CMD_BACKUP) {
 				        showownership(attr);
 					printf("# Interpreted Unix owner %d, group %d, mode 0%03o\n",
 						(int)uid,(int)gid,mode);
@@ -5429,21 +4238,18 @@ void showfull(const char *fullname, BOOL isdir)
 				}
 #if POSIXACLS
 				if (pxdesc) {
-					if (!opt_b
+					if ((cmd != CMD_BACKUP)
 					    && (pxdesc->defcnt
 					       || (pxdesc->tagsset
 						   & (POSIX_ACL_USER
 							| POSIX_ACL_GROUP
 							| POSIX_ACL_MASK))))
 						showposix(pxdesc);
-#if USESTUBS
-					stdfree(pxdesc); /* allocated within library */
-#else
 					free(pxdesc);
-#endif
 				}
-#endif
-				if ((opt_r || opt_b) && (securindex < MAXSECURID)
+#endif /* POSIXACLS */
+				if ((opt_r || (cmd == CMD_BACKUP))
+				    && (securindex < MAXSECURID)
 				    && (securindex > 0) && psecurdata) {
 					psecurdata->filecount++;
 					psecurdata->mode = mode;
@@ -5459,37 +4265,47 @@ void showfull(const char *fullname, BOOL isdir)
 				psecurdata = &securdata[securindex >> SECBLKSZ]
 					[securindex & ((1 << SECBLKSZ) - 1)];
 				psecurdata->filecount++;
-				if (opt_b || opt_r) {
-					if (!opt_b && !opt_v)
-						printf("%s %s\n",(isdir ? "Directory" : "File"),fullname);
+				if ((cmd == CMD_BACKUP) || opt_r) {
+					if ((cmd != CMD_BACKUP) && !opt_v) {
+						printf("%s ",(isdir ? "Directory" : "File"));
+						printname(stdout,fullname);
+						printf("\n");
+					}
 					printf("Security key : 0x%x mode %03o (already displayed)\n",
 						securindex,psecurdata->mode);
 					if (attrib != INVALID_FILE_ATTRIBUTES)
 						printf("Windows attrib : 0x%x\n",attrib);
 				} else {
-					printf("%s %s",(isdir ? "Directory" : "File"),fullname);
+					printf("%s ",(isdir ? "Directory" : "File"));
+					printname(stdout,fullname);
 					printf(" : key 0x%x\n",securindex);
 				}
-				if ((opt_a || opt_b) && opt_v
-				    && psecurdata && psecurdata->attr) {
-					printf("# %s %s hash 0x%lx\n",(isdir ? "Directory" : "File"),
-						fullname,
+				if (((cmd == CMD_AUDIT) || (cmd == CMD_BACKUP))
+				    && opt_v
+				    && psecurdata
+				    && psecurdata->attr) {
+					printf("# %s ",(isdir ? "Directory" : "File"));
+					printname(stdout,fullname);
+					printf(" hash 0x%lx\n",
 						(unsigned long)hash((le32*)psecurdata->attr,
 							ntfs_attr_size(psecurdata->attr)));
 				}
 			}
 		} else {
-			if (!opt_v && !opt_b)
-				printf("%s %s",(isdir ? "Directory" : "File"),fullname);
+			if (!opt_v && (cmd != CMD_BACKUP)) {
+				printf("%s ",(isdir ? "Directory" : "File"));
+				printname(stdout, fullname);
+			}
 			printf("   (Failed)\n");
-			printf("** Could not get security data of %s, partsz %d\n",
-				fullname,partsz);
+			printf("** Could not get security data of ");
+			printname(stdout, fullname);
+			printf(", partsz %d\n", partsz);
 			printerror(stdout);
 			errors++;
 		}
 }
 
-BOOL recurseshow(const char *path)
+static BOOL recurseshow(const char *path)
 {
 	struct CALLBACK dircontext;
 	struct LINK *current;
@@ -5504,7 +4320,7 @@ BOOL recurseshow(const char *path)
 	if (isdir) {
 		showfull(path,TRUE);
 		if (opt_v) {
-			if (opt_b)
+			if (cmd == CMD_BACKUP)
 				printf("#\n#\n");
 			else
 				printf("\n\n");
@@ -5519,7 +4335,7 @@ BOOL recurseshow(const char *path)
 		if (errno == ENOTDIR) {
 			showfull(path,FALSE);
 			if (opt_v) {
-				if (opt_b)
+				if (cmd == CMD_BACKUP)
 					printf("#\n#\n");
 				else
 					printf("\n\n");
@@ -5534,7 +4350,7 @@ BOOL recurseshow(const char *path)
 }
 
 
-BOOL singleshow(const char *path)
+static BOOL singleshow(const char *path)
 {
 	BOOL isdir;
 	BOOL err;
@@ -5553,29 +4369,33 @@ BOOL singleshow(const char *path)
 	return (err);
 }
 
+#ifndef HAVE_WINDOWS_H
+
 #ifdef HAVE_SETXATTR
 
 static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, size_t size)
 {
 #if defined(__APPLE__) || defined(__DARWIN__)
     return getxattr(path, name, value, size, 0, 0);
-#else
+#else /* defined(__APPLE__) || defined(__DARWIN__) */
     return getxattr(path, name, value, size);
-#endif
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 }
 
 /*
  *		   Display all the parameters associated to a mounted file
+ *
+ *	(Unix only)
  */
 
-BOOL showmounted(const char *fullname)
+static BOOL showmounted(const char *fullname)
 {
 
 	static char attr[MAXATTRSZ];
 	struct stat st;
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
-#endif
+#endif /* POSIXACLS */
 	BOOL mapped;
 	int attrsz;
 	int mode;
@@ -5620,11 +4440,11 @@ BOOL showmounted(const char *fullname)
 					printf("No user mapping : "
 						"cannot display the Posix ACL\n");
 				}
-#else
+#else /* POSIXACLS */
 				mode = linux_permissions(attr,isdir);
-#endif
+#endif /* POSIXACLS */
 				if (opt_v >= 2) {
-					level = (opt_b ? 4 : 0);
+					level = (cmd == CMD_BACKUP ? 4 : 0);
 					showheader(attr,level);
 					showusid(attr,level);
 					showgsid(attr,level);
@@ -5649,15 +4469,11 @@ BOOL showmounted(const char *fullname)
 							| POSIX_ACL_GROUP
 							| POSIX_ACL_MASK))))
 						showposix(pxdesc);
-#if USESTUBS
-					stdfree(pxdesc); /* allocated within library */
-#else
 					free(pxdesc);
-#endif
 				}
 				if (mapped)
 					ntfs_free_mapping(context.mapping);
-#endif
+#endif /* POSIXACLS */
 			} else {
 				printf("Descriptor fails sanity check\n");
 				errors++;
@@ -5673,7 +4489,7 @@ BOOL showmounted(const char *fullname)
 	return (err);
 }
 
-BOOL processmounted(const char *fullname)
+static BOOL processmounted(const char *fullname)
 {
 
 	static char attr[MAXATTRSZ];
@@ -5682,7 +4498,7 @@ BOOL processmounted(const char *fullname)
 	BOOL err;
 
 	err = FALSE;
-	if (!opt_u)
+	if (cmd != CMD_USERMAP)
 		err = showmounted(fullname);
 	else
 	if (!stat(fullname,&st)) {
@@ -5712,7 +4528,7 @@ BOOL processmounted(const char *fullname)
 
 #else /* HAVE_SETXATTR */
 
-BOOL processmounted(const char *fullname __attribute__((unused)))
+static BOOL processmounted(const char *fullname __attribute__((unused)))
 {
 	fprintf(stderr,"Not possible on this configuration,\n");
 	fprintf(stderr,"you have to use an unmounted partition\n");
@@ -5721,9 +4537,11 @@ BOOL processmounted(const char *fullname __attribute__((unused)))
 
 #endif /* HAVE_SETXATTR */
 
+#endif /* HAVE_WINDOWS_H */
+
 #if POSIXACLS
 
-BOOL recurseset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
+static BOOL recurseset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
 {
 	struct CALLBACK dircontext;
 	struct LINK *current;
@@ -5742,7 +4560,7 @@ BOOL recurseset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
 			printerror(stdout);
 			errors++;
 		} else {
-			if (opt_b)
+			if (cmd == CMD_BACKUP)
 				printf("#\n#\n");
 			else
 				printf("\n\n");
@@ -5770,9 +4588,9 @@ BOOL recurseset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
 	return (!err);
 }
 
-#else
+#else /* POSIXACLS */
 
-BOOL recurseset(const char *path, int mode)
+static BOOL recurseset(const char *path, int mode)
 {
 	struct CALLBACK dircontext;
 	struct LINK *current;
@@ -5786,7 +4604,7 @@ BOOL recurseset(const char *path, int mode)
 			callback, &dircontext);
 	if (isdir) {
 		setfull(path,mode,TRUE);
-		if (opt_b)
+		if (cmd == CMD_BACKUP)
 			printf("#\n#\n");
 		else
 			printf("\n\n");
@@ -5808,11 +4626,11 @@ BOOL recurseset(const char *path, int mode)
 	return (!err);
 }
 
-#endif
+#endif /* POSIXACLS */
 
 #if POSIXACLS
 
-BOOL singleset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
+static BOOL singleset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
 {
 	BOOL isdir;
 	BOOL err;
@@ -5836,9 +4654,9 @@ BOOL singleset_posix(const char *path, const struct POSIX_SECURITY *pxdesc)
 	return (!err);
 }
 
-#endif
+#else /* POSIXACLS */
 
-BOOL singleset(const char *path, int mode)
+static BOOL singleset(const char *path, int mode)
 {
 	BOOL isdir;
 	BOOL err;
@@ -5857,26 +4675,30 @@ BOOL singleset(const char *path, int mode)
 	return (!err);
 }
 
-int callback(struct CALLBACK *dircontext, char *ntfsname,
-	int length, int type,
-	long long pos  __attribute__((unused)), u64 mft_ref __attribute__((unused)),
-	unsigned int dt_type __attribute__((unused)))
+#endif /* POSIXACLS */
+
+static int callback(void *ctx, const ntfschar *ntfsname,
+	const int length, const int type,
+	const s64 pos  __attribute__((unused)),
+	const MFT_REF mft_ref __attribute__((unused)),
+	const unsigned int dt_type __attribute__((unused)))
 {
 	struct LINK *linkage;
+	struct CALLBACK *dircontext;
 	char *name;
 	int newlth;
 	int size;
 
+	dircontext = (struct CALLBACK*)ctx;
 	size = utf8size(ntfsname,length);
 	if (dircontext
 	    && (type != 2)     /* 2 : dos name (8+3) */
 	    && (size > 0)      /* chars convertible to utf8 */
 	    && ((length > 2)
-		|| (ntfsname[0] != '.')
-		|| (ntfsname[1] != '\0')
-		|| ((ntfsname[2] || ntfsname[3])
-		   && ((ntfsname[2] != '.') || (ntfsname[3] != '\0'))))) {
-		linkage = (struct LINK*)malloc(sizeof(struct LINK) 
+		|| !le16_eq(ntfsname[0], const_cpu_to_le16('.'))
+		|| ((length > 1)
+		    && !le16_eq(ntfsname[1], const_cpu_to_le16('.'))))) {
+		linkage = (struct LINK*)malloc(sizeof(struct LINK)
 				+ strlen(dircontext->dir)
 				+ size + 2);
 		if (linkage) {
@@ -5896,34 +4718,11 @@ int callback(struct CALLBACK *dircontext, char *ntfsname,
 	return (0);
 }
 
-#endif
-
-#ifdef WIN32
-
 /*
- *		 Backup security descriptors in a directory tree (Windows mode)
+ *		 Backup security descriptors in a directory tree
  */
 
-BOOL backup(const char *root)
-{
-	BOOL err;
-	time_t now;
-	const char *txtime;
-
-	now = time((time_t*)NULL);
-	txtime = ctime(&now);
-	printf("#\n# Recursive ACL collection on %s#\n",txtime);
-	err = recurseshow(root);
-	return (err);
-}
-
-#else
-
-/*
- *		 Backup security descriptors in a directory tree (Linux mode)
- */
-
-BOOL backup(const char *volume, const char *root)
+static BOOL backup(const char *volume, const char *root)
 {
 	BOOL err;
 	int count;
@@ -5962,33 +4761,11 @@ BOOL backup(const char *volume, const char *root)
 	return (err);
 }
 
-#endif
-
-#ifdef WIN32
-
 /*
- *		 List security descriptors in a directory tree (Windows mode)
+ *		 List security descriptors in a directory tree
  */
 
-BOOL listfiles(const char *root)
-{
-	BOOL err;
-
-	if (opt_r) {
-		printf("\nRecursive file check\n");
-		err = recurseshow(root);
-	} else
-		err = singleshow(root);
-	return (err);
-}
-
-#else
-
-/*
- *		 List security descriptors in a directory tree (Linux mode)
- */
-
-BOOL listfiles(const char *volume, const char *root)
+static BOOL listfiles(const char *volume, const char *root)
 {
 	BOOL err;
 	int i,j;
@@ -6015,8 +4792,6 @@ BOOL listfiles(const char *volume, const char *root)
 				err = singleshow(root);
 			close_volume(volume);
 		} else {
-			fprintf(stderr,"Could not open volume %s\n",volume);
-			printerror(stdout);
 			err = TRUE;
 		}
 		close_security_api();
@@ -6030,12 +4805,14 @@ BOOL listfiles(const char *volume, const char *root)
 	return (err);
 }
 
-BOOL mapproposal(const char *volume, const char *name)
+#ifdef HAVE_WINDOWS_H
+
+static BOOL mapproposal(const char *volume, const char *name)
 {
 	BOOL err;
 	u32 attrsz;
 	int securindex;
-	char attr[256]; /* header (20) and a couple of SIDs (max 40 each) */
+	char attr[256]; /* header (20) and a couple of SIDs (max 68 each) */
 
 	err = FALSE;
 	if (!getuid() && open_security_api()) {
@@ -6049,9 +4826,10 @@ BOOL mapproposal(const char *volume, const char *name)
 			if (securindex)
 				err = proposal(name,attr);
 			else {
-				fprintf(stderr,"*** Could not get the ACL of %s\n",
-						name);
-				printerror(stdout);
+				fprintf(stderr,"*** Could not get the ACL of ");
+				printname(stderr, name);
+				fprintf(stderr,"\n");
+				printerror(stderr);
 				errors++;
 			}
 			close_volume(volume);
@@ -6073,13 +4851,11 @@ BOOL mapproposal(const char *volume, const char *name)
 
 #endif
 
-#ifndef WIN32
-
 /*
  *		Check whether a SDS entry is valid
  */
 
-BOOL valid_sds(const char *attr, unsigned int offset,
+static BOOL valid_sds(const char *attr, unsigned int offset,
 		unsigned int entrysz, unsigned int size, u32 prevkey,
 		BOOL second)
 {
@@ -6155,7 +4931,7 @@ BOOL valid_sds(const char *attr, unsigned int offset,
  *	and store current data for subsequent checks
  */
 
-int consist_sds(const char *attr, unsigned int offset,
+static int consist_sds(const char *attr, unsigned int offset,
 		unsigned int entrysz, BOOL second)
 {
 	int errcnt;
@@ -6215,10 +4991,10 @@ int consist_sds(const char *attr, unsigned int offset,
 
 
 /*
- *		       Auditing of $SDS (Linux only)
+ *		       Auditing of $SDS
  */
 
-int audit_sds(BOOL second)
+static int audit_sds(BOOL second)
 {
 	static char attr[MAXATTRSZ + 20];
 	BOOL isdir;
@@ -6345,7 +5121,7 @@ int audit_sds(BOOL second)
  *		Check whether a SII entry is sane
  */
 
-BOOL valid_sii(const char *entry, u32 prevkey)
+static BOOL valid_sii(const char *entry, u32 prevkey)
 {
 	BOOL valid;
 	u32 key;
@@ -6414,7 +5190,7 @@ BOOL valid_sii(const char *entry, u32 prevkey)
  *		Check whether a SII entry is consistent with other known data
  */
 
-int consist_sii(const char *entry)
+static int consist_sii(const char *entry)
 {
 	int errcnt;
 	u32 key;
@@ -6471,10 +5247,10 @@ int consist_sii(const char *entry)
 
 
 /*
- *		       Auditing of $SII (Linux only)
+ *		       Auditing of $SII
  */
 
-int audit_sii()
+static int audit_sii(void)
 {
 	char *entry;
 	int errcnt;
@@ -6490,7 +5266,7 @@ int audit_sii()
 	prevkey = 0;
 	done = FALSE;
 	do {
-		entry = (char*)ntfs_read_sii(ntfs_context,(void*)entry);
+		entry = (char*)ntfs_read_sii(ntfs_context,(INDEX_ENTRY*)entry);
 		if (entry) {
 			valid = valid_sii(entry,prevkey);
 			if (valid) {
@@ -6514,7 +5290,7 @@ int audit_sii()
  *		Check whether a SII entry is sane
  */
 
-BOOL valid_sdh(const char *entry, u32 prevkey, u32 prevhash)
+static BOOL valid_sdh(const char *entry, u32 prevkey, u32 prevhash)
 {
 	BOOL valid;
 	u32 key;
@@ -6602,7 +5378,7 @@ BOOL valid_sdh(const char *entry, u32 prevkey, u32 prevhash)
  *		Check whether a SDH entry is consistent with other known data
  */
 
-int consist_sdh(const char *entry)
+static int consist_sdh(const char *entry)
 {
 	int errcnt;
 	u32 key;
@@ -6657,10 +5433,10 @@ int consist_sdh(const char *entry)
 }
 
 /*
- *		       Auditing of $SDH (Linux only)
+ *		       Auditing of $SDH
  */
 
-int audit_sdh()
+static int audit_sdh(void)
 {
 	char *entry;
 	int errcnt;
@@ -6678,7 +5454,7 @@ int audit_sdh()
 	entry = (char*)NULL;
 	done = FALSE;
 	do {
-		entry = (char*)ntfs_read_sdh(ntfs_context,(void*)entry);
+		entry = (char*)ntfs_read_sdh(ntfs_context,(INDEX_ENTRY*)entry);
 		if (entry) {
 			valid = valid_sdh(entry,prevkey,prevhash);
 			if (valid) {
@@ -6703,7 +5479,7 @@ int audit_sdh()
  *		Audit summary
  */
 
-void audit_summary()
+static void audit_summary(void)
 {
 	int count;
 	int flags;
@@ -6758,10 +5534,10 @@ void audit_summary()
 }
 
 /*
- *		       Auditing (Linux only)
+ *		       Auditing
  */
 
-BOOL audit(const char *volume)
+static BOOL audit(const char *volume)
 {
 	BOOL err;
 
@@ -6793,8 +5569,6 @@ BOOL audit(const char *volume)
 	return (err);
 }
 
-#endif
-
 #if POSIXACLS
 
 /*
@@ -6802,7 +5576,7 @@ BOOL audit(const char *volume)
  *	[d:]{ugmo}:uid[:perms],...
  */
 
-struct POSIX_SECURITY *encode_posix_acl(const char *str)
+static struct POSIX_SECURITY *encode_posix_acl(const char *str)
 {
 	int acccnt;
 	int defcnt;
@@ -7046,21 +5820,29 @@ struct POSIX_SECURITY *encode_posix_acl(const char *str)
 		}
 			/* compute the mode and tagsset */
 		tagsset = 0;
-		for (i=0; i<acccnt; i++)
+		for (i=0; i<acccnt; i++) {
 			tagsset |= acl->ace[i].tag;
 			switch (acl->ace[i].tag) {
 			case POSIX_ACL_USER_OBJ :
 				mode |= acl->ace[i].perms << 6;
 				break;
 			case POSIX_ACL_GROUP_OBJ :
-				mode |= acl->ace[i].perms << 3;
+					/* unless mask seen first */
+				if (!(tagsset & POSIX_ACL_MASK))
+					mode |= acl->ace[i].perms << 3;
 				break;
 			case POSIX_ACL_OTHER :
 				mode |= acl->ace[i].perms;
 				break;
+			case POSIX_ACL_MASK :
+					/* overrides group */
+				mode = (mode & 07707)
+						| (acl->ace[i].perms << 3);
+				break;
 			default :
 				break;
 			}
+		}
 		pxdesc->mode = mode;
 		pxdesc->tagsset = tagsset;
 		pxdesc->acl.version = POSIX_VERSION;
@@ -7092,719 +5874,585 @@ showposix(pxdesc);
 
 #endif /* POSIXACLS */
 
-
-int getoptions(int argc, char *argv[])
+static BOOL setperms(const char *volume, const char *perms, const char *base)
 {
-	int xarg;
-	int narg;
-	const char *parg;
-	BOOL err;
-
-	opt_a = FALSE;
-	opt_b = FALSE;
-	opt_e = FALSE;
-	opt_h = FALSE;
-#if FORCEMASK
-	opt_m = FALSE;
-#endif
-	opt_r = FALSE;
-	opt_s = FALSE;
-#if SELFTESTS & !USESTUBS
-	opt_t = FALSE;
-#endif
-	opt_u = FALSE;
-	opt_v = 0;
-	xarg = 1;
-	err = FALSE;
-	while ((xarg < argc) && (argv[xarg][0] == '-')) {
-		parg = argv[xarg++];
-		while (*++parg)
-			switch (*parg)
-				{
-#ifndef WIN32
-				case 'a' :
-					opt_a = TRUE;
-					break;
-#endif
-				case 'b' :
-					opt_b = TRUE;
-					break;
-				case 'e' :
-					opt_e = TRUE;
-					break;
-				case 'h' :
-					opt_h = TRUE;
-					break;
-#if FORCEMASK
-				case 'm' :
-					opt_m = TRUE;
-					break;
-#endif
-				case 'r' :
-				case 'R' :
-					opt_r = TRUE;
-					break;
-				case 's' :
-					opt_s = TRUE;
-					break;
-#if SELFTESTS & !USESTUBS
-				case 't' :
-					opt_t = TRUE;
-					break;
-#endif
-				case 'u' :
-					opt_u = TRUE;
-					break;
-				case 'v' :
-					opt_v++;
-					break;
-				default :
-					fprintf(stderr,"Invalid option -%c\n",*parg);
-					err = TRUE;
-			}
-	}
-	narg = argc - xarg;
-#ifdef WIN32
-	if (   ((opt_h || opt_s) && (narg > 1))
-	    || ((opt_r || opt_b || opt_u) && ((narg < 1) || (narg > 2)))
-#if SELFTESTS & !USESTUBS
-	    || (opt_t && (narg > 0))
-#endif
-	    || (opt_e && !opt_s)
-	    || (!opt_h && !opt_r && !opt_b && !opt_s
-#if SELFTESTS & !USESTUBS
-			&& !opt_t
-#endif
-			&& ((narg < 1) || (narg > 2))))
-
-		err = TRUE;
-	if (err) {
-		xarg = 0;
-		fprintf(stderr,"Usage:\n");
-#if SELFTESTS & !USESTUBS
-		fprintf(stderr,"   secaudit -t\n");
-		fprintf(stderr,"	run self-tests\n");
-#endif
-		fprintf(stderr,"   secaudit -h [file]\n");
-		fprintf(stderr,"	display security descriptors within file\n");
-		fprintf(stderr,"   secaudit [-v] file\n");
-		fprintf(stderr,"	display the security parameters of file\n");
-		fprintf(stderr,"   secaudit -r[v] directory\n");
-		fprintf(stderr,"	display the security parameters of files in directory\n");
-		fprintf(stderr,"   secaudit -b[v] directory\n");
-		fprintf(stderr,"        backup the security parameters of files in directory\n");
-		fprintf(stderr,"   secaudit -s[ev] [backupfile]\n");
-		fprintf(stderr,"        set the security parameters as indicated in backup file\n");
-		fprintf(stderr,"        with -e also set extra parameters (Windows attrib)\n");
-		fprintf(stderr,"   secaudit perms file\n");
-		fprintf(stderr,"	set the security parameters of file to perms\n");
-		fprintf(stderr,"   secaudit -r[v] perms directory\n");
-		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
-		fprintf(stderr,"   secaudit -u file\n");
-		fprintf(stderr,"	get a user mapping proposal applicable to file\n");
-#if POSIXACLS
-		fprintf(stderr,"   Note: perms can be an octal mode or a Posix ACL description\n");
-#else
-		fprintf(stderr,"   Note: perms is an octal mode\n");
-#endif
-		fprintf(stderr,"          -v is for verbose, -vv for very verbose\n");
-	}
-#else
-	if (   (opt_h && (narg > 1))
-	    || (opt_a && (narg != 1))
-	    || ((opt_r || opt_b || opt_s || opt_u)
-			&& ((narg < 1) || (narg > 3)))
-#if SELFTESTS & !USESTUBS
-	    || (opt_t && (narg > 0))
-#endif
-	    || (opt_e && !opt_s)
-	    || (!opt_h && !opt_a && !opt_r && !opt_b && !opt_s && !opt_u
-#if SELFTESTS & !USESTUBS
-		&& !opt_t
-#endif
-#ifdef HAVE_SETXATTR
-		&& ((narg < 1) || (narg > 3))))
-#else
-		&& ((narg < 2) || (narg > 3))))
-#endif
-		err = TRUE;
-	if (err) {
-		xarg = 0;
-		fprintf(stderr,"Usage:\n");
-#if SELFTESTS & !USESTUBS
-		fprintf(stderr,"   secaudit -t\n");
-		fprintf(stderr,"	run self-tests\n");
-#endif
-		fprintf(stderr,"   secaudit -h [file]\n");
-		fprintf(stderr,"	display security descriptors within file\n");
-		fprintf(stderr,"   secaudit -a[rv] volume\n");
-		fprintf(stderr,"	audit the volume\n");
-		fprintf(stderr,"   secaudit [-v] volume file\n");
-		fprintf(stderr,"	display the security parameters of file\n");
-		fprintf(stderr,"   secaudit -r[v] volume directory\n");
-		fprintf(stderr,"	display the security parameters of files in directory\n");
-		fprintf(stderr,"   secaudit -b[v] volume directory\n");
-		fprintf(stderr,"        backup the security parameters of files in directory\n");
-		fprintf(stderr,"   secaudit -s[ev] volume [backupfile]\n");
-		fprintf(stderr,"        set the security parameters as indicated in backup file\n");
-		fprintf(stderr,"        with -e also set extra parameters (Windows attrib)\n");
-		fprintf(stderr,"   secaudit volume perms file\n");
-		fprintf(stderr,"	set the security parameters of file to perms\n");
-		fprintf(stderr,"   secaudit -r[v] volume perms directory\n");
-		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
-		fprintf(stderr,"   secaudit -u volume file\n");
-		fprintf(stderr,"	get a user mapping proposal applicable to file\n");
-#ifdef HAVE_SETXATTR
-		fprintf(stderr," special cases, do not require being root :\n");
-		fprintf(stderr,"   secaudit -u mounted-file\n");
-		fprintf(stderr,"	get a user mapping proposal applicable to mounted file\n");
-		fprintf(stderr,"   secaudit [-v] mounted-file\n");
-		fprintf(stderr,"	display the security parameters of a mounted file\n");
-#endif
-#if POSIXACLS
-		fprintf(stderr,"   Note: perms can be an octal mode or a Posix ACL description\n");
-#else
-		fprintf(stderr,"   Note: perms is an octal mode\n");
-#endif
-		fprintf(stderr,"          -v is for verbose, -vv for very verbose\n");
-	}
-#endif
-	if ((sizeof(SID) != 12) && !err) {
-		fprintf(stderr,"Possible alignment problem, check your compiler options\n");
-		err = TRUE;
-		xarg = 0;
-	}
-	return (xarg);
-}
-
-/*
- *		Memory allocation with checks
- */
-
-#undef malloc
-#undef calloc
-#undef free
-#undef isalloc
-
-void dumpalloc(const char *txt)
-{
-	struct CHKALLOC *q;
-
-	if (firstalloc) {
-		printf("alloc table at %s\n",txt);
-		for (q=firstalloc; q; q=q->next)
-#ifdef __x86_64__
-			printf("%08llx : %u bytes at %08llx allocated at %s line %d\n",
-				(long long)q,(unsigned int)q->size,
-				(long long)q->alloc,q->file,q->line);
-#else
-			printf("%08lx : %u bytes at %08lx allocated at %s line %d\n",
-				(long)q,(unsigned int)q->size,
-				(long)q->alloc,q->file,q->line);
-#endif
-	}
-}
-
-void *chkmalloc(size_t size, const char *file, int line)
-{
-	void *p;
-	struct CHKALLOC *q;
-
-	p = (void*)malloc(size+1);
-	if (p) {
-		((unsigned char*)p)[size] = 0xaa;
-		q = (struct CHKALLOC*)malloc(sizeof(struct CHKALLOC));
-		if (q) {
-			q->next = firstalloc;
-			q->alloc = p;
-			q->size = size;
-			q->file = file;
-			q->line = line;
-			firstalloc = q;
-		}
-	}
-	return (p);
-}
-
-void *chkcalloc(size_t cnt, size_t size, const char *file, int line)
-{
-	return (chkmalloc(cnt*size,file,line));
-}
-
-void chkfree(void *p, const char *file, int line)
-{
-	struct CHKALLOC *q;
-	struct CHKALLOC *r;
-
-	if (p) {
-		if (firstalloc && (firstalloc->alloc == p)) {
-			r = firstalloc;
-			firstalloc = firstalloc->next;
-		} else {
-			q = firstalloc;
-			if (q)
-				while (q->next && (q->next->alloc != p))
-					q = q->next;
-			if (q && q->next) {
-				r = q->next;
-				q->next = r->next;
-			} else {
-				r = (struct CHKALLOC*)NULL;
-				printf("** freeing unallocated memory in %s line %d\n",file,line);
-				if (!isatty(1))
-					fprintf(stderr,"** freeing unallocated memory in %s line %d\n",file,line);
-			}
-		}
-		if (r) {
-			if (((unsigned char*)p)[r->size] != 0xaa) {
-				printf("** memory corruption, alloc in %s line %d release in %s %d\n",
-					r->file,r->line,file,line);
-				if (!isatty(1))
-					fprintf(stderr,"** memory corruption, alloc in %s line %d release in %s %d\n",
-						r->file,r->line,file,line);
-			}
-			memset(p,0xaa,r->size);
-			free(r);
-			free(p);
-		}
-	}
-}
-
-void *stdmalloc(size_t size)
-{
-	return (malloc(size));
-}
-
-void stdfree(void *p)
-{
-	free(p);
-}
-
-BOOL chkisalloc(void *p, const char *file, int line)
-{
-	struct CHKALLOC *q;
-
-	if (p) {
-		q = firstalloc;
-		while (q && (q->alloc != p))
-			q = q->next;
-	} else
-		q = (struct CHKALLOC*)NULL;
-	if (!p || !q) {
-#ifdef __x86_64__
-		printf("error in %s %d : 0x%llx not allocated\n",file,line,
-					(long long)p);
-#else
-		printf("error in %s %d : 0x%lx not allocated\n",file,line,
-					(long)p);
-#endif
-	}
-	return (p && q);
-}
-
-
-
-
-#ifdef WIN32
-
-/*
- *		 Windows version
- */
-
-main(argc,argv)
-int argc;
-char *argv[];
-{
-	FILE *fd;
-	int xarg;
-	int mode;
-	unsigned int size;
-	BOOL cmderr;
-	char *filename;
 	const char *p;
+	BOOL cmderr;
 	int i;
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
-#endif
+#else /* POSIXACLS */
+	int mode;
+#endif /* POSIXACLS */
 
-	printf("%s\n",BANNER);
 	cmderr = FALSE;
-	errors = 0;
-	warnings = 0;
-	xarg = getoptions(argc,argv);
-	if (xarg) {
-		for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
-			securdata[i] = (struct SECURITY_DATA*)NULL;
+	p = perms;
 #if POSIXACLS
-		context.mapping[MAPUSERS] = (struct MAPPING*)NULL;
-		context.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
-#endif
-		firstalloc = (struct CHKALLOC*)NULL;
-		mappingtype = MAPNONE;
-		switch (argc - xarg) {
-		case 0 :
-			if (opt_h)
-				showhex(stdin);
-			else
-				if (opt_s)
-					restore(stdin);
-#if SELFTESTS & !USESTUBS
-			if (opt_t)
-				selftests();
-#endif
-			break;
-		case 1 :
-			if (opt_h || opt_s) {
-				fd = fopen(argv[xarg],"r");
-				if (fd) {
-					if (opt_h)
-						showhex(fd);
-					else
-						restore(fd);
-					fclose(fd);
-				} else { 
-					fprintf(stderr,"Could not open %s\n",argv[xarg]);
-					cmderr = TRUE;
-				}
-			} else {
-				size = utf16size(argv[xarg]);
-				if (size) {
-					filename = (char*)malloc(2*size + 2);
-					if (filename) {
-						makeutf16(filename,argv[xarg]);
-						if (opt_u) {
-							cmderr = mapproposal(filename);
-						} else {
-#if POSIXACLS
-							if (local_build_mapping(context.mapping,filename)) {
-								printf("*** Could not get user mapping data\n");
-								warnings++;
-							}
-#endif
-							if (opt_b)
-								cmderr = backup(filename);
-							else {
-								if (opt_r)
-									cmderr = listfiles(filename);
-								else
-									cmderr = singleshow(filename);
-							}
-#if POSIXACLS
-							ntfs_free_mapping(context.mapping);
-#endif
-						}
-						free(filename);
-					} else {
-						fprintf(stderr,"No more memory\n");
-						cmderr = TRUE;
-					}
-				} else {
-					fprintf(stderr,"Bad UTF-8 name \"%s\"\n",argv[xarg]);
-					cmderr = TRUE;
-				}
-			}
-			break;
-		case 2 :
-			mode = 0;
-			p = argv[xarg];
-#if POSIXACLS
-			pxdesc = encode_posix_acl(p);
-			if (pxdesc) {
-				size = utf16size(argv[xarg + 1]);
-				if (size) {
-					filename = (char*)malloc(2*size + 2);
-					if (filename) {
-						makeutf16(filename,argv[xarg + 1]);
-						if (local_build_mapping(context.mapping,filename)) {
-							printf("*** Could not get user mapping data\n");
-							warnings++;
-						}
-						if (opt_r) {
-							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
-								securdata[i] = (struct SECURITY_DATA*)NULL;
-							recurseset_posix(filename,pxdesc);
-						} else
-							singleset_posix(filename,pxdesc);
-						ntfs_free_mapping(context.mapping);
-						free(filename);
-					} else {
-						fprintf(stderr,"No more memory\n");
-						cmderr = TRUE;
-					}
-					chkfree(pxdesc,__FILE__,__LINE__);
-				} else {
-					fprintf(stderr,"Bad UTF-8 name \"%s\"\n",argv[xarg + 1]);
-					cmderr = TRUE;
-				}
-			}
-#else
-			while ((*p >= '0') && (*p <= '7'))
-				mode = (mode << 3) + (*p++) - '0';
-			if (*p) {
-				fprintf(stderr,"New mode should be given in octal\n");
-				cmderr = TRUE;
-			} else {
-				size = utf16size(argv[xarg + 1]);
-				if (size) {
-					filename = (char*)malloc(2*size + 2);
-					if (filename) {
-						makeutf16(filename,argv[xarg + 1]);
-#if POSIXACLS
-						if (local_build_mapping(&context,filename)) {
-							printf("*** Could not get user mapping data\n");
-							warnings++;
-						}
-#endif
-						if (opt_r) {
-							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
-								securdata[i] = (struct SECURITY_DATA*)NULL;
-							recurseset(filename,mode);
-						} else
-							singleset(filename,mode);
-						free(filename);
-					} else {
-						fprintf(stderr,"No more memory\n");
-						cmderr = TRUE;
-					}
-				} else {
-					fprintf(stderr,"Bad UTF-8 name \"%s\"\n",argv[xarg + 1]);
-					cmderr = TRUE;
-				}
-			}
-#endif
-			break;
-#if FORCEMASK
-		case 3 :
-			mode = 0;
-			forcemsk = 0;
-			p = argv[xarg];
-			while (*p) {
-				if ((*p >= '0') && (*p <= '9'))
-					forcemsk = (forcemsk << 4) + *p - '0';
-				else forcemsk = (forcemsk << 4) + (*p & 7) + 9;
-			p++;
-			}
-			p = argv[xarg + 1];
-			while ((*p >= '0') && (*p <= '7'))
-				mode = (mode << 3) + (*p++) - '0';
-			if (*p) {
-				fprintf(stderr,"New mode should be given in octal\n");
-				cmderr = TRUE;
-			} else {
+	pxdesc = encode_posix_acl(p);
+	if (pxdesc) {
+		if (!getuid() && open_security_api()) {
+			if (open_volume(volume,NTFS_MNT_NONE)) {
 				if (opt_r) {
-					recurseset(argv[xarg + 2],mode);
-				}
-				else singleset(argv[xarg + 2],mode);
+					for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
+						securdata[i] = (struct SECURITY_DATA*)NULL;
+					recurseset_posix(base,pxdesc);
+				} else
+					singleset_posix(base,pxdesc);
+				close_volume(volume);
+			} else {
+				fprintf(stderr,"Could not open volume %s\n",volume);
+				printerror(stderr);
+				cmderr = TRUE;
 			}
-			break;
-#endif
-		}
-		if (warnings)
-			printf("** %u %s signalled\n",warnings,
-				(warnings > 1 ? "warnings were" : "warning was"));
-		if (errors)
-			printf("** %u %s found\n",errors,
-				(errors > 1 ? "errors were" : "error was"));
-		else
-			if (!cmderr)
-				printf("No errors were found\n");
-		if (!isatty(1)) {
-			fflush(stdout);
-			if (warnings)
-				fprintf(stderr,"** %u %s signalled\n",warnings,
-					(warnings > 1 ? "warnings were" : "warning was"));
-			if (errors)
-				fprintf(stderr,"** %u %s found\n",errors,
-					(errors > 1 ? "errors were" : "error was"));
+			close_security_api();
+		} else {
+			if (getuid())
+				fprintf(stderr,"This is only possible as root\n");
 			else
-				fprintf(stderr,"No errors were found\n");
-		freeblocks();
+				fprintf(stderr,"Could not open security API\n");
+			cmderr = TRUE;
+		}
+		free(pxdesc);
+	} else
+		cmderr = TRUE;
+#else /* POSIXACLS */
+	mode = 0;
+	while ((*p >= '0') && (*p <= '7'))
+		mode = (mode << 3) + (*p++) - '0';
+	if (*p) {
+		fprintf(stderr,"New mode should be given in octal\n");
+		cmderr = TRUE;
+	} else {
+		if (!getuid() && open_security_api()) {
+			if (open_volume(volume,NTFS_MNT_NONE)) {
+				if (opt_r) {
+					for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
+						securdata[i] = (struct SECURITY_DATA*)NULL;
+					recurseset(base,mode);
+				} else
+					singleset(base,mode);
+				close_volume(volume);
+			} else {
+				fprintf(stderr,"Could not open volume %s\n",volume);
+				printerror(stderr);
+				cmderr = TRUE;
+			}
+			close_security_api();
+		} else {
+			if (getuid())
+				fprintf(stderr,"This is only possible as root\n");
+			else
+				fprintf(stderr,"Could not open security API\n");
+			cmderr = TRUE;
 		}
 	}
-	dumpalloc("termination");
-	if (cmderr || errors)
-		exit(1);
-	return (0);
+#endif /* POSIXACLS */
+	return (cmderr);
 }
 
-#else
+static void usage(void)
+{
+#ifdef HAVE_WINDOWS_H
+	fprintf(stderr,"Usage:\n");
+#ifdef SELFTESTS
+	fprintf(stderr,"   ntfssecaudit -t\n");
+	fprintf(stderr,"	run self-tests\n");
+#endif /* SELFTESTS */
+	fprintf(stderr,"   ntfssecaudit -h [file]\n");
+	fprintf(stderr,"	display security descriptors within file\n");
+	fprintf(stderr,"   ntfssecaudit -a[rv] volume\n");
+	fprintf(stderr,"	audit the volume\n");
+	fprintf(stderr,"   ntfssecaudit [-v] file\n");
+	fprintf(stderr,"	display the security parameters of file\n");
+	fprintf(stderr,"   ntfssecaudit -r[v] directory\n");
+	fprintf(stderr,"	display the security parameters of files in directory\n");
+	fprintf(stderr,"   ntfssecaudit -b[v] directory\n");
+	fprintf(stderr,"        backup the security parameters of files in directory\n");
+	fprintf(stderr,"   ntfssecaudit -s[ev] volume [backupfile]\n");
+	fprintf(stderr,"        set the security parameters as indicated in backup file\n");
+	fprintf(stderr,"        with -e also set extra parameters (Windows attrib)\n");
+	fprintf(stderr,"   ntfssecaudit perms file\n");
+	fprintf(stderr,"	set the security parameters of file to perms\n");
+	fprintf(stderr,"   ntfssecaudit -r[v] perms directory\n");
+	fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+	fprintf(stderr,"   ntfssecaudit -u file\n");
+	fprintf(stderr,"	get a user mapping proposal applicable to file\n");
+#if POSIXACLS
+	fprintf(stderr,"   Notes: perms can be an octal mode or a Posix ACL description\n");
+#else /* POSIXACLS */
+	fprintf(stderr,"   Notes: perms is an octal mode\n");
+#endif /* POSIXACLS */
+	fprintf(stderr,"          volume is a drive letter and colon (eg. D:)\n");
+	fprintf(stderr,"          -v is for verbose, -vv for very verbose\n");
+#else /* HAVE_WINDOWS_H */
+	fprintf(stderr,"Usage:\n");
+#ifdef SELFTESTS
+	fprintf(stderr,"   ntfssecaudit -t\n");
+	fprintf(stderr,"	run self-tests\n");
+#endif /* SELFTESTS */
+	fprintf(stderr,"   ntfssecaudit -h [file]\n");
+	fprintf(stderr,"	display security descriptors within file\n");
+	fprintf(stderr,"   ntfssecaudit -a[rv] volume\n");
+	fprintf(stderr,"	audit the volume\n");
+	fprintf(stderr,"   ntfssecaudit [-v] volume file\n");
+	fprintf(stderr,"	display the security parameters of file\n");
+	fprintf(stderr,"   ntfssecaudit -r[v] volume directory\n");
+	fprintf(stderr,"	display the security parameters of files in directory\n");
+	fprintf(stderr,"   ntfssecaudit -b[v] volume directory\n");
+	fprintf(stderr,"        backup the security parameters of files in directory\n");
+	fprintf(stderr,"   ntfssecaudit -s[ev] volume [backupfile]\n");
+	fprintf(stderr,"        set the security parameters as indicated in backup file\n");
+	fprintf(stderr,"        with -e also set extra parameters (Windows attrib)\n");
+	fprintf(stderr,"   ntfssecaudit volume perms file\n");
+	fprintf(stderr,"	set the security parameters of file to perms\n");
+	fprintf(stderr,"   ntfssecaudit -r[v] volume perms directory\n");
+	fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+#ifdef HAVE_SETXATTR
+	fprintf(stderr," special cases, do not require being root :\n");
+	fprintf(stderr,"   ntfssecaudit -u mounted-file\n");
+	fprintf(stderr,"	get a user mapping proposal applicable to mounted file\n");
+	fprintf(stderr,"   ntfssecaudit [-v] mounted-file\n");
+	fprintf(stderr,"	display the security parameters of a mounted file\n");
+#endif /* HAVE_SETXATTR */
+#if POSIXACLS
+	fprintf(stderr,"   Notes: perms can be an octal mode or a Posix ACL description\n");
+#else /* POSIXACLS */
+	fprintf(stderr,"   Notes: perms is an octal mode\n");
+#endif /* POSIXACLS */
+#if defined(__sun) && defined (__SVR4)
+	fprintf(stderr,"          volume is a partition designator (eg. /dev/dsk/c5t0d0p1)\n");
+#else /* defined(__sun) && defined (__SVR4) */
+	fprintf(stderr,"          volume is a partition designator (eg. /dev/sdb2)\n");
+#endif /* defined(__sun) && defined (__SVR4) */
+	fprintf(stderr,"          -v is for verbose, -vv for very verbose\n");
+#endif /* HAVE_WINDOWS_H */
+}
+
+static void version(void)
+{
+	static const char *EXEC_NAME = "ntfssecaudit";
+
+// confusing (see banner)
+	printf("\n%s v%s (libntfs-3g) - Audit security data on a NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION);
+	printf("    Copyright (c) 2007-2016 Jean-Pierre Andre\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+#ifdef HAVE_WINDOWS_H
 
 /*
- *		 Linux version
+ *		Split a Windows file designator into volume and fullpath
  */
+
+static BOOL splitarg(char **split, const char *arg)
+{
+	char curdir[MAXFILENAME];
+	BOOL err;
+	BOOL withvol;
+	BOOL withfullpath;
+	int lthd;
+	char *volume;
+	char *filename;
+
+	err = TRUE;
+	withvol = arg[0] && (arg[1] == ':');
+	if (withvol)
+		withfullpath = (arg[2] == '/') || (arg[2] == '\\');
+	else
+		withfullpath = (arg[0] == '/') || (arg[0] == '\\');
+	lthd = 0;
+	if (!withvol || !withfullpath) {
+		if (getcwd(curdir, sizeof(curdir)))
+			lthd = strlen(curdir);
+	}
+	if (withvol && !withfullpath && arg[2]
+	    && ((arg[0] ^ curdir[0]) & 0x3f)) {
+		fprintf(stderr,"%c: is not the current drive,\n",arg[0]);
+		fprintf(stderr,"please use the full path\n");
+	} else {
+		if (withvol && !withfullpath && !arg[2]
+		    && ((arg[0] ^ curdir[0]) & 0x3f)) {
+			curdir[2] = '\\';
+			curdir[3] = 0;
+			lthd = 3;
+		}
+		volume = (char*)malloc(4);
+		if (volume) {
+			if (withvol)
+				volume[0] = arg[0];
+			else
+				volume[0] = curdir[0];
+			volume[1] = ':';
+			volume[2] = 0;
+			filename = (char*)malloc(strlen(arg) + lthd + 2);
+			if (filename) {
+				if (withfullpath) {
+					if (withvol)
+						strcpy(filename, &arg[2]);
+					else
+						strcpy(filename, arg);
+				} else {
+					strcpy(filename, &curdir[2]);
+					if (curdir[lthd - 1] != '\\')
+						strcat(filename, "\\");
+					if (withvol)
+						strcat(filename, &arg[2]);
+					else
+						strcat(filename, arg);
+				}
+				if (!cleanpath(filename)) {
+					split[0] = volume;
+					split[1] = filename;
+					err = FALSE;
+				} else {
+					fprintf(stderr,"Bad path %s\n", arg);
+				}
+			} else
+				free(volume);
+		}
+	}
+	return (err);
+}
+
+#endif /* HAVE_WINDOWS_H */
+
+/*
+ *		Parse the command-line options
+ */
+
+static int parse_options(int argc, char *argv[])
+{
+	static const char *sopt = "-abehHrstuvV";
+	static const struct option lopt[] = {
+		{ "audit",	 no_argument,		NULL, 'a' },
+		{ "backup",	 no_argument,		NULL, 'b' },
+		{ "extra",	 no_argument,		NULL, 'e' },
+		{ "help",	 no_argument,		NULL, 'H' },
+		{ "hexdecode",	 no_argument,		NULL, 'h' },
+		{ "recurse",	 no_argument,		NULL, 'r' },
+		{ "set",	 no_argument,		NULL, 's' },
+		{ "test",	 no_argument,		NULL, 't' },
+		{ "user-mapping",no_argument,		NULL, 'u' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "version",	 no_argument,		NULL, 'V' },
+		{ NULL,		 0,			NULL,  0  }
+	};
+
+	int c = -1;
+	int err = 0;
+	int ver = 0;
+	int help = 0;
+	int xarg = 0;
+	CMDS prevcmd;
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	opt_e = FALSE;
+	opt_r = FALSE;
+	opt_v = 0;
+	cmd = CMD_NONE;
+	prevcmd = CMD_NONE;
+
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:
+			if (!xarg)
+				xarg = optind - 1;
+			break;
+		case 'a':
+			prevcmd = cmd;
+			cmd = CMD_AUDIT;
+			break;
+		case 'b':
+			prevcmd = cmd;
+			cmd = CMD_BACKUP;
+			break;
+		case 'e':
+			opt_e = TRUE;
+			break;
+		case 'h':
+			prevcmd = cmd;
+			cmd = CMD_HEX;
+			break;
+		case 'H':
+			help++;
+			break;
+		case 'r':
+			opt_r = TRUE;
+			break;
+		case 's':
+			prevcmd = cmd;
+			cmd = CMD_SET;
+			break;
+#ifdef SELFTESTS
+		case 't':
+			prevcmd = cmd;
+			cmd = CMD_TEST;
+			break;
+#endif
+		case 'u':
+			prevcmd = cmd;
+			cmd = CMD_USERMAP;
+			break;
+		case 'v':
+			opt_v++;
+			break;
+		case 'V':
+			ver++;
+			break;
+		default:
+			if ((c < 'a') || (c > 'z'))
+				fprintf(stderr,"Unhandled option case: %d.\n", c);
+			else
+				fprintf(stderr,"Invalid option -%c\n",c);
+			err++;
+			break;
+		}
+		if ((cmd != CMD_NONE)
+		    && (prevcmd != CMD_NONE)
+		    && (prevcmd != cmd)) {
+			fprintf(stderr,"Incompatible commands\n");
+			err++;
+		}
+	}
+
+	if (!xarg)
+		xarg = argc;
+
+	if (help || err)
+		cmd = CMD_HELP;
+	else
+		if (ver)
+			cmd = CMD_VERSION;
+
+	return (err ? 0 : xarg);
+}
 
 int main(int argc, char *argv[])
 {
+	char *split[2];
+	char *uname;
 	FILE *fd;
-	const char *p;
 	int xarg;
 	BOOL cmderr;
+	BOOL fail;
 	int i;
-#if POSIXACLS
-	struct POSIX_SECURITY *pxdesc;
-#else
-	unsigned int mode;
-#endif
 
 	printf("%s\n",BANNER);
 	cmderr = FALSE;
+	fail = FALSE;
 	errors = 0;
 	warnings = 0;
-	xarg = getoptions(argc,argv);
+	split[0] = split[1] = (char*)NULL;
+	uname = (char*)NULL;
+	xarg = parse_options(argc,argv);
 	if (xarg) {
 		for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
 			securdata[i] = (struct SECURITY_DATA*)NULL;
 #if POSIXACLS
 		context.mapping[MAPUSERS] = (struct MAPPING*)NULL;
 		context.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
-#endif
-		firstalloc = (struct CHKALLOC*)NULL;
+#endif /* POSIXACLS */
 		mappingtype = MAPNONE;
-		switch (argc - xarg) {
-		case 0 :
-			if (opt_h)
-				showhex(stdin);
-#if SELFTESTS & !USESTUBS
-			if (opt_t)
-				selftests();
-#endif
-			break;
-		case 1 :
-			if (opt_a)
-				cmderr = audit(argv[xarg]);
+
+		switch (cmd) {
+		case CMD_AUDIT :
+			if (xarg == (argc - 1))
+				fail = audit(argv[xarg]);
 			else
-				if (opt_h) {
-					fd = fopen(argv[xarg],"rb");
-					if (fd) {
-						showhex(fd);
-						fclose(fd);
-					} else { 
-						fprintf(stderr,"Could not open %s\n",argv[xarg]);
-						cmderr = TRUE;
-					}
-				} else
-					if (opt_b)
-						cmderr = backup(argv[xarg],"/");
-					else
-						if (opt_r)
-							cmderr = listfiles(argv[xarg],"/");
-						else
-							if (opt_s)
-								cmderr = dorestore(argv[xarg],stdin);
-							else
-								cmderr = processmounted(argv[xarg]);
-			break;
-		case 2 :
-			if (opt_b)
-				cmderr = backup(argv[xarg],argv[xarg+1]);
-			else
-				if (opt_s) {
-					fd = fopen(argv[xarg+1],"rb");
-					if (fd) {
-						if (dorestore(argv[xarg],fd))
-							cmderr = TRUE;
-						fclose(fd);
-					} else { 
-						fprintf(stderr,"Could not open %s\n",argv[xarg]);
-						cmderr = TRUE;
-					}
-				} else
-					if (opt_u)
-						cmderr = mapproposal(argv[xarg],argv[xarg+1]);
-					else
-						cmderr = listfiles(argv[xarg],argv[xarg+1]);
-			break;
-		case 3 :
-			p = argv[xarg+1];
-#if POSIXACLS
-			pxdesc = encode_posix_acl(p);
-			if (pxdesc) {
-				if (!getuid() && open_security_api()) {
-					if (open_volume(argv[xarg],NTFS_MNT_NONE)) {
-						if (opt_r) {
-							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
-								securdata[i] = (struct SECURITY_DATA*)NULL;
-							recurseset_posix(argv[xarg + 2],pxdesc);
-						} else
-							singleset_posix(argv[xarg + 2],pxdesc);
-						close_volume(argv[xarg]);
-					} else {
-						fprintf(stderr,"Could not open volume %s\n",argv[xarg]);
-						printerror(stderr);
-						cmderr = TRUE;
-					}
-					close_security_api();
-				} else {
-					if (getuid())
-						fprintf(stderr,"This is only possible as root\n");
-					else
-						fprintf(stderr,"Could not open security API\n");
-					cmderr = TRUE;
-				}
-			chkfree(pxdesc,__FILE__,__LINE__);
-			} else
 				cmderr = TRUE;
+			break;
+		case CMD_BACKUP :
+			switch (argc - xarg) {
+			case 1 :
+#ifdef HAVE_WINDOWS_H
+				if (!splitarg(split, argv[xarg]))
+					fail = backup(split[0], split[1]);
+				else
+					cmderr = TRUE;
 #else
-			mode = 0;
-			while ((*p >= '0') && (*p <= '7'))
-				mode = (mode << 3) + (*p++) - '0';
-			if (*p) {
-				fprintf(stderr,"New mode should be given in octal\n");
+				fail = backup(argv[xarg],"/");
+#endif
+				break;
+			case 2 :
+				cmderr = backup(argv[xarg],argv[xarg+1]);
+				break;
+			default :
 				cmderr = TRUE;
-			} else
-				if (!getuid() && open_security_api()) {
-					if (open_volume(argv[xarg],NTFS_MNT_NONE)) {
-						if (opt_r) {
-							for (i=0; i<(MAXSECURID + (1 << SECBLKSZ) - 1)/(1 << SECBLKSZ); i++)
-								securdata[i] = (struct SECURITY_DATA*)NULL;
-							recurseset(argv[xarg + 2],mode);
-						} else
-							singleset(argv[xarg + 2],mode);
-						close_volume(argv[xarg]);
-					} else {
-						fprintf(stderr,"Could not open volume %s\n",argv[xarg]);
-						printerror(stderr);
-						cmderr = TRUE;
-					}
-					close_security_api();
+				break;
+			}
+			break;
+		case CMD_HEX :
+			switch (argc - xarg) {
+			case 0 :
+				showhex(stdin);
+				break;
+			case 1 :
+				fd = fopen(argv[xarg],"rb");
+				if (fd) {
+					showhex(fd);
+					fclose(fd);
 				} else {
-					if (getuid())
-						fprintf(stderr,"This is only possible as root\n");
-					else
-						fprintf(stderr,"Could not open security API\n");
+					fprintf(stderr,"Could not open %s\n",
+							argv[xarg]);
 					cmderr = TRUE;
 				}
+				break;
+			default :
+				cmderr = TRUE;
+				break;
+			}
+			break;
+		case CMD_NONE :
+			switch (argc - xarg) {
+			case 1 :
+#ifdef HAVE_WINDOWS_H
+				if (!splitarg(split, argv[xarg]))
+					fail = listfiles(split[0], split[1]);
+				else
+					cmderr = TRUE;
+#else
+				if (opt_r)
+					cmderr = listfiles(argv[xarg],"/");
+				else
+					cmderr = processmounted(argv[xarg]);
 #endif
+				break;
+			case 2 :
+#ifdef HAVE_WINDOWS_H
+				if (!splitarg(split, argv[xarg + 1]))
+					fail = setperms(split[0], 
+							argv[xarg], split[1]);
+				else
+					cmderr = TRUE;
+#else /* HAVE_WINDOWS_H */
+				fail = listfiles(argv[xarg],argv[xarg+1]);
+#endif /* HAVE_WINDOWS_H */
+				break;
+			case 3 :
+#ifdef HAVE_WINDOWS_H
+				uname = unixname(argv[xarg+2]);
+				if (uname)
+					fail = setperms(argv[xarg],
+							argv[xarg+1], uname);
+				else
+					cmderr = TRUE;
+#else /* HAVE_WINDOWS_H */
+				cmderr = setperms(argv[xarg], argv[xarg+1],
+							argv[xarg+2]);
+#endif
+				break;
+			default :
+				cmderr = TRUE;
+				break;
+			}
+			break;
+		case CMD_SET :
+			switch (argc - xarg) {
+			case 1 :
+				cmderr = dorestore(argv[xarg],stdin);
+				break;
+			case 2 :
+				fd = fopen(argv[xarg+1],"rb");
+				if (fd) {
+					if (dorestore(argv[xarg],fd))
+						cmderr = TRUE;
+					fclose(fd);
+				} else {
+					fprintf(stderr,"Could not open %s\n",
+								argv[xarg]);
+					cmderr = TRUE;
+				}
+				break;
+			default :
+				cmderr = TRUE;
+			}
+			break;
+#ifdef SELFTESTS
+		case CMD_TEST :
+			if (xarg != argc)
+				cmderr = TRUE;
+			else
+				selftests();
+			break;
+#endif
+		case CMD_USERMAP :
+			switch (argc - xarg) {
+			case 1 :
+#ifdef HAVE_WINDOWS_H
+				if (!splitarg(split, argv[xarg]))
+					fail = mapproposal(split[0],
+								split[1]);
+				else
+					cmderr = TRUE;
+#else /* HAVE_WINDOWS_H */
+				processmounted(argv[xarg]);
+#endif /* HAVE_WINDOWS_H */
+				break;
+			case 2 :
+#ifdef HAVE_WINDOWS_H
+				uname = unixname(argv[xarg+1]);
+				if (uname)
+					cmderr = mapproposal(argv[xarg],
+								uname);
+				else
+					cmderr = TRUE;
+#else /* HAVE_WINDOWS_H */
+				cmderr = TRUE;
+#endif /* HAVE_WINDOWS_H */
+				break;
+			default :
+				cmderr = TRUE;
+			}
+			break;
+		case CMD_HELP :
+		default :
+			usage();
+			break;
+		case CMD_VERSION :
+			version();
 			break;
 		}
+
 		if (warnings)
 			printf("** %u %s signalled\n",warnings,
-				(warnings > 1 ? "warnings were" : "warning was"));
+				(warnings > 1 ? "warnings were"
+						: "warning was"));
 		if (errors)
 			printf("** %u %s found\n",errors,
 				(errors > 1 ? "errors were" : "error was"));
 		else
-			if (!cmderr)
-				printf("No errors were found\n");
+			if (fail)
+				printf("Command failed\n");
+			else
+				if (cmderr)
+					usage();
+				else
+					printf("No errors were found\n");
 		if (!isatty(1)) {
 			fflush(stdout);
 			if (warnings)
 				fprintf(stderr,"** %u %s signalled\n",warnings,
-					(warnings > 1 ? "warnings were" : "warning was"));
+					(warnings > 1 ? "warnings were"
+							: "warning was"));
 			if (errors)
 				fprintf(stderr,"** %u %s found\n",errors,
-					(errors > 1 ? "errors were" : "error was"));
+					(errors > 1 ? "errors were"
+							: "error was"));
 			else
-				if (!cmderr)
-					fprintf(stderr,"No errors were found\n");
+				fprintf(stderr,"No errors were found\n");
 		}
+		if (split[0])
+			free(split[0]);
+		if (split[1])
+			free(split[1]);
+		if (uname)
+			free(uname);
 		freeblocks();
 	} else
-		cmderr = TRUE;
-	dumpalloc("termination");
+		usage();
 	if (cmderr || errors)
 		exit(1);
 	return (0);
 }
-
-#endif

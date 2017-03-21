@@ -173,7 +173,7 @@ struct POSIX_SECURITY {
 	int defcnt;
 	int firstdef;
 	u16 tagsset;
-	s32 alignment[0];
+	u16 filler;
 	struct POSIX_ACL acl;
 } ;
         
@@ -256,7 +256,9 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *dir_ni, BOOL fordir);
 int ntfs_open_secure(ntfs_volume *vol);
-void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
+int ntfs_close_secure(ntfs_volume *vol);
+
+void ntfs_destroy_security_context(struct SECURITY_CONTEXT *scx);
 
 #if POSIXACLS
 

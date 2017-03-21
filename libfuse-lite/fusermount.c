@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <paths.h>
 
 #ifdef __SOLARIS__
 #include <sys/mnttab.h>

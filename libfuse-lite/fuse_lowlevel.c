@@ -22,6 +22,16 @@
 #include <limits.h>
 #include <errno.h>
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
+#endif
+
 #define PARAM(inarg) (((const char *)(inarg)) + sizeof(*(inarg)))
 #define OFFSET_MAX 0x7fffffffffffffffLL
 
@@ -561,10 +571,13 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 
     if (req->f->op.mknod) {
 #if defined(__SOLARIS__) && defined(_LP64)
-	/* Must unpack the device, as arg->rdev is limited to 32 bits */
+	/*
+	 * Must unpack the device, as arg->rdev is limited to 32 bits,
+	 * and must have the same format in 32-bit and 64-bit builds.
+	 */
 	req->f->op.mknod(req, nodeid, name, arg->mode,
-		makedev((arg->rdev >> 18) & 0x3ffff,
-			arg->rdev & 0x3fff));
+		makedev((arg->rdev >> 18) & 0x3fff,
+			arg->rdev & 0x3ffff));
 #else
 	req->f->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
 #endif
@@ -1090,6 +1103,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	if (arg->flags & FUSE_DONT_MASK)
 	    f->conn.capable |= FUSE_CAP_DONT_MASK;
+	if (arg->flags & FUSE_POSIX_ACL)
+	    f->conn.capable |= FUSE_CAP_POSIX_ACL;
 #endif
 	if (arg->flags & FUSE_BIG_WRITES)
 	    f->conn.capable |= FUSE_CAP_BIG_WRITES;
@@ -1130,6 +1145,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	    if (f->conn.want & FUSE_CAP_DONT_MASK)
 		outarg.flags |= FUSE_DONT_MASK;
+	    if (f->conn.want & FUSE_CAP_POSIX_ACL)
+		outarg.flags |= FUSE_POSIX_ACL;
 #endif
     } else {
 	/* Never use a version more recent than supported by the kernel */
@@ -1144,6 +1161,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 #ifdef POSIXACLS
 	    if (f->conn.want & FUSE_CAP_DONT_MASK)
 		outarg.flags |= FUSE_DONT_MASK;
+	    if (f->conn.want & FUSE_CAP_POSIX_ACL)
+		outarg.flags |= FUSE_POSIX_ACL;
 #endif
     	}
     }

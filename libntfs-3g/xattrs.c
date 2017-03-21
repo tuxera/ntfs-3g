@@ -23,8 +23,6 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_SETXATTR /* extended attributes support required */
-
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -82,10 +80,6 @@ struct LE_POSIX_ACL {
         
 #endif
 #endif
-
-static const char xattr_ntfs_3g[] = "ntfs-3g.";
-static const char nf_ns_user_prefix[] = "user.";
-static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
 
 static const char nf_ns_xattr_ntfs_acl[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
@@ -798,5 +792,3 @@ int ntfs_xattr_system_removexattr(struct SECURITY_CONTEXT *scx,
 	}
 	return (res);
 }
-
-#endif  /* HAVE_SETXATTR */

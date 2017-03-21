@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2008-2014 Jean-Pierre Andre
+ * Copyright (c) 2008-2016 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -37,11 +37,6 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
-
 #ifdef HAVE_SYS_SYSMACROS_H
 #include <sys/sysmacros.h>
 #endif
@@ -60,6 +55,7 @@
 #include "logging.h"
 #include "misc.h"
 #include "reparse.h"
+#include "xattrs.h"
 
 struct MOUNT_POINT_REPARSE_DATA {      /* reparse data for junctions */
 	le16	subst_name_offset;
@@ -448,8 +444,13 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 			 + (!le32_andz(reparse_attr->reparse_tag,
 			     IO_REPARSE_TAG_IS_MICROSOFT) ? 0 : sizeof(GUID))) == size);
 	if (ok) {
-		/* switch (reparse_attr->reparse_tag) { */
+		do {
 		if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_MOUNT_POINT)) {
+			if (size < sizeof(REPARSE_POINT) +
+				   sizeof(struct MOUNT_POINT_REPARSE_DATA)) {
+				ok = FALSE;
+				break;
+			}
 			mount_point_data = (const struct MOUNT_POINT_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
@@ -460,8 +461,13 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 				 + sizeof(struct MOUNT_POINT_REPARSE_DATA)
 				 + offs + lth)) > size))
 				ok = FALSE;
-		}
-		else if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_SYMLINK)) {
+			break;
+		} else if (le32_eq(reparse_attr->reparse_tag, IO_REPARSE_TAG_SYMLINK)) {
+			if (size < sizeof(REPARSE_POINT) +
+				   sizeof(struct SYMLINK_REPARSE_DATA)) {
+				ok = FALSE;
+				break;
+			}
 			symlink_data = (const struct SYMLINK_REPARSE_DATA*)
 						reparse_attr->reparse_data;
 			offs = le16_to_cpu(symlink_data->subst_name_offset);
@@ -470,10 +476,10 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 				 + sizeof(struct SYMLINK_REPARSE_DATA)
 				 + offs + lth)) > size)
 				ok = FALSE;
-		}
-		else {
-			/* break; */
-		}
+			break;
+		} else {
+			break;
+		} } while(0);
 	}
 	if (!ok)
 		errno = EINVAL;
@@ -718,8 +724,7 @@ static char *ntfs_get_rellink(ntfs_inode *ni, ntfschar *junction, int count)
  *			symbolic link or directory junction
  */
 
-char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
-			int *pattr_size)
+char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point)
 {
 	s64 attr_size = 0;
 	char *target;
@@ -814,7 +819,6 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
 		}
 		free(reparse_attr);
 	}
-	*pattr_size = attr_size;
 	if (bad)
 		errno = EOPNOTSUPP;
 	return (target);
@@ -849,7 +853,6 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 	return (possible);
 }
 
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 
 /*
  *			Set the index for new reparse data
@@ -888,7 +891,6 @@ static int set_reparse_index(ntfs_inode *ni, ntfs_index_context *xr,
 	return (ntfs_ie_add(xr,(INDEX_ENTRY*)&indx));
 }
 
-#endif /* HAVE_SETXATTR */
 
 /*
  *		Remove a reparse data index entry if attribute present
@@ -965,7 +967,6 @@ static ntfs_index_context *open_reparse_index(ntfs_volume *vol)
 	return (xr);
 }
 
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 
 /*
  *		Update the reparse data and index
@@ -1031,7 +1032,6 @@ static int update_reparse_data(ntfs_inode *ni, ntfs_index_context *xr,
 	return (res);
 }
 
-#endif /* HAVE_SETXATTR */
 
 /*
  *		Delete a reparse index entry
@@ -1070,7 +1070,6 @@ int ntfs_delete_reparse_index(ntfs_inode *ni)
 	return (res);
 }
 
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 
 /*
  *		Get the ntfs reparse data into an extended attribute
@@ -1255,4 +1254,31 @@ int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 	return (res ? -1 : 0);
 }
 
-#endif /* HAVE_SETXATTR */
+
+/*
+ *		Get the reparse data into a buffer
+ *
+ *	Returns the buffer if the reparse data exists and is valid
+ *		NULL otherwise (with errno set according to the cause).
+ *	When a buffer is returned, it has to be freed by caller.
+ */
+
+REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni)
+{
+	s64 attr_size = 0;
+	REPARSE_POINT *reparse_attr;
+
+	reparse_attr = (REPARSE_POINT*)NULL;
+	if (ni) {
+		reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
+			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
+		if (reparse_attr
+		    && !valid_reparse_data(ni, reparse_attr, attr_size)) {
+			free(reparse_attr);
+			reparse_attr = (REPARSE_POINT*)NULL;
+			errno = ENOENT;
+		}
+	} else
+		errno = EINVAL;
+	return (reparse_attr);
+}

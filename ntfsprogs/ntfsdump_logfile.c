@@ -319,7 +319,7 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array size is "
 				"wrong.  Cannot handle this yet.\n");
-	if (le16_to_cpu(rstr->usa_ofs) < sizeof(RESTART_PAGE_HEADER))
+	if (le16_to_cpu(rstr->usa_ofs) < offsetof(RESTART_PAGE_HEADER, usn))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array overlaps "
 				"restart page header.  Cannot handle this "
@@ -557,17 +557,17 @@ static void dump_log_record(LOG_RECORD *lr)
 			(unsigned int)le32_to_cpu(lr->record_type));
 	ntfs_log_info("transaction_id = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->transaction_id));
-	ntfs_log_info("flags = 0x%x:", le16_to_cpu(lr->flags));
-	if (le16_cmpz(lr->flags))
+	ntfs_log_info("flags = 0x%x:", le16_to_cpu(lr->log_record_flags));
+	if (le16_cmpz(lr->log_record_flags))
 		ntfs_log_info(" NONE\n");
 	else {
 		int _b = 0;
 
-		if (!le16_andz(lr->flags, LOG_RECORD_MULTI_PAGE)) {
+		if (!le16_andz(lr->log_record_flags, LOG_RECORD_MULTI_PAGE)) {
 			ntfs_log_info(" LOG_RECORD_MULTI_PAGE");
 			_b = 1;
 		}
-		if (!le16_andz(lr->flags, le16_not(LOG_RECORD_MULTI_PAGE))) {
+		if (!le16_andz(lr->log_record_flags, le16_not(LOG_RECORD_MULTI_PAGE))) {
 			if (_b)
 				ntfs_log_info(" |");
 			ntfs_log_info(" Unknown flags");
@@ -589,8 +589,8 @@ static void dump_log_record(LOG_RECORD *lr)
 	if (le16_to_cpu(lr->lcns_to_follow) > 0)
 		ntfs_log_info("Array of lcns:\n");
 	for (i = 0; i < le16_to_cpu(lr->lcns_to_follow); i++)
-		ntfs_log_info("lcn_list[%u].lcn = 0x%llx\n", i, (unsigned long long)
-				sle64_to_cpu(lr->lcn_list[i].lcn));
+		ntfs_log_info("lcn_list[%u].lcn = 0x%llx\n", i,
+			(unsigned long long)sle64_to_cpu(lr->lcn_list[i]));
 }
 
 /**
@@ -633,9 +633,9 @@ rcrd_pass_loc:
 	ntfs_log_info("page count = %i\n", le16_to_cpu(rcrd->page_count));
 	ntfs_log_info("page position = %i\n", le16_to_cpu(rcrd->page_position));
 	ntfs_log_info("header.next_record_offset = 0x%llx\n", (unsigned long long)
-			le16_to_cpu(rcrd->header.packed.next_record_offset));
+			le16_to_cpu(rcrd->next_record_offset));
 	ntfs_log_info("header.last_end_lsn = 0x%llx\n", (unsigned long long)
-			sle64_to_cpu(rcrd->header.packed.last_end_lsn));
+			sle64_to_cpu(rcrd->last_end_lsn));
 	/*
 	 * Where does the 0x40 come from? Is it just usa_offset +
 	 * usa_client * 2 + 7 & ~7 or is it derived from somewhere?
@@ -648,7 +648,7 @@ rcrd_pass_loc:
 		client++;
 		lr = (LOG_RECORD*)((u8*)lr + 0x70);
 	} while (((u8*)lr + 0x70 <= (u8*)rcrd +
-			le16_to_cpu(rcrd->header.packed.next_record_offset)));
+			le16_to_cpu(rcrd->next_record_offset)));
 
 	pass++;
 	goto rcrd_pass_loc;

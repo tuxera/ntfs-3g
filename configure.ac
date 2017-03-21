@@ -24,8 +24,8 @@
 
 # Autoconf
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[2016.2.22],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION="87"
+AC_INIT([ntfs-3g],[2017.2.15],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION="88"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
@@ -119,6 +119,14 @@ AC_ARG_ENABLE(
 	[AS_HELP_STRING([--enable-xattr-mappings],[enable system extended attributes mappings])],
 	,
 	[enable_xattr_mappings="no"]
+)
+
+AC_ARG_ENABLE(
+	[plugins],
+	[AS_HELP_STRING([--disable-plugins], [Disable external reparse point
+	 plugins for the ntfs-3g FUSE driver])],
+	[if test x${enableval} = "xyes"; then disable_plugins="no"; fi],
+	[disable_plugins="no"]
 )
 
 AC_ARG_ENABLE(
@@ -465,12 +473,13 @@ fi
 
 # Checks for header files.
 AC_HEADER_STDC
+AC_HEADER_MAJOR
 AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	mntent.h stddef.h stdint.h stdlib.h stdio.h stdarg.h string.h \
 	strings.h errno.h time.h unistd.h utime.h wchar.h getopt.h features.h \
 	regex.h endian.h byteswap.h sys/byteorder.h sys/disk.h sys/endian.h \
-	sys/param.h sys/ioctl.h sys/mkdev.h sys/mount.h sys/stat.h sys/types.h \
-	sys/vfs.h sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h \
+	sys/param.h sys/ioctl.h sys/mount.h sys/stat.h sys/types.h \
+	sys/vfs.h sys/statvfs.h linux/major.h linux/fd.h \
 	linux/fs.h inttypes.h linux/hdreg.h \
 	machine/endian.h windows.h syslog.h pwd.h malloc.h])
 
@@ -534,6 +543,16 @@ AC_CHECK_FUNCS([ \
 ])
 AC_SYS_LARGEFILE
 
+# The dlopen API might be in libc or in libdl.  Check libc first, then
+# fall back to libdl.
+LIBDL=""
+if test "x${disable_plugins}" = "xno"; then
+	AC_CHECK_LIB(c, dlopen, ,
+		[AC_CHECK_LIB(dl, dlopen, [LIBDL="-ldl"],
+			[AC_MSG_ERROR(["Unable to find libdl (required for external plugin support)"])])])
+fi
+AC_SUBST([LIBDL])
+
 if test "$GCC" = "yes" ; then
 	# We add -Wall to enable some compiler warnings.
 	CFLAGS="${CFLAGS} -Wall"
@@ -566,6 +585,7 @@ test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
 test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
 test "${enable_posix_acls}" != "no" && AC_DEFINE([POSIXACLS], [1], [POSIX ACL support])
 test "${enable_xattr_mappings}" != "no" && AC_DEFINE([XATTR_MAPPINGS], [1], [system extended attributes mappings])
+test "${disable_plugins}" != "no" && AC_DEFINE([DISABLE_PLUGINS], [1], [Define to 1 for disabling reparse plugins])
 
 test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"
@@ -617,6 +637,7 @@ AM_CONDITIONAL([ENABLE_NTFS_3G], [test "${enable_ntfs_3g}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" = "yes"])
 AM_CONDITIONAL([ENABLE_EXTRAS], [test "${enable_extras}" = "yes"])
 AM_CONDITIONAL([ENABLE_QUARANTINED], [test "${enable_quarantined}" = "yes"])
+AM_CONDITIONAL([DISABLE_PLUGINS], [test "${disable_plugins}" != "no"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then
@@ -658,11 +679,11 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfstruncate.8
 	ntfsprogs/ntfsfallocate.8
 	ntfsprogs/ntfsrecover.8
+	ntfsprogs/ntfsusermap.8
+	ntfsprogs/ntfssecaudit.8
 	src/Makefile
 	src/ntfs-3g.8
 	src/ntfs-3g.probe.8
-	src/ntfs-3g.usermap.8
-	src/ntfs-3g.secaudit.8
 ])
 AC_OUTPUT
 

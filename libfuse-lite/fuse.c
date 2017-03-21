@@ -1281,8 +1281,15 @@ static void reply_entry(fuse_req_t req, const struct fuse_entry_param *e,
 {
     if (!err) {
         struct fuse *f = req_fuse(req);
+#ifdef __SOLARIS__
+                     /* Skip forget for negative result */
+        if ((fuse_reply_entry(req, e) == -ENOENT)
+          && (e->ino != 0))
+            forget_node(f, e->ino, 1);
+#else /* __SOLARIS__ */
         if (fuse_reply_entry(req, e) == -ENOENT)
             forget_node(f, e->ino, 1);
+#endif
     } else
         reply_err(req, err);
 }
@@ -2081,9 +2088,7 @@ static void fuse_lib_opendir(fuse_req_t req, fuse_ino_t ino,
         }
     } else {
         reply_err(req, err);
-#ifndef __SOLARIS__
         pthread_mutex_destroy(&dh->lock);
-#endif /* ! __SOLARIS__ */
         free(dh);
     }
     free(path);
@@ -2901,7 +2906,7 @@ static void fuse_lib_help(void)
 "    -o direct_io           use direct I/O\n"
 "    -o kernel_cache        cache files in kernel\n"
 #ifdef __SOLARIS__
-"    -o [no]auto_cache      enable caching based on modification times\n"
+"    -o [no]auto_cache      enable caching based on modification times (off)\n"
 #endif /* __SOLARIS__ */
 "    -o umask=M             set file permissions (octal)\n"
 "    -o uid=N               set file owner\n"

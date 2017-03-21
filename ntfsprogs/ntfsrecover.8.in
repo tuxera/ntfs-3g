@@ -86,6 +86,13 @@ generated during several sessions.
 \fB\-h\fR, \fB\-\-help\fR
 Show some help information.
 .TP
+\fB\-k\fR, \fB\-\-kill\-fast\-restart\fR
+When Windows has been interrupted with fast restart mode activated,
+part of pending changes are kept in the Windows cache and only the same
+Windows version can recover them. This option can be used to apply the
+changes recorded in the log file and drop the ones in the Windows cache.
+This is dangerous and may cause loss of data.
+.TP
 \fB\-n\fR, \fB\-\-no-action\fR
 Do not apply any modification, useful when using the options -p, -s or -u.
 .TP

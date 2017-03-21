@@ -41,9 +41,6 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
-#ifdef HAVE_SETXATTR
-#include <sys/xattr.h>
-#endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -64,6 +61,7 @@
 #include "acls.h"
 #include "cache.h"
 #include "misc.h"
+#include "xattrs.h"
 
 /*
  *	JPA NTFS constants or structs
@@ -525,8 +523,7 @@ static int entersecurity_data(ntfs_volume *vol,
 			 */
 			res = ntfs_attr_shrink_size(vol->secure_ni,STREAM_SDS,
 				4, offs - gap + ALIGN_SDS_BLOCK + fullsz);
-		}
-		else
+		} else
 			errno = ENOSPC;
 		free(fullattr);
 	} else
@@ -3063,7 +3060,6 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni)
 	return (allowed);
 }
 
-#ifdef HAVE_SETXATTR    /* extended attributes interface required */
 
 #if POSIXACLS
 
@@ -3242,7 +3238,6 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 	return (res ? -1 : 0);
 }
 
-#endif /* HAVE_SETXATTR */
 
 /*
  *		Set new permissions to a file
@@ -4383,7 +4378,6 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path,
 	return (!scx->mapping[MAPUSERS] || link_group_members(scx));
 }
 
-#ifdef HAVE_SETXATTR    /* extended attributes interface required */
 
 /*
  *		Get the ntfs attribute into an extended attribute
@@ -4469,58 +4463,83 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 	return (res ? -1 : 0);
 }
 
-#endif /* HAVE_SETXATTR */
 
 /*
- *	Open $Secure once for all
- *	returns zero if it succeeds
- *		non-zero if it fails. This is not an error (on NTFS v1.x)
+ *	Open the volume's security descriptor index ($Secure)
+ *
+ *	returns  0 if it succeeds
+ *		-1 with errno set if it fails and the volume is NTFS v3.0+
  */
-
-
 int ntfs_open_secure(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
-	int res;
+	ntfs_index_context *sii;
+	ntfs_index_context *sdh;
 
-	res = -1;
-	vol->secure_ni = (ntfs_inode*)NULL;
-	vol->secure_xsii = (ntfs_index_context*)NULL;
-	vol->secure_xsdh = (ntfs_index_context*)NULL;
-	if (vol->major_ver >= 3) {
-			/* make sure this is a genuine $Secure inode 9 */
-		ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
-		if (ni && (ni->mft_no == 9)) {
-			vol->secure_reentry = 0;
-			vol->secure_xsii = ntfs_index_ctx_get(ni,
-						sii_stream, 4);
-			vol->secure_xsdh = ntfs_index_ctx_get(ni,
-						sdh_stream, 4);
-			if (ni && vol->secure_xsii && vol->secure_xsdh) {
-				vol->secure_ni = ni;
-				res = 0;
-			}
-		}
+	if (vol->secure_ni) /* Already open? */
+		return 0;
+
+	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
+	if (!ni)
+		goto err;
+
+	if (ni->mft_no != FILE_Secure) {
+		ntfs_log_error("$Secure does not have expected inode number!");
+		errno = EINVAL;
+		goto err_close_ni;
 	}
-	return (res);
+
+	/* Allocate the needed index contexts. */
+	sii = ntfs_index_ctx_get(ni, sii_stream, 4);
+	if (!sii)
+		goto err_close_ni;
+
+	sdh = ntfs_index_ctx_get(ni, sdh_stream, 4);
+	if (!sdh)
+		goto err_close_sii;
+
+	vol->secure_xsdh = sdh;
+	vol->secure_xsii = sii;
+	vol->secure_ni = ni;
+	return 0;
+
+err_close_sii:
+	ntfs_index_ctx_put(sii);
+err_close_ni:
+	ntfs_inode_close(ni);
+err:
+	/* Failing on NTFS pre-v3.0 is expected. */
+	if (vol->major_ver < 3)
+		return 0;
+	ntfs_log_perror("Failed to open $Secure");
+	return -1;
 }
 
 /*
- *		Final cleaning
+ *	Close the volume's security descriptor index ($Secure)
+ *
+ *	returns  0 if it succeeds
+ *		-1 with errno set if it fails
+ */
+int ntfs_close_secure(ntfs_volume *vol)
+{
+	int res = 0;
+
+	if (vol->secure_ni) {
+		ntfs_index_ctx_put(vol->secure_xsdh);
+		ntfs_index_ctx_put(vol->secure_xsii);
+		res = ntfs_inode_close(vol->secure_ni);
+		vol->secure_ni = NULL;
+	}
+	return res;
+}
+
+/*
+ *		Destroy a security context
  *	Allocated memory is freed to facilitate the detection of memory leaks
  */
-
-void ntfs_close_secure(struct SECURITY_CONTEXT *scx)
+void ntfs_destroy_security_context(struct SECURITY_CONTEXT *scx)
 {
-	ntfs_volume *vol;
-
-	vol = scx->vol;
-	if (vol->secure_ni) {
-		ntfs_index_ctx_put(vol->secure_xsii);
-		ntfs_index_ctx_put(vol->secure_xsdh);
-		ntfs_inode_close(vol->secure_ni);
-		
-	}
 	ntfs_free_mapping(scx->mapping);
 	free_caches(scx);
 }
@@ -5339,7 +5358,6 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				scx->vol->secure_flags = 0;
 					/* accept no mapping and no $Secure */
 				ntfs_build_mapping(scx,(const char*)NULL,TRUE);
-				ntfs_open_secure(vol);
 			} else {
 				if (scapi)
 					free(scapi);
@@ -5371,7 +5389,7 @@ BOOL ntfs_leave_file_security(struct SECURITY_API *scapi)
 	ok = FALSE;
 	if (scapi && (scapi->magic == MAGIC_API) && scapi->security.vol) {
 		vol = scapi->security.vol;
-		ntfs_close_secure(&scapi->security);
+		ntfs_destroy_security_context(&scapi->security);
 		free(scapi);
  		if (!ntfs_umount(vol, 0))
 			ok = TRUE;

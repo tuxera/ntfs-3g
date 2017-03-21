@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2015 Jean-Pierre Andre
+ * Copyright (c) 2010-2016 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -28,6 +28,10 @@
 #include <stdlib.h>
 #endif
 
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
@@ -43,9 +47,13 @@
 #include <getopt.h>
 #include <fuse.h>
 
+#include "compat.h"
 #include "inode.h"
+#include "dir.h"
 #include "security.h"
 #include "xattrs.h"
+#include "reparse.h"
+#include "plugin.h"
 #include "ntfs-3g_common.h"
 #include "realpath.h"
 #include "misc.h"
@@ -747,6 +755,172 @@ int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
 	}
 exit :
 	return (ret);
+}
+
+#endif /* HAVE_SETXATTR */
+
+#ifndef DISABLE_PLUGINS
+
+int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
+				const plugin_operations_t *ops, void *handle)
+{
+	plugin_list_t *plugin;
+	int res;
+
+	res = -1;
+	plugin = (plugin_list_t*)ntfs_malloc(sizeof(plugin_list_t));
+	if (plugin) {
+		plugin->tag = tag;
+		plugin->ops = ops;
+		plugin->handle = handle;
+		plugin->next = ctx->plugins;
+		ctx->plugins = plugin;
+		res = 0;
+	}
+	return (res);
+}
+
+/*
+ *		Get the reparse operations associated to an inode
+ *
+ *	The plugin able to process the reparse point is dynamically loaded
+ *
+ *	When successful, returns the operations vector and the reparse
+ *		data if requested,
+ *	Otherwise returns NULL, with errno set.
+ */
+
+const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
+				ntfs_inode *ni, REPARSE_POINT **reparse_wanted)
+{
+	const struct plugin_operations *ops;
+	void *handle;
+	REPARSE_POINT *reparse;
+	le32 tag;
+	plugin_list_t *plugin;
+	plugin_init_t pinit;
+
+	ops = (struct plugin_operations*)NULL;
+	reparse = ntfs_get_reparse_point(ni);
+	if (reparse) {
+		tag = reparse->reparse_tag;
+		for (plugin=ctx->plugins; plugin && !le32_eq(plugin->tag, tag);
+						plugin = plugin->next) { }
+		if (plugin) {
+			ops = plugin->ops;
+		} else {
+#ifdef PLUGIN_DIR
+			char name[sizeof(PLUGIN_DIR) + 64];
+
+			snprintf(name,sizeof(name), PLUGIN_DIR
+					"/ntfs-plugin-%08lx.so",
+					(long)le32_to_cpu(tag));
+#else
+			char name[64];
+
+			snprintf(name,sizeof(name), "ntfs-plugin-%08lx.so",
+					(long)le32_to_cpu(tag));
+#endif
+			handle = dlopen(name, RTLD_LAZY);
+			if (handle) {
+				pinit = (plugin_init_t)dlsym(handle, "init");
+				if (pinit) {
+				/* pinit() should set errno if it fails */
+					ops = (*pinit)(tag);
+					if (ops && register_reparse_plugin(ctx,
+							tag, ops, handle))
+						ops = (struct plugin_operations*)NULL;
+				} else
+					errno = ELIBBAD;
+				if (!ops)
+					dlclose(handle);
+			} else {
+				if (!(ctx->errors_logged & ERR_PLUGIN)) {
+					ntfs_log_perror(
+						"Could not load plugin %s",
+						name);
+					ntfs_log_error("Hint %s\n",dlerror());
+				}
+				ctx->errors_logged |= ERR_PLUGIN;
+			}
+		}
+		if (ops && reparse_wanted)
+			*reparse_wanted = reparse;
+		else
+			free(reparse);
+	}
+	return (ops);
+}
+
+void close_reparse_plugins(ntfs_fuse_context_t *ctx)
+{
+	while (ctx->plugins) {
+		plugin_list_t *next;
+
+		next = ctx->plugins->next;
+		if (ctx->plugins->handle)
+			dlclose(ctx->plugins->handle);
+		free(ctx->plugins);
+		ctx->plugins = next;
+	}
+}
+
+#endif /* DISABLE_PLUGINS */
+
+#ifdef HAVE_SETXATTR
+
+/*
+ *		Check whether a user xattr is allowed
+ *
+ *	The inode must be a plain file or a directory. The only allowed
+ *	metadata file is the root directory (useful for MacOSX and hopefully
+ *	does not harm Windows).
+ */
+
+BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx __attribute__((unused)),
+			ntfs_inode *ni)
+{
+	u32 dt_type;
+	BOOL res;
+
+		/* Quick return for common cases and root */
+	if (le32_andz(ni->flags, le32_or(FILE_ATTR_SYSTEM, FILE_ATTR_REPARSE_POINT))
+	    || (ni->mft_no == FILE_root))
+		res = TRUE;
+	else {
+			/* Reparse point depends on kind, see plugin */
+		if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
+#ifndef DISABLE_PLUGINS
+			struct stat stbuf;
+			REPARSE_POINT *reparse;
+			const plugin_operations_t *ops;
+
+			res = FALSE; /* default for error cases */
+			ops = select_reparse_plugin(ctx, ni, &reparse);
+			if (ops) {
+				if (ops->getattr
+				    && !ops->getattr(ni,reparse,&stbuf)) {
+					res = S_ISREG(stbuf.st_mode)
+						    || S_ISDIR(stbuf.st_mode);
+				}
+				free(reparse);
+			}
+#else /* DISABLE_PLUGINS */
+			res = FALSE; /* mountpoints, symlinks, ... */
+#endif /* DISABLE_PLUGINS */
+		} else {
+				/* Metadata */
+			if (ni->mft_no < FILE_first_user)
+				res = FALSE;
+			else {
+				/* Interix types */
+				dt_type = ntfs_interix_types(ni);
+				res = (dt_type == NTFS_DT_REG)
+					|| (dt_type == NTFS_DT_DIR);
+			}
+		}
+	}
+	return (res);
 }
 
 #endif /* HAVE_SETXATTR */

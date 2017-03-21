@@ -1,11 +1,11 @@
-.\" Copyright (c) 2007-2009 Jean-Pierre André.
+.\" Copyright (c) 2007-2016 Jean-Pierre André.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G.SECAUDIT 8 "February 2010" "ntfs-3g.secaudit 1.4.1"
+.TH NTFSSECAUDIT 8 "February 2010" "ntfssecaudit 1.5.0"
 .SH NAME
-ntfs-3g.secaudit \- NTFS Security Data Auditing
+ntfssecaudit \- NTFS Security Data Auditing
 .SH SYNOPSIS
-.B ntfs-3g.secaudit
+.B ntfssecaudit
 \fB[\fIoptions\fP\fB]\fR
 .I args
 .PP
@@ -39,7 +39,7 @@ and args define the parameters and the set of files acted upon.
 .PP
 Typing secaudit with no args will display a summary of available options.
 .SH DESCRIPTION
-\fBntfs-3g.secaudit\fR
+\fBntfssecaudit\fR
 displays the ownership and permissions of a set of files on an NTFS
 file system, and checks their consistency. It can be started in terminal
 mode only (no graphical user interface is available.)
@@ -53,7 +53,7 @@ of information. It is therefore advisable to redirect the output to
 a file or pipe it to a text editor for examination.
 .SH OPTIONS
 Below are the valid combinations of options and arguments that
-\fBntfs-3g.secaudit\fR accepts. All the indicated arguments are
+\fBntfssecaudit\fR accepts. All the indicated arguments are
 mandatory and must be unique (if wildcards are used, they must
 resolve to a single name.)
 .TP
@@ -135,25 +135,25 @@ Example : "\fBu::7,g::5,o:0,u:510:rwx,g:500:5,d:u:510:7\fP"
 Audit the global security data on /dev/sda1
 .RS
 .sp
-.B ntfs-3g.secaudit -ar /dev/sda1
+.B ntfssecaudit -ar /dev/sda1
 .sp
 .RE
 Display the ownership and permissions parameters for files in directory
 /audio/music on device /dev/sda5, excluding sub-directories :
 .RS
 .sp
-.B ntfs-3g.secaudit /dev/sda5 /audio/music
+.B ntfssecaudit /dev/sda5 /audio/music
 .sp
 .RE
 Set all files in directory /audio/music on device /dev/sda5 as writeable
 by owner and read-only for everybody :
 .RS
 .sp
-.B ntfs-3g.secaudit -r /dev/sda5 644 /audio/music
+.B ntfssecaudit -r /dev/sda5 644 /audio/music
 .sp
 .RE
 .SH EXIT CODES
-.B ntfs-3g.secaudit
+.B ntfssecaudit
 exits with a value of 0 when no error was detected, and with a value
 of 1 when an error was detected.
 .SH KNOWN ISSUES
@@ -170,7 +170,7 @@ in detail. You can contact the
 development team on the ntfs\-3g\-devel@lists.sf.net
 address.
 .SH AUTHORS
-.B ntfs-3g.secaudit
+.B ntfssecaudit
 has been developed by Jean-Pierre André.
 .SH THANKS
 Several people made heroic efforts, often over five or more

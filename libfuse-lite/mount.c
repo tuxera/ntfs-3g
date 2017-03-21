@@ -350,7 +350,7 @@ static int receive_fd(int fd)
     }
 
     cmsg = CMSG_FIRSTHDR(&msg);
-    if (!cmsg->cmsg_type == SCM_RIGHTS) {
+    if (cmsg->cmsg_type != SCM_RIGHTS) {
         fprintf(stderr, "got control message of unknown type %d\n",
                 cmsg->cmsg_type);
         return -1;
@@ -380,10 +380,13 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
            then the filesystem is already unmounted */
         if (res == 1 && (pfd.revents & POLLERR))
             return;
+              /*
+               * Need to close file descriptor, otherwise synchronous umount
+               * would recurse into filesystem, and deadlock.
+               */
+        close(fd);
     }
 #ifndef __SOLARIS__
-    close(fd);
-
     fusermount(1, 0, 1, "", mountpoint);
 #else /* __SOLARIS__ */
     if (geteuid() == 0) {

@@ -299,8 +299,9 @@ static int set_new_serial(ntfs_volume *vol)
 			serial_number = cpu_to_le64(sn);
 		}
 		if (!change_serial(vol, 0, serial_number, bs, oldbs)) {
-			number_of_sectors = sle64_to_cpu(bs->number_of_sectors);
-			if (!change_serial(vol, number_of_sectors,
+			number_of_sectors = ntfs_device_size_get(vol->dev,
+						vol->sector_size);
+			if (!change_serial(vol, number_of_sectors - 1,
 						serial_number, bs, oldbs)) {
 				ntfs_log_info("New serial number : %016llx\n",
 					(long long)le64_to_cpu(

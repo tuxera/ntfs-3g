@@ -412,16 +412,23 @@ static const char *reparse_type_name(le32 tag)
 {
 	const char *name;
 
-	if (le32_eq(tag, IO_REPARSE_TAG_MOUNT_POINT))
+	do {
+	if (le32_eq(tag, IO_REPARSE_TAG_MOUNT_POINT)) {
 		name = " (mount point)";
-	else
-		if (le32_eq(tag, IO_REPARSE_TAG_SYMLINK))
-			name = " (symlink)";
-		else
-			if (le32_eq(tag, IO_REPARSE_TAG_WOF))
-				name = " (Wof compressed)";
-			else
-				name = "";
+		break;
+	} else if (le32_eq(tag, IO_REPARSE_TAG_SYMLINK)) {
+		name = " (symlink)";
+		break;
+	} else if (le32_eq(tag, IO_REPARSE_TAG_WOF)) {
+		name = " (Wof compressed)";
+		break;
+	} else if (le32_eq(tag, IO_REPARSE_TAG_DEDUP)) {
+		name = " (deduplicated)";
+		break;
+	} else {
+		name = "";
+		break;
+	} } while(0);
 	return (name);
 }
 

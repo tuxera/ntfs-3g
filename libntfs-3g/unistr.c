@@ -59,7 +59,11 @@
 #include "logging.h"
 #include "misc.h"
 
-#define NOREVBOM 0  /* JPA rejecting U+FFFE and U+FFFF, open to debate */
+#ifndef ALLOW_BROKEN_UNICODE
+/* Erik allowing broken UTF-16 surrogate pairs and U+FFFE and U+FFFF by default,
+ * open to debate. */
+#define ALLOW_BROKEN_UNICODE 1
+#endif /* !defined(ALLOW_BROKEN_UNICODE) */
 
 /*
  * IMPORTANT
@@ -139,14 +143,24 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
  * @name1_len:	length of first Unicode name to compare
  * @name2:	second Unicode name to compare
  * @name2_len:	length of second Unicode name to compare
- * @ic:		either CASE_SENSITIVE or IGNORE_CASE
- * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
- * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
+ * @ic:		either CASE_SENSITIVE or IGNORE_CASE (see below)
+ * @upcase:	upcase table
+ * @upcase_len:	upcase table size
  *
+ * If @ic is CASE_SENSITIVE, then the names are compared primarily ignoring
+ * case, but if the names are equal ignoring case, then they are compared
+ * case-sensitively.  As an example, "abc" would collate before "BCD" (since
+ * "abc" and "BCD" differ ignoring case and 'A' < 'B') but after "ABC" (since
+ * "ABC" and "abc" are equal ignoring case and 'A' < 'a').  This matches the
+ * collation order of filenames as indexed in NTFS directories.
+ *
+ * If @ic is IGNORE_CASE, then the names are only compared case-insensitively
+ * and are considered to match if and only if they are equal ignoring case.
+ *
+ * Returns:
  *  -1 if the first name collates before the second one,
- *   0 if the names match,
- *   1 if the second name collates before the first one, or
- *
+ *   0 if the names match, or
+ *   1 if the second name collates before the first one
  */
 int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
@@ -158,7 +172,7 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 	u16 u1, u2;
 
 #ifdef DEBUG
-	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
+	if (!name1 || !name2 || !upcase || !upcase_len) {
 		ntfs_log_debug("ntfs_names_collate received NULL pointer!\n");
 		exit(1);
 	}
@@ -201,9 +215,9 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 				return 1;
 		} else {
 			do {
-				u1 = c1 = le16_to_cpu(*name1);
+				u1 = le16_to_cpu(*name1);
 				name1++;
-				u2 = c2 = le16_to_cpu(*name2);
+				u2 = le16_to_cpu(*name2);
 				name2++;
 				if (u1 < upcase_len)
 					u1 = le16_to_cpu(upcase[u1]);
@@ -444,10 +458,15 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 */
  
 /* 
- * Return the amount of 8-bit elements in UTF-8 needed (without the terminating
- * null) to store a given UTF-16LE string.
+ * Return the number of bytes in UTF-8 needed (without the terminating null) to
+ * store the given UTF-16LE string.
  *
- * Return -1 with errno set if string has invalid byte sequence or too long.
+ * On error, -1 is returned, and errno is set to the error code. The following
+ * error codes can be expected:
+ *	EILSEQ		The input string is not valid UTF-16LE (only possible
+ *			if compiled without ALLOW_BROKEN_UNICODE).
+ *	ENAMETOOLONG	The length of the UTF-8 string in bytes (without the
+ *			terminating null) would exceed @outs_len.
  */
 static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_len)
 {
@@ -456,14 +475,28 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 	BOOL surrog;
 
 	surrog = FALSE;
-	for (i = 0; i < ins_len && !le16_cmpz(ins[i]); i++) {
+	for (i = 0; i < ins_len && !le16_cmpz(ins[i]) && count <= outs_len; i++) {
 		unsigned short c = le16_to_cpu(ins[i]);
 		if (surrog) {
 			if ((c >= 0xdc00) && (c < 0xe000)) {
 				surrog = FALSE;
 				count += 4;
-			} else 
+			} else {
+#if ALLOW_BROKEN_UNICODE
+				/* The first UTF-16 unit of a surrogate pair has
+				 * a value between 0xd800 and 0xdc00. It can be
+				 * encoded as an individual UTF-8 sequence if we
+				 * cannot combine it with the next UTF-16 unit
+				 * unit as a surrogate pair. */
+				surrog = FALSE;
+				count += 3;
+
+				--i;
+				continue;
+#else
 				goto fail;
+#endif /* ALLOW_BROKEN_UNICODE */
+			}
 		} else
 			if (c < 0x80)
 				count++;
@@ -473,21 +506,30 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 				count += 3;
 			else if (c < 0xdc00)
 				surrog = TRUE;
-#if NOREVBOM
-			else if ((c >= 0xe000) && (c < 0xfffe))
-#else
+#if ALLOW_BROKEN_UNICODE
+			else if (c < 0xe000)
+				count += 3;
 			else if (c >= 0xe000)
-#endif
+#else
+			else if ((c >= 0xe000) && (c < 0xfffe))
+#endif /* ALLOW_BROKEN_UNICODE */
 				count += 3;
 			else 
 				goto fail;
-		if (count > outs_len) {
-			errno = ENAMETOOLONG;
-			goto out;
-		}
 	}
-	if (surrog) 
+
+	if (surrog && count <= outs_len) {
+#if ALLOW_BROKEN_UNICODE
+		count += 3; /* ending with a single surrogate */
+#else
 		goto fail;
+#endif /* ALLOW_BROKEN_UNICODE */
+	}
+
+	if (count > outs_len) {
+		errno = ENAMETOOLONG;
+		goto out;
+	}
 
 	ret = count;
 out:
@@ -502,7 +544,7 @@ fail:
  * @ins:	input utf16 string buffer
  * @ins_len:	length of input string in utf16 characters
  * @outs:	on return contains the (allocated) output multibyte string
- * @outs_len:	length of output buffer in bytes
+ * @outs_len:	length of output buffer in bytes (ignored if *@outs is NULL)
  *
  * Return -1 with errno set if string has invalid byte sequence or too long.
  */
@@ -521,10 +563,16 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 	int halfpair;
 
 	halfpair = 0;
-	if (!*outs)
+	if (!*outs) {
+		/* If no output buffer was provided, we will allocate one and
+		 * limit its length to PATH_MAX.  Note: we follow the standard
+		 * convention of PATH_MAX including the terminating null. */
 		outs_len = PATH_MAX;
+	}
 
-	size = utf16_to_utf8_size(ins, ins_len, outs_len);
+	/* The size *with* the terminating null is limited to @outs_len,
+	 * so the size *without* the terminating null is limited to one less. */
+	size = utf16_to_utf8_size(ins, ins_len, outs_len - 1);
 
 	if (size < 0)
 		goto out;
@@ -548,8 +596,24 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0x80 + ((c >> 6) & 15) + ((halfpair & 3) << 4);
 				*t++ = 0x80 + (c & 63);
 				halfpair = 0;
-			} else 
+			} else {
+#if ALLOW_BROKEN_UNICODE
+				/* The first UTF-16 unit of a surrogate pair has
+				 * a value between 0xd800 and 0xdc00. It can be
+				 * encoded as an individual UTF-8 sequence if we
+				 * cannot combine it with the next UTF-16 unit
+				 * unit as a surrogate pair. */
+				*t++ = 0xe0 | (halfpair >> 12);
+				*t++ = 0x80 | ((halfpair >> 6) & 0x3f);
+				*t++ = 0x80 | (halfpair & 0x3f);
+				halfpair = 0;
+
+				--i;
+				continue;
+#else
 				goto fail;
+#endif /* ALLOW_BROKEN_UNICODE */
+			}
 		} else if (c < 0x80) {
 			*t++ = c;
 	    	} else {
@@ -562,6 +626,13 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 		        	*t++ = 0x80 | (c & 0x3f);
 			} else if (c < 0xdc00)
 				halfpair = c;
+#if ALLOW_BROKEN_UNICODE
+			else if (c < 0xe000) {
+				*t++ = 0xe0 | (c >> 12);
+				*t++ = 0x80 | ((c >> 6) & 0x3f);
+				*t++ = 0x80 | (c & 0x3f);
+			}
+#endif /* ALLOW_BROKEN_UNICODE */
 			else if (c >= 0xe000) {
 				*t++ = 0xe0 | (c >> 12);
 				*t++ = 0x80 | ((c >> 6) & 0x3f);
@@ -570,6 +641,13 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				goto fail;
 	        }
 	}
+#if ALLOW_BROKEN_UNICODE
+	if (halfpair) { /* ending with a single surrogate */
+		*t++ = 0xe0 | (halfpair >> 12);
+		*t++ = 0x80 | ((halfpair >> 6) & 0x3f);
+		*t++ = 0x80 | (halfpair & 0x3f);
+	}
+#endif /* ALLOW_BROKEN_UNICODE */
 	*t = '\0';
 	
 #if defined(__APPLE__) || defined(__DARWIN__)
@@ -691,15 +769,16 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 			    | ((u32)(s[1] & 0x3F) << 6)
 			    | ((u32)(s[2] & 0x3F));
 			/* Check valid ranges */
-#if NOREVBOM
+#if ALLOW_BROKEN_UNICODE
 			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
-			  || ((*wc >= 0xe000) && (*wc <= 0xFFFD)))
+			  || ((*wc >= 0xD800) && (*wc <= 0xDFFF))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFF)))
 				return 3;
 #else
 			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
-			  || ((*wc >= 0xe000) && (*wc <= 0xFFFF)))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFD)))
 				return 3;
-#endif
+#endif /* ALLOW_BROKEN_UNICODE */
 		}
 		goto fail;
 					/* four-byte */
@@ -804,7 +883,7 @@ fail:
  * @ins:	input Unicode string buffer
  * @ins_len:	length of input string in Unicode characters
  * @outs:	on return contains the (allocated) output multibyte string
- * @outs_len:	length of output buffer in bytes
+ * @outs_len:	length of output buffer in bytes (ignored if *@outs is NULL)
  *
  * Convert the input little endian, 2-byte Unicode string @ins, of length
  * @ins_len into the multibyte string format dictated by the current locale.
@@ -1236,7 +1315,8 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 		{ 0x3c2, 0x3c2,  0x0, 2, 6, 1 },
 		{ 0x3d7, 0x3d7, -0x8, 2, 6, 1 },
 		{ 0x515, 0x523, -0x1, 2, 6, 1 },
-		{ 0x1d79, 0x1d79, 0x8a04, 2, 6, 1 },
+			/* below, -0x75fc stands for 0x8a04 and truncation */
+		{ 0x1d79, 0x1d79, -0x75fc, 2, 6, 1 },
 		{ 0x1efb, 0x1eff, -0x1, 2, 6, 1 },
 		{ 0x1fc3, 0x1ff3,  0x9, 48, 6, 1 },
 		{ 0x1fcc, 0x1ffc,  0x0, 48, 6, 1 },
@@ -1397,10 +1477,14 @@ void ntfs_ucsfree(ntfschar *ucs)
  *		Check whether a name contains no chars forbidden
  *	for DOS or Win32 use
  *
+ *	If @strict is TRUE, then trailing dots and spaces are forbidden.
+ *	These names are technically allowed in the Win32 namespace, but
+ *	they can be problematic.  See comment for FILE_NAME_WIN32.
+ *
  *	If there is a bad char, errno is set to EINVAL
  */
 
-BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
+BOOL ntfs_forbidden_chars(const ntfschar *name, int len, BOOL strict)
 {
 	BOOL forbidden;
 	int ch;
@@ -1413,9 +1497,9 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('>' - 0x20))
 			| (1L << ('?' - 0x20));
 
-	forbidden = (len == 0)
-			|| le16_eq(name[len-1], const_cpu_to_le16(' '))
-			|| le16_eq(name[len-1], const_cpu_to_le16('.'));
+	forbidden = (len == 0) ||
+		    (strict && (le16_eq(name[len-1], const_cpu_to_le16(' ')) ||
+				le16_eq(name[len-1], const_cpu_to_le16('.'))));
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
 		if ((ch < 0x20)
@@ -1437,10 +1521,15 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
  *	The reserved names are CON, PRN, AUX, NUL, COM1..COM9, LPT1..LPT9
  *	with no suffix or any suffix.
  *
+ *	If @strict is TRUE, then trailing dots and spaces are forbidden.
+ *	These names are technically allowed in the Win32 namespace, but
+ *	they can be problematic.  See comment for FILE_NAME_WIN32.
+ *
  *	If the name is forbidden, errno is set to EINVAL
  */
 
-BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
+BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len,
+			  BOOL strict)
 {
 	BOOL forbidden;
 	int h;
@@ -1458,7 +1547,7 @@ BOOL ntfs_forbidden_names(ntfs_volume *vol, const ntfschar *name, int len)
 	static const ntfschar lpt[] = { const_cpu_to_le16('l'),
 			const_cpu_to_le16('p'), const_cpu_to_le16('t') };
 
-	forbidden = ntfs_forbidden_chars(name, len);
+	forbidden = ntfs_forbidden_chars(name, len, strict);
 	if (!forbidden && (len >= 3)) {
 		/*
 		 * Rough hash check to tell whether the first couple of chars

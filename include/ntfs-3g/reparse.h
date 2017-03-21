@@ -24,11 +24,13 @@
 #ifndef REPARSE_H
 #define REPARSE_H
 
-char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point,
-			int *pattr_size);
+char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point);
+
 BOOL ntfs_possible_symlink(ntfs_inode *ni);
 
 int ntfs_get_ntfs_reparse_data(ntfs_inode *ni, char *value, size_t size);
+
+REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni);
 
 int ntfs_set_ntfs_reparse_data(ntfs_inode *ni, const char *value,
 			size_t size, int flags);

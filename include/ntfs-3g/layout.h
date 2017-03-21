@@ -171,6 +171,12 @@ typedef enum {
 #define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
 
+/*
+ * The size of a logical sector in bytes, used as the sequence number stride for
+ * multi-sector transfers.  This is intended to be less than or equal to the
+ * physical sector size, since if this were greater than the physical sector
+ * size, then incomplete multi-sector transfers may not be detected.
+ */
 #define NTFS_BLOCK_SIZE		512
 #define NTFS_BLOCK_SIZE_BITS	9
 
@@ -545,16 +551,15 @@ typedef enum {
  * enum COLLATION_RULES - The collation rules for sorting views/indexes/etc
  * (32-bit).
  *
- * COLLATION_UNICODE_STRING - Collate Unicode strings by comparing their binary
- *	Unicode values, except that when a character can be uppercased, the
- *	upper case value collates before the lower case one.
- * COLLATION_FILE_NAME - Collate file names as Unicode strings. The collation
- *	is done very much like COLLATION_UNICODE_STRING. In fact I have no idea
- *	what the difference is. Perhaps the difference is that file names
- *	would treat some special characters in an odd way (see
- *	unistr.c::ntfs_collate_names() and unistr.c::legal_ansi_char_array[]
- *	for what I mean but COLLATION_UNICODE_STRING would not give any special
- *	treatment to any characters at all, but this is speculation.
+ * COLLATION_BINARY - Collate by binary compare where the first byte is most
+ *	significant.
+ * COLLATION_FILE_NAME - Collate Unicode strings by comparing their 16-bit
+ *	coding units, primarily ignoring case using the volume's $UpCase table,
+ *	but falling back to a case-sensitive comparison if the names are equal
+ *	ignoring case.
+ * COLLATION_UNICODE_STRING - TODO: this is not yet implemented and still needs
+ *	to be properly documented --- is it really the same as
+ *	COLLATION_FILE_NAME?
  * COLLATION_NTOFS_ULONG - Sorting is done according to ascending le32 key
  *	values. E.g. used for $SII index in FILE_Secure, which sorts by
  *	security_id (le32).
@@ -585,17 +590,9 @@ static const COLLATION_RULES
 #else
 typedef enum {
 #endif
-	COLLATION_BINARY	 = const_cpu_to_le32(0), /* Collate by binary
-					compare where the first byte is most
-					significant. */
-	COLLATION_FILE_NAME	 = const_cpu_to_le32(1), /* Collate file names
-					as Unicode strings. */
-	COLLATION_UNICODE_STRING = const_cpu_to_le32(2), /* Collate Unicode
-					strings by comparing their binary
-					Unicode values, except that when a
-					character can be uppercased, the upper
-					case value collates before the lower
-					case one. */
+	COLLATION_BINARY		= const_cpu_to_le32(0),
+	COLLATION_FILE_NAME		= const_cpu_to_le32(1),
+	COLLATION_UNICODE_STRING	= const_cpu_to_le32(2),
 	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(16),
 	COLLATION_NTOFS_SID		= const_cpu_to_le32(17),
 	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(18),
@@ -1141,12 +1138,17 @@ typedef enum {
 	FILE_NAME_WIN32			= 0x01,
 		/* The standard WinNT/2k NTFS long filenames. Case insensitive.
 		   All Unicode chars except: '\0', '"', '*', '/', ':', '<',
-		   '>', '?', '\' and '|'. Further, names cannot end with a '.'
-		   or a space. */
+		   '>', '?', '\' and '|'.  Trailing dots and spaces are allowed,
+		   even though on Windows a filename with such a suffix can only
+		   be created and accessed using a WinNT-style path, i.e.
+		   \\?\-prefixed.  (If a regular path is used, Windows will
+		   strip the trailing dots and spaces, which makes such
+		   filenames incompatible with most Windows software.) */
 	FILE_NAME_DOS			= 0x02,
 		/* The standard DOS filenames (8.3 format). Uppercase only.
 		   All 8-bit characters greater space, except: '"', '*', '+',
-		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'. */
+		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'.  Trailing
+		   dots and spaces are forbidden. */
 	FILE_NAME_WIN32_AND_DOS		= 0x03,
 		/* 3 means that both the Win32 and the DOS filenames are
 		   identical and hence have been saved in this single filename

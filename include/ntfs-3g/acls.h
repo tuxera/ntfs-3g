@@ -38,16 +38,6 @@
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
 
 /*
- *		Macro definitions needed to share code with secaudit
- */
-
-#define NTFS_FIND_USID(map,uid,buf) ntfs_find_usid(map,uid,buf)
-#define NTFS_FIND_GSID(map,gid,buf) ntfs_find_gsid(map,gid,buf)
-#define NTFS_FIND_USER(map,usid) ntfs_find_user(map,usid)
-#define NTFS_FIND_GROUP(map,gsid) ntfs_find_group(map,gsid)
-
-
-/*
  *		Matching of ntfs permissions to Linux permissions
  *	these constants are adapted to endianness
  *	when setting, set them all
@@ -102,10 +92,11 @@
 #define ROOT_GROUP_UNMARK FILE_READ_EA	/* ACL granted to root as group */
 
 /*
- *		A type large enough to hold any SID
+ *		Maximum SID size and a type large enough to hold it
  */
 
-typedef char BIGSID[40];
+#define MAX_SID_SIZE (8 + SID_MAX_SUB_AUTHORITIES*4)
+typedef char BIGSID[MAX_SID_SIZE];
 
 /*
  *		Struct to hold the input mapping file

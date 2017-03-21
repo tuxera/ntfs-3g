@@ -2,6 +2,7 @@
  * logfile.h - Exports for $LogFile handling.  Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2016      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -93,7 +94,8 @@ typedef struct {
 				   version is 1. */
 /* 28*/	sle16 major_ver;	/* Log file major version.  We only support
 				   version 1.1. */
-/* sizeof() = 30 (0x1e) bytes */
+/* 30*/	le16 usn;
+/* sizeof() = 32 (0x20) bytes */
 } __attribute__((__packed__)) RESTART_PAGE_HEADER;
 
 /*
@@ -101,8 +103,8 @@ typedef struct {
  * in this particular client array.  Also inside the client records themselves,
  * this means that there are no client records preceding or following this one.
  */
-#define LOGFILE_NO_CLIENT	const_cpu_to_le16(0xffff)
 #define LOGFILE_NO_CLIENT_CPU	0xffff
+#define LOGFILE_NO_CLIENT	const_cpu_to_le16(LOGFILE_NO_CLIENT_CPU)
 
 /*
  * These are the so far known RESTART_AREA_* flags (16-bit) which contain
@@ -329,17 +331,15 @@ typedef struct {
 	le32 flags;
 	le16 page_count;
 	le16 page_position;
-	union {
-		struct {
-			le16 next_record_offset;
-			u8 reserved[6];
-			leLSN last_end_lsn;
-		} __attribute__((__packed__)) packed;
-	} __attribute__((__packed__)) header;
+	le16 next_record_offset;
+	le16 reserved[3];
+	leLSN last_end_lsn;
 } __attribute__((__packed__)) RECORD_PAGE_HEADER;
 
 /**
  * enum LOG_RECORD_FLAGS - Possible 16-bit flags for log records.
+ *
+ *	Some flags describe what kind of update is being logged.
  *
  * (Or is it log record pages?)
  */
@@ -351,6 +351,9 @@ static const LOG_RECORD_FLAGS
 typedef enum {
 #endif
 	LOG_RECORD_MULTI_PAGE = const_cpu_to_le16(0x0001),	/* ??? */
+		/* The flags below were introduced in Windows 10 */
+	LOG_RECORD_DELETING =	const_cpu_to_le16(0x0002),
+	LOG_RECORD_ADDING =	const_cpu_to_le16(0x0004),
 #if !ENABLE_STRICT_ENDIANNESS_CHECKING
 	LOG_RECORD_SIZE_PLACE_HOLDER = 0xffff,
 		/* This has nothing to do with the log record. It is only so
@@ -368,6 +371,52 @@ typedef struct {
 	le16 client_index;
 } __attribute__((__packed__)) LOG_CLIENT_ID;
 
+/*
+ *	LOG_RECORD_TYPE : types of log records
+ */
+
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le32 LOG_RECORD_TYPE;
+
+static const LOG_RECORD_TYPE
+#else
+enum {
+#endif
+	LOG_STANDARD =		const_cpu_to_le32(1),
+	LOG_CHECKPOINT =	const_cpu_to_le32(2),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
+	LOG_RECORD_TYPE_PLACE_HOLDER = 0xffffffffU
+} ;
+typedef le32 LOG_RECORD_TYPE;
+#else
+	__LOG_RECORD_TYPE_end;
+#endif
+
+/*
+ *	ATTRIBUTE_FLAGS : flags describing the kind of NTFS record 
+ *	is being updated.
+ *	These flags were introduced in Vista, only two flags are known?
+ */
+
+#if ENABLE_STRICT_ENDIANNESS_CHECKING
+typedef le16 ATTRIBUTE_FLAGS;
+
+static const ATTRIBUTE_FLAGS
+#else
+enum {
+#endif
+	ACTS_ON_MFT =		const_cpu_to_le16(2),
+	ACTS_ON_INDX =		const_cpu_to_le16(8),
+#if !ENABLE_STRICT_ENDIANNESS_CHECKING
+	ATTRIBUTE_FLAGS_PLACE_HOLDER = 0xffff,
+} ;
+typedef le16 ATTRIBUTE_FLAGS;
+#else
+	__ATTRIBUTE_FLAGS_end;
+#endif
+
+#define LOG_RECORD_HEAD_SZ 0x30 /* size of header of struct LOG_RECORD */
+
 /**
  * struct LOG_RECORD - Log record header.
  *
@@ -379,31 +428,78 @@ typedef struct {
 	leLSN client_undo_next_lsn;
 	le32 client_data_length;
 	LOG_CLIENT_ID client_id;
-	le32 record_type;
+	LOG_RECORD_TYPE record_type;
 	le32 transaction_id;
-	le16 flags;
+	LOG_RECORD_FLAGS log_record_flags;
 	le16 reserved_or_alignment[3];
 /* Now are at ofs 0x30 into struct. */
 	le16 redo_operation;
 	le16 undo_operation;
 	le16 redo_offset;
 	le16 redo_length;
-	le16 undo_offset;
-	le16 undo_length;
-	le16 target_attribute;
-	le16 lcns_to_follow;		   /* Number of lcn_list entries
+	union {
+		struct {
+			le16 undo_offset;
+			le16 undo_length;
+			le16 target_attribute;
+			le16 lcns_to_follow;   /* Number of lcn_list entries
 					      following this entry. */
 /* Now at ofs 0x40. */
-	le16 record_offset;
-	le16 attribute_offset;
-	le32 alignment_or_reserved;
-	leVCN target_vcn;
+			le16 record_offset;
+			le16 attribute_offset;
+			le16 cluster_index;
+			ATTRIBUTE_FLAGS attribute_flags;
+			leVCN target_vcn;
 /* Now at ofs 0x50. */
-	struct {			   /* Only present if lcns_to_follow
-					      is not 0. */
-		leLCN lcn;
-	} __attribute__((__packed__)) lcn_list[0];
+			leLCN lcn_list[0]; /* Only present if lcns_to_follow
+						is not 0. */
+		} __attribute__((__packed__));
+		struct {
+			leLSN transaction_lsn;
+			leLSN attributes_lsn;
+			leLSN names_lsn;
+			leLSN dirty_pages_lsn;
+			le64 unknown_list[0];
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
 } __attribute__((__packed__)) LOG_RECORD;
+
+/**
+ * struct BITMAP_ACTION - Bitmap change being logged
+ */
+
+struct BITMAP_ACTION {
+	le32 firstbit;
+	le32 count;
+} ;
+
+/**
+ * struct ATTR - Attribute record.
+ *
+ *	The format of an attribute record has changed from Windows 10.
+ *	The old format was 44 bytes long, despite having 8 bytes fields,
+ *	and this leads to alignment problems in arrays.
+ *	This problem does not occur in the new format, which is shorter.
+ *	The format being used can generally be determined from size.
+ */
+typedef struct {	/* Format up to Win10 (44 bytes) */
+	le64 unknown1;
+	le64 unknown2;
+	le64 inode;
+	leLSN lsn;
+	le32 unknown3;
+	le32 type;
+	le32 unknown4;
+} __attribute__((__packed__)) ATTR_OLD;
+
+typedef struct {	/* Format since Win10 (40 bytes) */
+	le64 unknown1;
+	le64 unknown2;
+	le32 type;
+	le32 unknown3;
+	le64 inode;
+	leLSN lsn;
+} __attribute__((__packed__)) ATTR_NEW;
 
 extern BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp);
 extern BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp);

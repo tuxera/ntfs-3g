@@ -60,6 +60,7 @@ typedef struct _ntfs_volume ntfs_volume;
 enum {
 	NTFS_MNT_NONE                   = 0x00000000,
 	NTFS_MNT_RDONLY                 = 0x00000001,
+	NTFS_MNT_MAY_RDONLY             = 0x02000000, /* Allow fallback to ro */
 	NTFS_MNT_FORENSIC               = 0x04000000, /* No modification during
 	                                               * mount. */
 	NTFS_MNT_EXCLUSIVE              = 0x08000000,
