@@ -359,7 +359,7 @@ static int clear_sparse(ntfs_attr *na, const char *name)
 			ctx->attr->data_size = cpu_to_sle64(na->data_size);
 			ctx->attr->initialized_size
 					= cpu_to_sle64(na->initialized_size);
-			ctx->attr->flags = cpu_to_le16(na->data_flags);
+			ctx->attr->flags = na->data_flags;
 			ctx->attr->compression_unit = 0;
 			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			NInoFileNameSetDirty(na->ni);

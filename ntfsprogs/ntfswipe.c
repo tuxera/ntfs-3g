@@ -403,6 +403,10 @@ static int parse_options(int argc, char *argv[])
 		}
 	}
 
+	if (opts.bytes && opts.undel) {
+		ntfs_log_error("Options --bytes and --undel are not compatible.\n");
+		err++;
+	}
 	/* Make sure we're in sync with the log levels */
 	levels = ntfs_log_get_levels();
 	if (levels & NTFS_LOG_LEVEL_VERBOSE)
@@ -1661,12 +1665,12 @@ static void fill_buffer (
 		/* For other passes, one of the fixed patterns is selected. */
 		do {
 #if (!defined __STRICT_ANSI__) && (defined HAVE_RANDOM)
-			i = (size_t)(random() % NPAT);
+			i = (size_t)random() % NPAT;
 #else
-			i = (size_t)(rand() % NPAT);
+			i = (size_t)rand() % NPAT;
 #endif
 		} while (selected[i] == 1);
-		bits = 	opts.bytes[i];
+		bits = 	patterns[i];
 		selected[i] = 1;
     	}
 
@@ -2123,6 +2127,9 @@ static void print_summary(void)
 			ntfs_log_quiet("0x%02x ", opts.bytes[i]);
 	}
 	ntfs_log_quiet("\n");
+	if (opts.undel)
+		ntfs_log_quiet("(however undelete data will be overwritten"
+			" by random values)\n");
 
 	if (opts.count > 1)
 		ntfs_log_quiet("%s will repeat these operations %d times.\n", EXEC_NAME, opts.count);

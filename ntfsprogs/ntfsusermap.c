@@ -237,7 +237,7 @@ static boolean close_volume(const char *volume)
 {
 	boolean r;
 
-	r = ntfs_leave_file_security(ntfs_context);
+	r = ntfs_leave_file_security(ntfs_context) ? AGREED : DENIED;
 	if (r)
 		fprintf(stderr,"\"%s\" closed\n",volume);
 	else

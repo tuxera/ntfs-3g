@@ -35,7 +35,9 @@ the unused space. BYTE-LIST is a comma-separated list of values in
 range 0-255 expressed in octal, decimal or hexadecimal base.
 .TP
 \fB\-c\fR, \fB\-\-count\fR NUM
-Define the number of times the unused space is to be overwritten.
+Define the number of times the unused space is to be overwritten. If both
+options \fB\-\-bytes\fR and \fB\-\-count\fR are set, the space is
+repeatedly overwritten this number of times by each of the values in the list.
 .TP
 \fB\-d\fR, \fB\-\-directory\fR
 Wipe all the directory indexes, which may contain names of deleted files.
@@ -68,7 +70,9 @@ Suppress some debug/warning/error messages.
 .TP
 \fB\-s\fR, \fB\-\-undel\fR
 Overwrite the space which had been allocated to a file which has been deleted
-recently and is still undeletable.
+recently and is still undeletable. This option is not compatible with
+\fB\-\-bytes\fR and the replacement bytes are random ones or taken from a
+standard list.
 .TP
 \fB\-t\fR, \fB\-\-tails\fR
 Overwrite the space at the end of files which is unused, but allocated
