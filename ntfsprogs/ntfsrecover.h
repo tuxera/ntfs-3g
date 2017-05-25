@@ -74,6 +74,7 @@ enum ACTIONS {
 
 struct BUFFER {
 	unsigned int num;
+	unsigned int rnum;
 	unsigned int size;
 	unsigned int headsz;
 	BOOL safe;

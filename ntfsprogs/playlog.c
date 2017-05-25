@@ -1,7 +1,7 @@
 /*
  *		Redo or undo a list of logged actions
  *
- * Copyright (c) 2014-2016 Jean-Pierre Andre
+ * Copyright (c) 2014-2017 Jean-Pierre Andre
  *
  */
 
@@ -229,7 +229,7 @@ static int sanity_indx_list(const char *buffer, u32 k, u32 end)
 
 	err = 0;
 	done = FALSE;
-	while ((k <= end) && !done) {
+	while ((k <= end) && !done && !err) {
 		lth = getle16(buffer,k+8);
 		if (optv > 1)
 			/* Usual indexes can be determined from size */
@@ -270,9 +270,20 @@ static int sanity_indx_list(const char *buffer, u32 k, u32 end)
 					(long long)getle64(buffer,k),
 					(int)lth,
 					(int)getle16(buffer,k+12),(int)k);
+				if ((lth < 80) || (lth & 7)) {
+					printf("** Invalid index record"
+						" length %d\n",lth);
+					err = 1;
+				}
 			}
 		done = (feedle16(buffer,k+12) & INDEX_ENTRY_END) || !lth;
-	   	k += lth;
+		if (lth & 7) {
+			if (optv <= 1) /* Do not repeat the warning */
+				printf("** Invalid index record length %d\n",
+								lth);
+			err = 1;
+		} else
+	   		k += lth;
    	}
 	if (k != end) {
 		printf("** Bad index record length %ld (computed %ld)\n",

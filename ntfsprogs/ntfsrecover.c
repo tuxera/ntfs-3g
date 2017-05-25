@@ -1,7 +1,7 @@
 /*
  *		Process log data from an NTFS partition
  *
- * Copyright (c) 2012-2016 Jean-Pierre Andre
+ * Copyright (c) 2012-2017 Jean-Pierre Andre
  *
  *	This program examines the Windows log file of an ntfs partition
  *	and plays the committed transactions in order to restore the
@@ -43,6 +43,7 @@
  */
 
 #define BASEBLKS 4 /* number of special blocks (always shown) */
+#define BASEBLKS2 34 /* number of special blocks when version >= 2.0 */
 #define RSTBLKS 2 /* number of restart blocks */
 #define BUFFERCNT 64 /* number of block buffers - a power of 2 */
 #define NTFSBLKLTH 512 /* usa block size */
@@ -122,6 +123,7 @@ u32 clustersz = 0;
 int clusterbits;
 u32 blocksz;
 int blockbits;
+int log_major;
 u16 bytespersect;
 u64 mftlcn;
 u32 mftrecsz;
@@ -136,6 +138,7 @@ u64 committed_lsn;
 u64 synced_lsn;
 u64 latest_lsn;
 u64 restart_lsn;
+u64 offset_mask; /* block number in an lsn */
 unsigned long firstblk; /* first block to dump (option -r) */
 unsigned long lastblk;  /* last block to dump (option -r) */
 u64 firstlcn; /* first block to dump (option -c) */
@@ -164,6 +167,7 @@ unsigned int playedactions; // change the name
 unsigned int redocount;
 unsigned int undocount;
 struct BUFFER *buffer_table[BASEBLKS + BUFFERCNT];
+unsigned int redirect[BASEBLKS2];
 
 static const le16 SDS[4] = {
 	const_cpu_to_le16('$'), const_cpu_to_le16('S'),
@@ -319,18 +323,22 @@ static const struct BUFFER *read_buffer(CONTEXT *ctx, unsigned int num)
 {
 	struct BUFFER *buffer;
 	BOOL got;
+	int k;
+	unsigned int rnum;
 
 		/*
 		 * The first four blocks are stored apart, to make
 		 * sure pages 2 and 3 and the page which is logically
 		 * before them can be accessed at the same time.
+		 * (Only two blocks are stored apart if version >= 2.0)
 		 * Also, block 0 is smaller because it has to be read
 		 * before the block size is known.
 		 * Note : the last block is supposed to have an odd
-		 * number, and cannot be overwritten by block 4 which
-		 * follows logically.
+		 * number, and cannot be overwritten by block 4 (or 34
+		 * if version >= 2.0) which follows logically.
 		 */
-	if (num < BASEBLKS)
+	if ((num < RSTBLKS)
+	    || ((log_major < 2) && (num < BASEBLKS)))
 		buffer = buffer_table[num + BUFFERCNT];
 	else
 		buffer = buffer_table[num & (BUFFERCNT - 1)];
@@ -342,20 +350,27 @@ static const struct BUFFER *read_buffer(CONTEXT *ctx, unsigned int num)
 		buffer = (struct BUFFER*)
 			malloc(sizeof(struct BUFFER) + blocksz);
 		buffer->size = blocksz;
-		buffer->num = num + 1; /* forced to being read */
+		buffer->rnum = num + 1; /* forced to being read */
 		buffer->safe = FALSE;
 		if (num < BASEBLKS)
 			buffer_table[num + BUFFERCNT] = buffer;
 		else
 			buffer_table[num & (BUFFERCNT - 1)] = buffer;
 	}
-	if (buffer && (buffer->num != num)) {
+	rnum = num;
+	if (log_major >= 2) {
+		for (k=RSTBLKS; k<BASEBLKS2; k++)
+			if (redirect[k] == num)
+				rnum = k;
+	}
+	if (buffer && (buffer->rnum != rnum)) {
 		buffer->num = num;
+		buffer->rnum = rnum;
 		if (ctx->vol)
-			got = (ntfs_attr_pread(log_na,(u64)num << blockbits,
+			got = (ntfs_attr_pread(log_na,(u64)rnum << blockbits,
                 		blocksz, buffer->block.data) == blocksz);
 		else
-			got = !fseek(ctx->file, loclogblk(ctx, num), 0)
+			got = !fseek(ctx->file, loclogblk(ctx, rnum), 0)
 			    && (fread(buffer->block.data, blocksz,
 						1, ctx->file) == 1);
 		if (got) {
@@ -365,7 +380,7 @@ static const struct BUFFER *read_buffer(CONTEXT *ctx, unsigned int num)
 			buffer->safe = !replaceusa(buffer, blocksz);
 		} else {
 			buffer->safe = FALSE;
-			fprintf(stderr,"** Could not read block %d\n", num);
+			fprintf(stderr,"** Could not read block %d\n", rnum);
 		}
 	}
 	return (buffer && buffer->safe ? buffer : (const struct BUFFER*)NULL);
@@ -1096,22 +1111,30 @@ static const struct BUFFER *findprevious(CONTEXT *ctx, const struct BUFFER *buf)
 	skipped = 0;
 	do {
 		prevmiddle = FALSE;
-		if (prevblk > BASEBLKS)
+		if (prevblk > (log_major < 2 ? BASEBLKS : BASEBLKS2))
 			prevblk--;
 		else
-			if (prevblk == BASEBLKS)
+			if (prevblk == (log_major < 2 ? BASEBLKS : BASEBLKS2))
 				prevblk = (logfilesz >> blockbits) - 1;
 			else {
 				rph = &buf->block.record;
-				prevblk = (sle64_to_cpu(rph->copy.file_offset)
+				if (log_major < 2)
+					prevblk = (sle64_to_cpu(
+						rph->copy.file_offset)
 							>> blockbits) - 1;
+				else
+					prevblk = (sle64_to_cpu(
+						rph->copy.last_lsn)
+						    & offset_mask)
+							>> (blockbits - 3);
 				/*
 				 * If an initial block leads to block 4, it
 				 * can mean the last block or no previous
 				 * block at all. Using the last block is safer,
 				 * its lsn will indicate whether it is stale.
 				 */
-				if (prevblk < BASEBLKS)
+				if (prevblk
+				    < (log_major < 2 ? BASEBLKS : BASEBLKS2))
 					prevblk = (logfilesz >> blockbits) - 1;
 			}
 		/* No previous block if the log only consists of block 2 or 3 */
@@ -2706,7 +2729,7 @@ static void showrest(const RESTART_PAGE_HEADER *rest)
 				(long)le32_to_cpu(rest->system_page_size));
 			printf("log_page_size          %08lx\n",
 				(long)le32_to_cpu(rest->log_page_size));
-			printf("restart_area_offset         %04x\n",
+			printf("restart_area_offset    %04x\n",
 				(int)le16_to_cpu(rest->restart_area_offset));
 			printf("minor_vers             %d\n",
 				(int)sle16_to_cpu(rest->minor_ver));
@@ -2876,6 +2899,8 @@ static BOOL dorest(CONTEXT *ctx, unsigned long blk,
 		}
 	}
 	restart_lsn = synced_lsn;
+	offset_mask = ((u64)1 << (64 - le32_to_cpu(restart.seq_number_bits)))
+				- (1 << (blockbits - 3));
 	return (dirty);
 }
 
@@ -2895,9 +2920,13 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 {
 	const struct BUFFER *buf;
 	BOOL bad;
+	int blk;
 	int major, minor;
 
 	bad = FALSE;
+	for (blk=0; blk<BASEBLKS2; blk++)
+		redirect[blk] = 0;
+	log_major = 0; /* needed for reading into a buffer */
 	if (ctx->vol) {
 		RESTART_PAGE_HEADER *rph;
 
@@ -2961,6 +2990,7 @@ static const struct BUFFER *read_restart(CONTEXT *ctx)
 					major, minor);
 				bad = TRUE;
 			}
+		log_major = major;
 		if (bad) {
 			buf = (const struct BUFFER*)NULL;
 		}
@@ -3343,7 +3373,8 @@ static TRISTATE backoverlap(CONTEXT *ctx, int blk,
 			mblk = blk + 1;
 			while (total < size) {
 				if (mblk >= (logfilesz >> blockbits))
-					mblk = BASEBLKS;
+					mblk = (log_major < 2 ? BASEBLKS
+							: BASEBLKS2);
 				more = size - total;
 				if (more > nextspace)
 					more = nextspace;
@@ -3427,9 +3458,15 @@ static TRISTATE backward_rcrd(CONTEXT *ctx, u32 blk, int skipped,
 		if (optv) {
 			if (optv >= 2)
 				hexdump(data,blocksz);
-			printf("* RCRD in block %ld 0x%lx (addr 0x%llx)\n",
-			     (long)blk,(long)blk,
-			     (long long)loclogblk(ctx, blk));
+			if (buf->rnum != blk)
+				printf("* RCRD for block %ld 0x%lx"
+				     " in block %ld (addr 0x%llx)\n",
+				     (long)blk,(long)blk,(long)buf->rnum,
+				     (long long)loclogblk(ctx, blk));
+			else
+				printf("* RCRD in block %ld 0x%lx (addr 0x%llx)\n",
+				     (long)blk,(long)blk,
+				     (long long)loclogblk(ctx, blk));
 		} else {
 			if (optt)
 				printf("block %ld\n",(long)blk);
@@ -3551,9 +3588,15 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 	u32 stopblk;
 	TRISTATE state;
 
-	if (optv)
-		printf("\n* block %d at 0x%llx\n",(int)blk,
+	if (optv) {
+		if ((log_major >= 2) && (buf->rnum != blk))
+			printf("\n* block %d for block %d at 0x%llx\n",
+					(int)buf->rnum,(int)blk,
+					(long long)loclogblk(ctx, buf->rnum));
+		else
+			printf("\n* block %d at 0x%llx\n",(int)blk,
 					(long long)loclogblk(ctx, blk));
+	}
 	ctx->firstaction = (struct ACTION_RECORD*)NULL;
 	ctx->lastaction = (struct ACTION_RECORD*)NULL;
 	nextbuf = (const struct BUFFER*)NULL;
@@ -3576,7 +3619,9 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 				skipped = blk - prevblk - 1;
 			else
 				skipped = blk - prevblk - 1
-					+ (logfilesz >> blockbits) - BASEBLKS;
+					+ (logfilesz >> blockbits)
+					- (log_major < 2 ? BASEBLKS
+							: BASEBLKS2);
 			magic = prevbuf->block.record.magic;
 			switch (magic) {
 			case magic_RCRD :
@@ -3599,9 +3644,18 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 						(long long)loclogblk(ctx, blk),
 						(long)prevblk);
 				else
-					printf("\n* block %ld at 0x%llx\n",
-						(long)blk,
-						(long long)loclogblk(ctx, blk));
+					if ((log_major >= 2)
+					    && (buf->rnum != blk))
+						printf("\n* block %ld for block %ld at 0x%llx\n",
+							(long)buf->rnum,
+							(long)blk,
+							(long long)loclogblk(
+							    ctx,buf->rnum));
+					else
+						printf("\n* block %ld at 0x%llx\n",
+							(long)blk,
+							(long long)loclogblk(
+								ctx, blk));
 			}
 			state = backward_rcrd(ctx, blk, skipped,
 						buf, prevbuf, nextbuf);
@@ -3632,6 +3686,98 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 	return (state == T_ERR ? 1 : 0);
 }
 
+/*
+ *		Determine the sequencing of blocks (when version >= 2.0)
+ *
+ *	Blocks 2..17 and 18..33 are temporary blocks being filled until
+ *	they are copied to their target locations, so there are three
+ *	possible location for recent blocks.
+ *
+ *	Returns the latest target block number
+ */
+
+static int block_sequence(CONTEXT *ctx)
+{
+	const struct BUFFER *buf;
+	int blk;
+	int k;
+	int target_blk;
+	int latest_blk;
+	s64 final_lsn;
+	s64 last_lsn;
+	s64 last_lsn12;
+	s64 last_lsn1, last_lsn2;
+
+	final_lsn = 0;
+	for (blk=RSTBLKS; 2*blk<(RSTBLKS+BASEBLKS2); blk++) {
+			/* First temporary block */
+		last_lsn1 = 0;
+		buf = read_buffer(ctx, blk);
+		if (buf && (buf->block.record.magic == magic_RCRD)) {
+			last_lsn1 = le64_to_cpu(
+					buf->block.record.copy.last_lsn);
+			if (!final_lsn
+			    || ((s64)(last_lsn1 - final_lsn) > 0))
+				final_lsn = last_lsn1;
+		}
+			/* Second temporary block */
+		buf = read_buffer(ctx, blk + (BASEBLKS2 - RSTBLKS)/2);
+		last_lsn2 = 0;
+		if (buf && (buf->block.record.magic == magic_RCRD)) {
+			last_lsn2 = le64_to_cpu(
+					buf->block.record.copy.last_lsn);
+			if (!final_lsn
+			    || ((s64)(last_lsn2 - final_lsn) > 0))
+				final_lsn = last_lsn2;
+		}
+			/* the latest last_lsn defines the target block */
+		last_lsn12 = 0;
+		latest_blk = 0;
+		if (last_lsn1 || last_lsn2) {
+			if (!last_lsn2
+			    || ((s64)(last_lsn1 - last_lsn2) > 0)) {
+				last_lsn12 = last_lsn1;
+				latest_blk = blk;
+			}
+			if (!last_lsn1
+			    || ((s64)(last_lsn1 - last_lsn2) <= 0)) {
+				last_lsn12 = last_lsn2;
+				latest_blk = blk + (BASEBLKS2 - RSTBLKS)/2;
+			}
+		}
+		last_lsn = 0;
+		target_blk = 0;
+		if (last_lsn12) {
+			target_blk = (last_lsn12 & offset_mask)
+							>> (blockbits - 3);
+			buf = read_buffer(ctx, target_blk);
+			if (buf && (buf->block.record.magic == magic_RCRD)) {
+				last_lsn = le64_to_cpu(
+					buf->block.record.copy.last_lsn);
+				if (!final_lsn
+				    || ((s64)(last_lsn - final_lsn) > 0))
+					final_lsn = last_lsn;
+			}
+		}
+			/* redirect to the latest block */
+		if (latest_blk
+		    && (!last_lsn || ((s64)(last_lsn - last_lsn12) < 0)))
+			redirect[latest_blk] = target_blk;
+	}
+	if (optv) {
+		printf("\n Blocks redirected :\n");
+		for (k=RSTBLKS; k<BASEBLKS2; k++)
+			if (redirect[k])
+				printf("* block %d to block %d\n",
+					(int)redirect[k],(int)k);
+	}
+	latest_lsn = final_lsn;
+	blk = (final_lsn & offset_mask) >> (blockbits - 3);
+	if (optv > 1)
+		printf("final lsn %llx in blk %d\n",(long long)final_lsn,blk);
+	return (blk);
+}
+
 static int walk(CONTEXT *ctx)
 {
 	const struct BUFFER *buf;
@@ -3644,6 +3790,7 @@ static int walk(CONTEXT *ctx)
 	u32 blk;
 	u32 nextblk;
 	u32 prevblk;
+	u32 finalblk;
 	int err;
 	u16 blkheadsz;
 	u16 pos;
@@ -3657,6 +3804,7 @@ static int walk(CONTEXT *ctx)
 	}
 	done = FALSE;
 	dirty = TRUE;
+	finalblk = 0;
 	err = 0;
 	blk = 0;
 	pos = 0;
@@ -3675,7 +3823,8 @@ static int walk(CONTEXT *ctx)
 	while (!done) {
 		 /* next block is needed to process the current one */
 		if ((nextblk >= (logfilesz >> blockbits)) && (optr || optf))
-			nextbuf = read_buffer(ctx, BASEBLKS);
+			nextbuf = read_buffer(ctx,
+					(log_major < 2 ? BASEBLKS : BASEBLKS2));
 		else
 			nextbuf = read_buffer(ctx,nextblk);
 		if (nextbuf) {
@@ -3741,17 +3890,30 @@ static int walk(CONTEXT *ctx)
 		}
 		blk = nextblk;
 		nextblk++;
+
+		if (!optr && (log_major >= 2) && (nextblk == RSTBLKS)) {
+			finalblk = block_sequence(ctx);
+			if (!finalblk) {
+				done = TRUE;
+				err = 1;
+			}
+		}
+
 		if (optr) { /* Only selected range */
-			if ((nextblk == BASEBLKS) && (nextblk < firstblk))
+			u32 endblk;
+
+			endblk = (log_major < 2 ? BASEBLKS : RSTBLKS);
+			if ((nextblk == endblk) && (nextblk < firstblk))
 				 nextblk = firstblk;
-			if ((blk >= BASEBLKS) && (blk > lastblk))
+			if ((blk >= endblk) && (blk > lastblk))
 				done = TRUE;
 		} else
 			if (optf) { /* Full log, forward */
 				if (blk*blocksz >= logfilesz)
 					done = TRUE;
 			} else
-				if (optb || optp || optu || opts) {
+				if (optb || optp || optu || opts
+				    || (log_major >= 2)) {
 					/* Restart blocks only (2 blocks) */
 					if (blk >= RSTBLKS)
 						done = TRUE;
@@ -3782,16 +3944,18 @@ static int walk(CONTEXT *ctx)
 	}
 	if (optv && opts && !dirty)
 		printf("* Volume is clean, nothing to do\n");
-	if (optb || optp || optu
-	    || (opts && dirty)) {
+	if (log_major >= 2)
+		blk = finalblk;
+	if (!err
+	    && (optb || optp || optu || (opts && dirty))) {
 		playedactions = 0;
 		ctx->firstaction = (struct ACTION_RECORD*)NULL;
 		ctx->lastaction = (struct ACTION_RECORD*)NULL;
-		buf = nextbuf;
-		nextbuf = read_buffer(ctx, blk+1);
-		startbuf = best_start(buf,nextbuf);
-		if (startbuf) {
-			if (startbuf == nextbuf) {
+		if (log_major < 2) {
+			buf = nextbuf;
+			nextbuf = read_buffer(ctx, blk+1);
+			startbuf = best_start(buf,nextbuf);
+			if (startbuf && (startbuf == nextbuf)) {
 				/* nextbuf is better, show blk */
 				if (optv && buf) {
 					printf("* Ignored block %d at 0x%llx\n",
@@ -3818,6 +3982,11 @@ static int walk(CONTEXT *ctx)
 							&nextbuf->block.record);
 				}
 			}
+		} else {
+			buf = startbuf = read_buffer(ctx, blk);
+			nextbuf = (const struct BUFFER*)NULL;
+		}
+		if (startbuf) {
 			/* The latest buf may be more recent than restart */
 			rph = &buf->block.record;
 			if ((s64)(sle64_to_cpu(rph->last_end_lsn)
