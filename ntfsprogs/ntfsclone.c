@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2016 Jean-Pierre Andre
+ * Copyright (c) 2010-2017 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -1711,10 +1711,17 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
-			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
-				err_exit("Cluster %llu referenced twice!\n"
-					 "You didn't shutdown your Windows "
-					 "properly?\n", (unsigned long long)k);
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1)) {
+				if (opt.ignore_fs_check)
+					Printf("Cluster %llu is referenced"
+						" twice!\n",
+						(unsigned long long)k);
+				else
+					err_exit("Cluster %llu referenced"
+						" twice!\nYou didn't shutdown"
+						" your Windows properly?\n",
+						(unsigned long long)k);
+			}
 		}
 
 		if (!opt.metadata_image)
