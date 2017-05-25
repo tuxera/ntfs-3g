@@ -806,7 +806,9 @@ static int adjust_high_vcn(ntfs_volume *vol, ATTR_RECORD *attr)
 	rl = ntfs_mapping_pairs_decompress(vol, attr, (runlist_element*)NULL);
 	if (rl) {
 		xrl = rl;
-		while (xrl->length)
+		if (xrl->length)
+			xrl++;
+		while ((xrl->length) && (xrl->lcn != LCN_RL_NOT_MAPPED))
 			xrl++;
 		high_vcn = xrl->vcn - 1;
 		attr->highest_vcn = cpu_to_sle64(high_vcn);
