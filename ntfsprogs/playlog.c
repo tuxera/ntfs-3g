@@ -2662,12 +2662,14 @@ static int redo_update_root_vcn(ntfs_volume *vol,
 	expected = ((const char*)&action->record)
 			+ get_undo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
-// length must be 8
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-+ 16; // explanation needed (right justified ?)
-	err = change_resident_expect(vol, action, buffer, data, expected,
-			target, length, AT_INDEX_ROOT);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = change_resident_expect(vol, action, buffer, data,
+				expected, target, length, AT_INDEX_ROOT);
+	}
 	return (err);
 }
 
@@ -2751,11 +2753,13 @@ static int redo_update_vcn(ntfs_volume *vol,
 	data = ((const char*)&action->record)
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
-			/* target is left-justified to creation time */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // to better describe
-	err = update_index(vol, action, buffer, data, target, length);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = update_index(vol, action, buffer, data, target, length);
+	}
 	return (err);
 }
 
@@ -3581,11 +3585,13 @@ static int undo_update_vcn(ntfs_volume *vol, const struct ACTION_RECORD *action,
 	data = ((const char*)&action->record)
 			+ get_undo_offset(&action->record);
 	length = le16_to_cpu(action->record.undo_length);
-			/* target is left-justified to creation time */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // to better describe
-	err = update_index(vol, action, buffer, data, target, length);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = update_index(vol, action, buffer, data, target, length);
+	}
 	return (err);
 }
 
@@ -3788,12 +3794,14 @@ static int undo_update_root_vcn(ntfs_volume *vol,
 	expected = ((const char*)&action->record)
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.undo_length);
-		/* the fixup is right-justified to the name length */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // explanation needed
-	err = change_resident_expect(vol, action, buffer, data, expected,
-			target, length, AT_INDEX_ROOT);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = change_resident_expect(vol, action, buffer, data,
+				expected, target, length, AT_INDEX_ROOT);
+	}
 	return (err);
 }
 
