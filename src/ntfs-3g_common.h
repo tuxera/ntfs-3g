@@ -51,6 +51,7 @@ enum {
 	OPT_ATIME,
 	OPT_RELATIME,
 	OPT_DMTIME,
+	OPT_RW,
 	OPT_FAKE_RW,
 	OPT_FSNAME,
 	OPT_NO_DEF_OPTS,
@@ -135,6 +136,7 @@ typedef struct {
 	ntfs_atime_t atime;
 	s64 dmtime;
 	BOOL ro;
+	BOOL rw;
 	BOOL show_sys_files;
 	BOOL hide_hid_files;
 	BOOL hide_dot_files;

@@ -4449,10 +4449,14 @@ int main(int argc, char *argv[])
         
 	/* Force read-only mount if the device was found read-only */
 	if (!ctx->ro && NVolReadOnly(ctx->vol)) {
+		ctx->rw = FALSE;
 		ctx->ro = TRUE;
 		if (ntfs_strinsert(&parsed_options, ",ro")) 
                 	goto err_out;
-	}
+		ntfs_log_info("Could not mount read-write, trying read-only\n");
+	} else
+		if (ctx->rw && ntfs_strinsert(&parsed_options, ",rw"))
+			goto err_out;
 	/* We must do this after ntfs_open() to be able to set the blksize */
 	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
 		goto err_out;

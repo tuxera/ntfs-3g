@@ -85,6 +85,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "atime", OPT_ATIME, FLGOPT_BOGUS },
 	{ "relatime", OPT_RELATIME, FLGOPT_BOGUS },
 	{ "delay_mtime", OPT_DMTIME, FLGOPT_DECIMAL | FLGOPT_OPTIONAL },
+	{ "rw", OPT_RW, FLGOPT_BOGUS },
 	{ "fake_rw", OPT_FAKE_RW, FLGOPT_BOGUS },
 	{ "fsname", OPT_FSNAME, FLGOPT_NOSUPPORT },
 	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
@@ -290,6 +291,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			case OPT_RO :
 			case OPT_FAKE_RW :
 				ctx->ro = TRUE;
+				break;
+			case OPT_RW :
+				ctx->rw = TRUE;
 				break;
 			case OPT_NOATIME :
 				ctx->atime = ATIME_DISABLED;
@@ -542,6 +546,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	if (ctx->ro) {
 		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
 		ctx->hiberfile = FALSE;
+		ctx->rw = FALSE;
 	}
 exit:
 	free(options);
