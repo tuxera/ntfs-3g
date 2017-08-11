@@ -30,8 +30,9 @@
 #ifndef _NTFS_PLUGIN_H
 #define _NTFS_PLUGIN_H
 
-#include "inode.h"
 #include "layout.h"
+#include "inode.h"
+#include "dir.h"
 
 struct fuse_file_info;
 struct stat;
@@ -71,10 +72,10 @@ typedef struct plugin_operations {
 			struct fuse_file_info *fi);
 
 	/*
-	 *	Release an open file
+	 *	Release an open file or directory
 	 * This is only called if fi->fh has been set to a non-null
 	 * value while opening. It may be used to free some context
-	 * specific to the open file.
+	 * specific to the open file or directory
 	 * The returned value is zero for success or a negative errno
 	 * value for failure.
 	 */
@@ -126,6 +127,30 @@ typedef struct plugin_operations {
 	 */
 	int (*truncate)(ntfs_inode *ni, const REPARSE_POINT *reparse,
 			off_t size);
+	/*
+	 *	Open a directory
+	 * The field fi->flags indicates the kind of opening.
+	 * The field fi->fh may be used to store some information which
+	 * will be available to subsequent readdir(). When used
+	 * this field must be non-null and freed in release().
+	 * The returned value is zero for success and a negative errno
+	 * value for failure.
+	 */
+	int (*opendir)(ntfs_inode *ni, const REPARSE_POINT *reparse,
+			struct fuse_file_info *fi);
+
+	/*
+	 *	Get entries from a directory
+	 *
+	 * Use the filldir() function with fillctx argument to return
+	 * the directory entries.
+	 * Names "." and ".." are expected to be returned.
+	 * The returned value is zero for success and a negative errno
+	 * value for failure.
+	 */
+	int (*readdir)(ntfs_inode *ni, const REPARSE_POINT *reparse,
+			s64 *pos, void *fillctx, ntfs_filldir_t filldir,
+			struct fuse_file_info *fi);
 } plugin_operations_t;
 
 
