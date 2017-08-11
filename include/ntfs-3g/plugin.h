@@ -110,7 +110,7 @@ typedef struct plugin_operations {
 	 *	Get a symbolic link
 	 * The symbolic link must be returned in an allocated buffer,
 	 * encoded in a zero terminated multibyte string compatible
-	 * which the locale mount option.
+	 * with the locale mount option.
 	 * The returned value is zero for success or a negative errno
 	 * value for failure.
 	 */
