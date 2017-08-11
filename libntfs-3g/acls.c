@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2016 Jean-Pierre Andre
+ * Copyright (c) 2007-2017 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -560,16 +560,34 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 			pace = (const ACCESS_ALLOWED_ACE*)
 				&((const char*)pacl)[offace];
 			acesz = le16_to_cpu(pace->size);
-			if (((offace + acesz) > end)
-			   || !ntfs_valid_sid(&pace->sid))
-				 ok = FALSE;
-			else {
-				/* Win10 may insert garbage in the last ACE */
+			switch (pace->type) {
+			case ACCESS_ALLOWED_ACE_TYPE :
+			case ACCESS_DENIED_ACE_TYPE :
 				wantsz = ntfs_sid_size(&pace->sid) + 8;
-				if (((nace < (acecnt - 1))
-					&& (wantsz != acesz))
+				if (((offace + acesz) > end)
+				    || !ntfs_valid_sid(&pace->sid)
+				    || (wantsz != acesz))
+					ok = FALSE;
+				break;
+			case SYSTEM_AUDIT_ACE_TYPE :
+			case ACCESS_ALLOWED_CALLBACK_ACE_TYPE :
+			case ACCESS_DENIED_CALLBACK_ACE_TYPE :
+			case SYSTEM_AUDIT_CALLBACK_ACE_TYPE :
+			case SYSTEM_MANDATORY_LABEL_ACE_TYPE :
+			case SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE :
+			case SYSTEM_SCOPED_POLICY_ID_ACE_TYPE :
+				/* Extra data after the SID */
+				wantsz = ntfs_sid_size(&pace->sid) + 8;
+				if (((offace + acesz) > end)
+				    || !ntfs_valid_sid(&pace->sid)
 				    || (wantsz > acesz))
 					ok = FALSE;
+				break;
+			default :
+				/* SID at a different location */
+				if ((offace + acesz) > end)
+					ok = FALSE;
+				break;
 			}
 			offace += acesz;
 		}
@@ -683,6 +701,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	int acesz;
 	int usidsz;
 	int gsidsz;
+	BOOL acceptable;
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
 	ACCESS_ALLOWED_ACE *pauthace;
@@ -708,6 +727,20 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 		acesz = le16_to_cpu(poldace->size);
 		src += acesz;
 		/*
+		 * Currently only ACE for file or directory access are
+		 * processed. More information needed about what to do
+		 * for other types (whose SID may be at a different location)
+		 */
+		switch (poldace->type) {
+		case ACCESS_ALLOWED_ACE_TYPE :
+		case ACCESS_DENIED_ACE_TYPE :
+			acceptable = TRUE;
+			break;
+		default :
+			acceptable = FALSE;
+			break;
+		}
+		/*
 		 * Extract inheritance for access, including inheritance for
 		 * access from an ACE with is both applied and inheritable.
 		 *
@@ -721,6 +754,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 		 * "information."
 		 */
 		if ((poldace->flags & selection)
+		    && acceptable
 		    && (!fordir
 			|| (poldace->flags & NO_PROPAGATE_INHERIT_ACE)
 			|| (poldace->mask & (GENERIC_ALL | GENERIC_READ
@@ -810,9 +844,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			 * Inheritance for access, specific to
 			 * creator-owner (and creator-group)
 			 */
-		if (fordir || !inherited
-		   || (poldace->flags
-			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE))) {
+		if ((fordir || !inherited
+			|| (poldace->flags
+			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE)))
+		    && acceptable) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
@@ -869,7 +904,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			   && !(poldace->flags & (CONTAINER_INHERIT_ACE
 					| NO_PROPAGATE_INHERIT_ACE)))
 				pnewace->flags |= INHERIT_ONLY_ACE;
-			if ((poldace->flags & CONTAINER_INHERIT_ACE)
+			if (acceptable
+			    && (poldace->flags & CONTAINER_INHERIT_ACE)
 			    && !(poldace->flags & NO_PROPAGATE_INHERIT_ACE)
 			    && !ntfs_same_sid(&poldace->sid, ownersid)
 			    && !ntfs_same_sid(&poldace->sid, groupsid)) {
@@ -3867,7 +3903,9 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				}
 			}
 		}
-		if (!ignore) {
+		if (((pace->type == ACCESS_ALLOWED_ACE_TYPE)
+			|| (pace->type == ACCESS_DENIED_ACE_TYPE))
+		    && !ignore) {
 			pxace->perms = 0;
 				/* specific decoding for vtx/uid/gid */
 			if (pxace->tag == POSIX_ACL_SPECIAL) {
