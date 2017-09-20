@@ -1989,15 +1989,41 @@ static int ntfs_fuse_utimens(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 			if (to_set & FUSE_SET_ATTR_ATIME_NOW)
 				mask |= NTFS_UPDATE_ATIME;
 			else
-				if (to_set & FUSE_SET_ATTR_ATIME)
+				if (to_set & FUSE_SET_ATTR_ATIME) {
+#ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
+					ni->last_access_time
+						= timespec2ntfs(stin->st_atimespec);
+#elif defined(HAVE_STRUCT_STAT_ST_ATIM)
 					ni->last_access_time
 						= timespec2ntfs(stin->st_atim);
+#else
+					ni->last_access_time.tv_sec
+						= stin->st_atime;
+#ifdef HAVE_STRUCT_STAT_ST_ATIMENSEC
+					ni->last_access_time.tv_nsec
+						= stin->st_atimensec;
+#endif
+#endif
+				}
 			if (to_set & FUSE_SET_ATTR_MTIME_NOW)
 				mask |= NTFS_UPDATE_MTIME;
 			else
-				if (to_set & FUSE_SET_ATTR_MTIME)
+				if (to_set & FUSE_SET_ATTR_MTIME) {
+#ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
+					ni->last_data_change_time
+						= timespec2ntfs(stin->st_mtimespec);
+#elif defined(HAVE_STRUCT_STAT_ST_ATIM)
 					ni->last_data_change_time 
 						= timespec2ntfs(stin->st_mtim);
+#else
+					ni->last_data_change_time.tv_sec
+						= stin->st_mtime;
+#ifdef HAVE_STRUCT_STAT_ST_ATIMENSEC
+					ni->last_data_change_time.tv_nsec
+						= stin->st_mtimensec;
+#endif
+#endif
+				}
 			ntfs_inode_update_times(ni, mask);
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		} else
