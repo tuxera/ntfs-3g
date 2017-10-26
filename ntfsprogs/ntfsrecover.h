@@ -79,6 +79,7 @@ struct BUFFER {
 	unsigned int headsz;
 	BOOL safe;
 	union {
+		u64 alignment;
 		RESTART_PAGE_HEADER restart;
 		RECORD_PAGE_HEADER record;
 		char data[1];
