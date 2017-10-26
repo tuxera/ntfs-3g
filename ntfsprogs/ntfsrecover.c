@@ -3687,6 +3687,60 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
 }
 
 /*
+ *		Find the latest log block
+ *
+ *	Usually, the latest block is either block 2 or 3 which act as
+ *	temporary block before being copied to target location.
+ *	However under some unknown condition the block are written
+ *	immediately to target location, and we have to scan for the
+ *	latest one.
+ *	Currently this is not checked for logfile version 2.x which
+ *	use a different layout of temporary blocks.
+ */
+
+const struct BUFFER *find_latest_block(CONTEXT *ctx, u32 baseblk,
+			const struct BUFFER *basebuf)
+{
+	le64 offset;
+	leLSN prevlsn;
+	leLSN curlsn;
+	u32 curblk;
+	u32 prevblk;
+	const struct BUFFER *prevbuf;
+	const struct BUFFER *curbuf;
+
+	offset = basebuf->block.record.copy.file_offset;
+	curblk = baseblk;
+	do {
+		if (curblk < BASEBLKS) {
+			prevbuf = basebuf;
+			prevlsn = basebuf->block.record.last_end_lsn;
+			prevblk = baseblk;
+			curblk = le64_to_cpu(offset) >> blockbits;
+		} else {
+			if (optv)
+				printf("block %d is more recent than block %d\n",
+					(int)curblk, (int)prevblk);
+			prevbuf = curbuf;
+			prevlsn = curlsn;
+			prevblk = curblk;
+			curblk++;
+			if (curblk >= (logfilesz >> blockbits))
+				curblk = (log_major < 2 ? BASEBLKS : BASEBLKS2);
+		}
+		curbuf = read_buffer(ctx, curblk);
+		if (curbuf && (curbuf->block.record.magic == magic_RCRD)) {
+			curlsn = curbuf->block.record.copy.last_lsn;
+		}
+	} while (curbuf
+		&& (curbuf->block.record.magic == magic_RCRD)
+		&& (le64_to_cpu(curlsn) > le64_to_cpu(prevlsn)));
+	if (optv)
+		printf("Block %d is the latest one\n",(int)prevblk);
+	return (prevbuf);
+}
+
+/*
  *		Determine the sequencing of blocks (when version >= 2.0)
  *
  *	Blocks 2..17 and 18..33 are temporary blocks being filled until
@@ -3982,6 +4036,12 @@ static int walk(CONTEXT *ctx)
 							&nextbuf->block.record);
 				}
 			}
+			if (startbuf && opts) {
+				buf = startbuf = find_latest_block(ctx,
+						blk, startbuf);
+				latest_lsn = le64_to_cpu(
+					buf->block.record.last_end_lsn);
+			}
 		} else {
 			buf = startbuf = read_buffer(ctx, blk);
 			nextbuf = (const struct BUFFER*)NULL;
@@ -4043,7 +4103,7 @@ static void version(void)
 {
 	printf("\n%s v%s (libntfs-3g) - Recover updates committed by Windows"
 			" on an NTFS Volume.\n\n", "ntfsrecover", VERSION);
-	printf("Copyright (c) 2012-2016 Jean-Pierre Andre\n");
+	printf("Copyright (c) 2012-2017 Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
