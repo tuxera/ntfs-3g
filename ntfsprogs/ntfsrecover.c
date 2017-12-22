@@ -3698,7 +3698,7 @@ static int walkback(CONTEXT *ctx, const struct BUFFER *buf, u32 blk,
  *	use a different layout of temporary blocks.
  */
 
-const struct BUFFER *find_latest_block(CONTEXT *ctx, u32 baseblk,
+static const struct BUFFER *find_latest_block(CONTEXT *ctx, u32 baseblk,
 			const struct BUFFER *basebuf)
 {
 	le64 offset;
@@ -3710,6 +3710,9 @@ const struct BUFFER *find_latest_block(CONTEXT *ctx, u32 baseblk,
 	const struct BUFFER *curbuf;
 
 	offset = basebuf->block.record.copy.file_offset;
+	curbuf = (const struct BUFFER*)NULL;
+	curlsn = const_cpu_to_le64(0);
+	prevblk = 0;
 	curblk = baseblk;
 	do {
 		if (curblk < BASEBLKS) {
