@@ -52,6 +52,8 @@ hibernation and fast restarting :
 powercfg /h off
 .sp
 .RE
+If either Windows is hibernated or its fast restart is enabled, partitions
+on internal disks are forced to be mounted in read-only mode.
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process, and everybody has
