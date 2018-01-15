@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2016 Jean-Pierre Andre
+ * Copyright (c) 2010-2018 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -801,7 +801,7 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 	const struct plugin_operations *ops;
 	void *handle;
 	REPARSE_POINT *reparse;
-	le32 tag;
+	le32 tag, seltag;
 	plugin_list_t *plugin;
 	plugin_init_t pinit;
 
@@ -809,7 +809,10 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 	reparse = ntfs_get_reparse_point(ni);
 	if (reparse) {
 		tag = reparse->reparse_tag;
-		for (plugin=ctx->plugins; plugin && (plugin->tag != tag);
+		seltag = tag;
+		if (tag & IO_REPARSE_TAG_WITH_FLAGS)
+			seltag &= IO_REPARSE_PLUGIN_SELECT;
+		for (plugin=ctx->plugins; plugin && (plugin->tag != seltag);
 						plugin = plugin->next) { }
 		if (plugin) {
 			ops = plugin->ops;
@@ -819,12 +822,12 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 
 			snprintf(name,sizeof(name), PLUGIN_DIR
 					"/ntfs-plugin-%08lx.so",
-					(long)le32_to_cpu(tag));
+					(long)le32_to_cpu(seltag));
 #else
 			char name[64];
 
 			snprintf(name,sizeof(name), "ntfs-plugin-%08lx.so",
-					(long)le32_to_cpu(tag));
+					(long)le32_to_cpu(seltag));
 #endif
 			handle = dlopen(name, RTLD_LAZY);
 			if (handle) {
@@ -833,7 +836,7 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 				/* pinit() should set errno if it fails */
 					ops = (*pinit)(tag);
 					if (ops && register_reparse_plugin(ctx,
-							tag, ops, handle))
+							seltag, ops, handle))
 						ops = (struct plugin_operations*)NULL;
 				} else
 					errno = ELIBBAD;

@@ -2412,8 +2412,13 @@ typedef struct {
  *		be slow. (E.g. the data is stored on a tape drive.)
  *	bit 31: Microsoft bit. If set, the tag is owned by Microsoft. User
  *		defined tags have to use zero here.
+ * 4. However, on Windows 10 :
+ *	Some flags may be used in bits 12 to 15 to further describe the
+ *	reparse point, and bit 28 may be set, probably to signal the
+ *	presence of these flags.
  */
 typedef enum {
+	IO_REPARSE_TAG_WITH_FLAGS	= const_cpu_to_le32(0x10000000),
 	IO_REPARSE_TAG_IS_ALIAS		= const_cpu_to_le32(0x20000000),
 	IO_REPARSE_TAG_IS_HIGH_LATENCY	= const_cpu_to_le32(0x40000000),
 	IO_REPARSE_TAG_IS_MICROSOFT	= const_cpu_to_le32(0x80000000),
@@ -2436,10 +2441,12 @@ typedef enum {
 	IO_REPARSE_TAG_DFM		= const_cpu_to_le32(0x80000016),
 	IO_REPARSE_TAG_WOF		= const_cpu_to_le32(0x80000017),
 	IO_REPARSE_TAG_WCI		= const_cpu_to_le32(0x80000018),
+	IO_REPARSE_TAG_CLOUD		= const_cpu_to_le32(0x9000001A),
 	IO_REPARSE_TAG_GVFS             = const_cpu_to_le32(0x9000001C),
 	IO_REPARSE_TAG_LX_SYMLINK       = const_cpu_to_le32(0xA000001D),
 
 	IO_REPARSE_TAG_VALID_VALUES	= const_cpu_to_le32(0xf000ffff),
+	IO_REPARSE_PLUGIN_SELECT	= const_cpu_to_le32(0xffff0fff),
 } PREDEFINED_REPARSE_TAGS;
 
 /**
