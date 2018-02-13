@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c)      2005 Yura Pakhuchiy
- * Copyright (c) 2014-2015 Jean-Pierre Andre
+ * Copyright (c) 2014-2018 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1389,16 +1389,27 @@ ntfs_inode *ntfs_mft_rec_alloc(ntfs_volume *vol, BOOL mft_data)
 			 */
 		if (ext_ni) {
 			/*
-			 * Make sure record 15 is a base extent and has
-			 * no extents.
-			 * Also make sure it has no name : a base inode with
-			 * no extents and no name cannot be in use.
-			 * Otherwise apply standard procedure.
+			 * Make sure record 15 is a base extent and it has
+			 * no name. A base inode with no name cannot be in use.
+			 * The test based on base_mft_record fails for
+			 * extents of MFT, so we need a special check.
+			 * If already used, apply standard procedure.
 			 */
    			if (!ext_ni->mrec->base_mft_record
-			    && !ext_ni->nr_extents)
+			    && !ext_ni->mrec->link_count)
 				forced_mft_data = TRUE;
 			ntfs_inode_close(ext_ni);
+			/* Double-check, in case it is used for MFT */
+			if (forced_mft_data && base_ni->nr_extents) {
+				int i;
+
+				for (i=0; i<base_ni->nr_extents; i++) {
+					if (base_ni->extent_nis[i]
+					    && (base_ni->extent_nis[i]->mft_no
+							== FILE_mft_data))
+						forced_mft_data = FALSE;
+   				}
+			}
 		}
 	}
 	if (forced_mft_data)
