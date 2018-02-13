@@ -837,7 +837,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 			if (!err)
 				err = errno;
 			ntfs_log_perror("Failed to open inode %lld with index",
-				(long long)le64_to_cpu(fn->parent_directory));
+				(long long)MREF_LE(fn->parent_directory));
 			continue;
 		}
 		ictx = ntfs_index_ctx_get(index_ni, NTFS_INDEX_I30, 4);
