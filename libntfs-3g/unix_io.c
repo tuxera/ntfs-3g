@@ -53,6 +53,9 @@
 #ifdef HAVE_LINUX_FD_H
 #include <linux/fd.h>
 #endif
+#ifdef HAVE_LINUX_FS_H
+#include <linux/fs.h>
+#endif
 
 #include "types.h"
 #include "mst.h"
@@ -142,6 +145,21 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 		err = errno;
 		goto err_out;
 	}
+#ifdef HAVE_LINUX_FS_H
+		/* Check whether the device was forced read-only */
+	if (NDevBlock(dev) && ((flags & O_RDWR) == O_RDWR)) {
+		int r;
+		int state;
+
+		r = ioctl(DEV_FD(dev), BLKROGET, &state);
+		if (!r && state) {
+			err = EROFS;
+			if (close(DEV_FD(dev)))
+				err = errno;
+			goto err_out;
+   		}
+	}
+#endif
 	
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
