@@ -59,6 +59,7 @@
 #include <fcntl.h>
 #endif
 
+#include "param.h"
 #include "debug.h"
 #include "types.h"
 #include "support.h"
@@ -246,8 +247,6 @@ static s64 max_free_cluster_range = 0;
 #define DIRTY_INODE		(1)
 #define DIRTY_ATTRIB		(2)
 
-#define NTFS_MAX_CLUSTER_SIZE	(65536)
-
 static s64 rounded_up_division(s64 numer, s64 denom)
 {
 	return (numer + (denom - 1)) / denom;
@@ -407,7 +406,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011-2016  Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2018  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1891,8 +1890,12 @@ static void lseek_to_cluster(ntfs_volume *vol, s64 lcn)
 static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 {
 	s64 i;
-	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	char *buff;
 	ntfs_volume *vol = resize->vol;
+
+	buff = (char*)ntfs_malloc(vol->cluster_size);
+	if (!buff)
+		perr_exit("ntfs_malloc");
 
 	for (i = 0; i < len; i++) {
 
@@ -1917,6 +1920,7 @@ static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 		resize->relocations++;
 		progress_update(&resize->progress, resize->relocations);
 	}
+	free(buff);
 }
 
 static void relocate_clusters(ntfs_resize_t *r, runlist *dest_rl, s64 src_lcn)
@@ -2758,8 +2762,12 @@ static void update_bootsector(ntfs_resize_t *r)
 	if (vol->dev->d_ops->read(vol->dev, bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs->number_of_sectors = cpu_to_sle64(r->new_volume_size *
-			bs->bpb.sectors_per_cluster);
+	if (bs->bpb.sectors_per_cluster > 128)
+		bs->number_of_sectors = cpu_to_sle64(r->new_volume_size
+				<< (256 - bs->bpb.sectors_per_cluster));
+	else
+		bs->number_of_sectors = cpu_to_sle64(r->new_volume_size *
+				bs->bpb.sectors_per_cluster);
 
 	if (r->mftmir_old || (r->mirr_from == MIRR_MFT)) {
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
