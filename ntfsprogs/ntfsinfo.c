@@ -413,9 +413,7 @@ static const char *reparse_type_name(le32 tag)
 	const char *name;
 	le32 seltag;
 
-	seltag = tag;
-	if (tag & IO_REPARSE_TAG_WITH_FLAGS)
-		seltag &= IO_REPARSE_PLUGIN_SELECT;
+	seltag = tag & IO_REPARSE_PLUGIN_SELECT;
 	switch (seltag) {
 	case IO_REPARSE_TAG_MOUNT_POINT :
 		name = " (mount point)";
