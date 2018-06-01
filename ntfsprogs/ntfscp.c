@@ -58,6 +58,7 @@
 #include "debug.h"
 /* #include "version.h" */
 #include "logging.h"
+#include "ntfstime.h"
 #include "misc.h"
 
 struct options {
@@ -69,6 +70,7 @@ struct options {
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
 	int		 minfragments;	/* Do minimal fragmentation */
+	int		 timestamp;	/* Copy the modification time */
 	int		 noaction;	/* Do not write to disk */
 	ATTR_TYPES	 attribute;	/* Write to this attribute. */
 	int		 inode;		/* Treat dest_file as inode number. */
@@ -129,6 +131,7 @@ static void usage(void)
 		"    -N, --attr-name NAME  Write to attribute with this name\n"
 		"    -n, --no-action       Do not write to disk\n"
 		"    -q, --quiet           Less output\n"
+		"    -t, --timestamp       Copy the modification time\n"
 		"    -V, --version         Version information\n"
 		"    -v, --verbose         More output\n\n",
 		EXEC_NAME);
@@ -146,7 +149,7 @@ static void usage(void)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-a:ifh?mN:no:qVv";
+	static const char *sopt = "-a:ifh?mN:no:qtVv";
 	static const struct option lopt[] = {
 		{ "attribute",	required_argument,	NULL, 'a' },
 		{ "inode",	no_argument,		NULL, 'i' },
@@ -156,6 +159,7 @@ static int parse_options(int argc, char **argv)
 		{ "attr-name",	required_argument,	NULL, 'N' },
 		{ "no-action",	no_argument,		NULL, 'n' },
 		{ "quiet",	no_argument,		NULL, 'q' },
+		{ "timestamp",	no_argument,		NULL, 't' },
 		{ "version",	no_argument,		NULL, 'V' },
 		{ "verbose",	no_argument,		NULL, 'v' },
 		{ NULL,		0,			NULL, 0   }
@@ -175,6 +179,7 @@ static int parse_options(int argc, char **argv)
 	opts.attr_name = NULL;
 	opts.inode = 0;
 	opts.attribute = AT_DATA;
+	opts.timestamp = 0;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -235,6 +240,9 @@ static int parse_options(int argc, char **argv)
 			opts.quiet++;
 			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
+		case 't':
+			opts.timestamp++;
+			break;
 		case 'V':
 			ver++;
 			break;
@@ -282,6 +290,12 @@ static int parse_options(int argc, char **argv)
 		if (opts.quiet && opts.verbose) {
 			ntfs_log_error("You may not use --quiet and --verbose "
 					"at the same time.\n");
+			err++;
+		}
+		if (opts.timestamp
+		    && (opts.attr_name || (opts.attribute != AT_DATA))) {
+			ntfs_log_error("Setting --timestamp is only possible"
+					" with unname data attribute.\n");
 			err++;
 		}
 	}
@@ -822,6 +836,7 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 int main(int argc, char *argv[])
 {
 	FILE *in;
+	struct stat st;
 	ntfs_volume *vol;
 	ntfs_inode *out;
 	ntfs_attr *na;
@@ -1136,6 +1151,15 @@ int main(int argc, char *argv[])
 	free(buf);
 close_attr:
 	ntfs_attr_close(na);
+	if (opts.timestamp) {
+		if (!fstat(fileno(in),&st)) {
+			out->last_data_change_time = st.st_mtime*10000000LL
+					+ NTFS_TIME_OFFSET;
+			ntfs_inode_update_times(out, 0);
+		} else {
+			ntfs_log_error("Failed to get the time stamp.\n");
+		}
+	}
 close_dst:
 	while (ntfs_inode_close(out) && !opts.noaction) {
 		if (errno != EBUSY) {
