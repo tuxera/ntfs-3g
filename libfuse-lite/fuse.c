@@ -134,7 +134,6 @@ struct fuse_dh {
     struct fuse *fuse;
     fuse_req_t req;
     char *contents;
-    int allocated;
     unsigned len;
     unsigned size;
     unsigned needlen;
