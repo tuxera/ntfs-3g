@@ -9,8 +9,8 @@ else
 noinst_LTLIBRARIES = libntfs-3g.la
 endif
 
-libntfs_3g_la_CFLAGS  = $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
-libntfs_3g_la_CPPFLAGS= $(AM_CPPFLAGS) $(LIBNTFS_CPPFLAGS)
+libntfs_3g_la_CFLAGS  = $(AM_CFLAGS)
+libntfs_3g_la_CPPFLAGS= $(AM_CPPFLAGS) $(LIBNTFS_CPPFLAGS) -I$(top_srcdir)/include/ntfs-3g
 libntfs_3g_la_LIBADD  = $(LIBNTFS_LIBS)
 libntfs_3g_la_LDFLAGS = -version-info $(LIBNTFS_3G_VERSION) -no-undefined
 
