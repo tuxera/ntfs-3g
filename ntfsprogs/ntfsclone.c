@@ -773,6 +773,9 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	}
 
 	rescue_pos = (off_t)(rescue_lcn * csize);
+	buff = (char*)ntfs_malloc(csize);
+	if (!buff)
+		err_exit("Not enough memory");
 
 		/* possible partial cluster holding the backup boot sector */
 	backup_bootsector = (lcn + 1)*csize >= full_device_size;
@@ -782,10 +785,6 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 			err_exit("Corrupted input, copy aborted");
 		}
 	}
-
-	buff = (char*)ntfs_malloc(csize);
-	if (!buff)
-		err_exit("Not enough memory");
 
 // need reading when not about to write ?
 	if (read_all(fd, buff, csize) == -1) {
@@ -1507,6 +1506,7 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 	s64 mft_no;
 	u32 mft_record_size;
 	u32 csize;
+	u32 buff_size;
 	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
@@ -1524,15 +1524,18 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 		/*
 		 * Depending on the sizes, there may be several records
 		 * per cluster, or several clusters per record.
+		 * Anyway, records are read and rescued by full clusters.
 		 */
 	if (csize >= mft_record_size) {
 		records_per_set = csize/mft_record_size;
 		clusters_per_set = 1;
+		buff_size = csize;
 	} else {
 		clusters_per_set = mft_record_size/csize;
 		records_per_set = 1;
+		buff_size = mft_record_size;
 	}
-	buff = (char*)ntfs_malloc(mft_record_size);
+	buff = (char*)ntfs_malloc(buff_size);
 	if (!buff)
 		err_exit("Not enough memory");
 
@@ -1585,6 +1588,7 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 	void *fd;
 	u32 indx_record_size;
 	u32 csize;
+	u32 buff_size;
 	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
@@ -1601,16 +1605,19 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 		/*
 		 * Depending on the sizes, there may be several records
 		 * per cluster, or several clusters per record.
+		 * Anyway, records are read and rescued by full clusters.
 		 */
 	indx_record_size = image->ni->vol->indx_record_size;
 	if (csize >= indx_record_size) {
 		records_per_set = csize/indx_record_size;
 		clusters_per_set = 1;
+		buff_size = csize;
 	} else {
 		clusters_per_set = indx_record_size/csize;
 		records_per_set = 1;
+		buff_size = indx_record_size;
 	}
-	buff = (char*)ntfs_malloc(indx_record_size);
+	buff = (char*)ntfs_malloc(buff_size);
 	if (!buff)
 		err_exit("Not enough memory");
 
