@@ -670,7 +670,7 @@ static int mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *o
 			break;
 		case 'L':
 			if (!opts2->label) {
-				opts2->label = argv[optind-1];
+				opts2->label = optarg;
 			} else {
 				ntfs_log_error("You may only specify the label "
 						"once.\n");
