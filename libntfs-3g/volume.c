@@ -529,7 +529,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 						dev->d_name);
 				goto error_exit;
 			} else {
-				ntfs_log_info("Can only open '%s' as read-only\n",
+				ntfs_log_info("Error opening '%s' read-write\n",
 						dev->d_name);
 				NVolSetReadOnly(vol);
 			}

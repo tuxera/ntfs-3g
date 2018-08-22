@@ -143,6 +143,9 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	*(int*)dev->d_private = open(dev->d_name, flags);
 	if (*(int*)dev->d_private == -1) {
 		err = errno;
+			/* if permission error and rw, retry read-only */
+		if ((err == EACCES) && ((flags & O_RDWR) == O_RDWR))
+			err = EROFS;
 		goto err_out;
 	}
 #ifdef HAVE_LINUX_FS_H
