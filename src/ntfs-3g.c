@@ -595,7 +595,7 @@ static int ntfs_macfuse_getxtimes(const char *org_path,
 	}
 	
 	/* We have no backup timestamp in NTFS. */
-	crtime->tv_sec = sle64_to_cpu(ni->creation_time);
+	*crtime = ntfs2timespec(ni->creation_time);
 exit:
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -605,7 +605,7 @@ exit:
 	return res;
 }
 
-int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -617,7 +617,7 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 		return -errno;
 	
 	if (tv) {
-		ni->creation_time = cpu_to_sle64(tv->tv_sec);
+		ni->creation_time = timespec2ntfs(*tv);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	}
 
@@ -626,7 +626,7 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 	return res;
 }
 
-int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -647,7 +647,7 @@ int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 	return res;
 }
 
-int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -659,7 +659,7 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 		return -errno;
 
 	if (tv) {
-		ni->last_mft_change_time = cpu_to_sle64(tv->tv_sec);
+		ni->last_mft_change_time = timespec2ntfs(*tv);
 		ntfs_fuse_update_times(ni, 0);
 	}
 
