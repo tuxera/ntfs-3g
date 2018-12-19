@@ -2879,7 +2879,7 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 			|| !(ctx->secure_flags & (1 << SECURITY_ACL))
 			|| (setting && ctx->inherit))
 		    && foracl) {
-			if (ctx->silent)
+			if (ctx->silent && !ctx->security.mapping[MAPUSERS])
 				errno = 0;
 			else
 				errno = EOPNOTSUPP;
