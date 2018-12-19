@@ -4148,7 +4148,8 @@ int main(int argc, char *argv[])
 	else {
 		ctx->abs_mnt_point = (char*)ntfs_malloc(PATH_MAX);
 		if (ctx->abs_mnt_point) {
-			if (getcwd(ctx->abs_mnt_point,
+			if ((strlen(opts.mnt_point) < PATH_MAX)
+			    && getcwd(ctx->abs_mnt_point,
 				     PATH_MAX - strlen(opts.mnt_point) - 1)) {
 				strcat(ctx->abs_mnt_point, "/");
 				strcat(ctx->abs_mnt_point, opts.mnt_point);
@@ -4156,6 +4157,9 @@ int main(int argc, char *argv[])
 			/* Solaris also wants the absolute mount point */
 				opts.mnt_point = ctx->abs_mnt_point;
 #endif /* defined(__sun) && defined (__SVR4) */
+			} else {
+				free(ctx->abs_mnt_point);
+				ctx->abs_mnt_point = (char*)NULL;
 			}
 		}
 	}
