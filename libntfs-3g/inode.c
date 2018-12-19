@@ -1518,14 +1518,16 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
 	FILE_NAME_ATTR *fn;
-	const u64 *times;
+	u64 times[4];
 	ntfs_time now;
 	int cnt;
 	int ret;
 
 	ret = -1;
 	if ((size >= 8) && !(flags & XATTR_CREATE)) {
-		times = (const u64*)value;
+		/* Copy, to avoid alignment issue encountered on ARM */
+		memcpy(times, value,
+			(size < sizeof(times) ? size : sizeof(times)));
 		now = ntfs_current_time();
 			/* update the standard information attribute */
 		ctx = ntfs_attr_get_search_ctx(ni, NULL);
