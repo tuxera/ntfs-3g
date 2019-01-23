@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2009-2017 Jean-Pierre Andre
+ * Copyright (c) 2009-2019 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -333,7 +333,7 @@ static int update_object_id(ntfs_inode *ni, ntfs_index_context *xo,
 
 	na = ntfs_attr_open(ni, AT_OBJECT_ID, AT_UNNAMED, 0);
 	if (na) {
-
+		memset(&old_attr, 0, sizeof(OBJECT_ID_ATTR));
 			/* remove the existing index entry */
 		oldsize = remove_object_id_index(na,xo,&old_attr);
 		if (oldsize < 0)
