@@ -4572,7 +4572,6 @@ int main(int argc, char *argv[])
 
 #ifndef DISABLE_PLUGINS
 	register_internal_reparse_plugins();
-	register_directory_plugins(ctx);
 #endif /* DISABLE_PLUGINS */
 
 	se = mount_fuse(parsed_options);

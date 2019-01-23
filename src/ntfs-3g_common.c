@@ -36,10 +36,6 @@
 #include <string.h>
 #endif
 
-#ifdef HAVE_FCNTL_H
-#include <fcntl.h>
-#endif
-
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
@@ -770,108 +766,6 @@ exit :
 
 #ifndef DISABLE_PLUGINS
 
-/*
- *		Get attribute information for reparse directories
- *
- *	Reparse directories have a reparse tag which should be ignored.
- */
-
-static int directory_getattr(ntfs_inode *ni, const REPARSE_POINT *reparse,
-			      struct stat *stbuf)
-{
-	static ntfschar I30[] =
-		{ const_cpu_to_le16('$'), const_cpu_to_le16('I'),
-		  const_cpu_to_le16('3'), const_cpu_to_le16('0') };
-	ntfs_attr *na;
-	int res;
-
-	res = -EOPNOTSUPP;
-	if (ni && reparse && stbuf
-		&& ((reparse->reparse_tag == IO_REPARSE_TAG_WCI)
-		|| ((reparse->reparse_tag & IO_REPARSE_TAG_DIRECTORY)
-		    && !(reparse->reparse_tag & IO_REPARSE_TAG_IS_ALIAS)))
-	    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
-			/* Directory */
-		stbuf->st_mode = S_IFDIR | 0555;
-		/* get index size, if not known */
-		if (!test_nino_flag(ni, KnownSize)) {
-			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, I30, 4);
-			if (na) {
-				ni->data_size = na->data_size;
-				ni->allocated_size = na->allocated_size;
-				set_nino_flag(ni, KnownSize);
-				ntfs_attr_close(na);
-			}
-		}
-		stbuf->st_size = ni->data_size;
-		stbuf->st_blocks = ni->allocated_size >> 9;
-		stbuf->st_nlink = 1;	/* Make find(1) work */
-		res = 0;
-	}
-	/* Not a directory, or another error occurred */
-	return (res);
-}
-
-/*
- *		Open a reparse directory for reading
- *
- *	Currently no reading context is created.
- */
-
-static int directory_opendir(ntfs_inode *ni, const REPARSE_POINT *reparse,
-			   struct fuse_file_info *fi)
-{
-	int res;
-
-	res = -EOPNOTSUPP;
-	if (ni && reparse && fi
-	    && ((reparse->reparse_tag == IO_REPARSE_TAG_WCI)
-		|| ((reparse->reparse_tag & IO_REPARSE_TAG_DIRECTORY)
-		    && !(reparse->reparse_tag & IO_REPARSE_TAG_IS_ALIAS)))
-	    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-	    && ((fi->flags & O_ACCMODE) == O_RDONLY))
-		res = 0;
-	return (res);
-}
-
-/*
- *		Release a reparse directory
- *
- *	Should never be called, as no reading context was defined.
- */
-
-static int directory_release(ntfs_inode *ni __attribute__((unused)),
-			   const REPARSE_POINT *reparse __attribute__((unused)),
-			   struct fuse_file_info *fi __attribute__((unused)))
-{
-	return 0;
-}
-
-/*
- *		Read an open reparse directory
- *
- *	Returns 0 or a negative error code
- */
-
-static int directory_readdir(ntfs_inode *ni, const REPARSE_POINT *reparse,
-			s64 *pos, void *fillctx, ntfs_filldir_t filldir,
-			struct fuse_file_info *fi __attribute__((unused)))
-{
-	int res;
-
-	res = -EOPNOTSUPP;
-	if (ni && reparse && pos && fillctx && filldir
-	    && ((reparse->reparse_tag == IO_REPARSE_TAG_WCI)
-	        || ((reparse->reparse_tag & IO_REPARSE_TAG_DIRECTORY)
-	    	    && !(reparse->reparse_tag & IO_REPARSE_TAG_IS_ALIAS)))
-	    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
-		res = 0;
-		if (ntfs_readdir(ni, pos, fillctx, filldir))
-			res = -errno;
-	}
-	return (res);
-}
-
 int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
 				const plugin_operations_t *ops, void *handle)
 {
@@ -879,16 +773,14 @@ int register_reparse_plugin(ntfs_fuse_context_t *ctx, le32 tag,
 	int res;
 
 	res = -1;
-	if (ctx) {
-		plugin = (plugin_list_t*)ntfs_malloc(sizeof(plugin_list_t));
-		if (plugin) {
-			plugin->tag = tag;
-			plugin->ops = ops;
-			plugin->handle = handle;
-			plugin->next = ctx->plugins;
-			ctx->plugins = plugin;
-			res = 0;
-		}
+	plugin = (plugin_list_t*)ntfs_malloc(sizeof(plugin_list_t));
+	if (plugin) {
+		plugin->tag = tag;
+		plugin->ops = ops;
+		plugin->handle = handle;
+		plugin->next = ctx->plugins;
+		ctx->plugins = plugin;
+		res = 0;
 	}
 	return (res);
 }
@@ -917,9 +809,7 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 	reparse = ntfs_get_reparse_point(ni);
 	if (reparse) {
 		tag = reparse->reparse_tag;
-		seltag = tag;
-		if (tag & IO_REPARSE_TAG_DIRECTORY)
-			seltag &= IO_REPARSE_TAG_DIRECTORY;
+		seltag = tag & IO_REPARSE_PLUGIN_SELECT;
 		for (plugin=ctx->plugins; plugin && (plugin->tag != seltag);
 						plugin = plugin->next) { }
 		if (plugin) {
@@ -978,23 +868,6 @@ void close_reparse_plugins(ntfs_fuse_context_t *ctx)
 			dlclose(ctx->plugins->handle);
 		free(ctx->plugins);
 		ctx->plugins = next;
-	}
-}
-
-void register_directory_plugins(ntfs_fuse_context_t *ctx)
-{
-	static const struct plugin_operations ops = {
-		.getattr = directory_getattr,
-		.release = directory_release,
-		.opendir = directory_opendir,
-		.readdir = directory_readdir,
-	} ;
-
-	if (ctx) {
-		register_reparse_plugin(ctx, IO_REPARSE_TAG_WCI,
-						&ops, (void*)NULL);
-		register_reparse_plugin(ctx, IO_REPARSE_TAG_DIRECTORY,
-						&ops, (void*)NULL);
 	}
 }
 
