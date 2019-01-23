@@ -4,7 +4,7 @@
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2006 Hil Liao
- * Copyright (c) 2014 Jean-Pierre Andre
+ * Copyright (c) 2014-2019 Jean-Pierre Andre
  *
  * This utility will copy file to an NTFS volume.
  *
@@ -1153,8 +1153,9 @@ close_attr:
 	ntfs_attr_close(na);
 	if (opts.timestamp) {
 		if (!fstat(fileno(in),&st)) {
-			out->last_data_change_time = st.st_mtime*10000000LL
+			s64 change_time = st.st_mtime*10000000LL
 					+ NTFS_TIME_OFFSET;
+			out->last_data_change_time = cpu_to_le64(change_time);
 			ntfs_inode_update_times(out, 0);
 		} else {
 			ntfs_log_error("Failed to get the time stamp.\n");
