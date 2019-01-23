@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2017 Jean-Pierre Andre
+ * Copyright (c) 2007-2019 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -263,7 +263,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2017 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2019 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -1074,10 +1074,9 @@ static void ntfs_fuse_readlink(fuse_req_t req, fuse_ino_t ino)
 		REPARSE_POINT *reparse;
 
 		res = CALL_REPARSE_PLUGIN(ni, readlink, &buf);
-		if (res) {
+		if (res || !buf) {
 			buf = strdup(ntfs_bad_reparse);
-			if (!buf)
-				res = -errno;
+			res = (buf ? 0 : -errno);
 		}
 #else /* DISABLE_PLUGINS */
 		errno = 0;

@@ -1,9 +1,10 @@
 /*
- * compat.h - Tweaks for Windows compatibility.
+ * compat.h - Tweaks for compatibility with non-Linux systems.
  *
  * Copyright (c) 2002 Richard Russon
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2008-2009 Szabolcs Szakacsits
+ * Copyright (c) 2019      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,6 +40,10 @@
 
 #ifndef ELIBBAD
 #define ELIBBAD ENOEXEC
+#endif
+
+#ifndef ELIBACC
+#define ELIBACC ENOENT
 #endif
 
 #ifndef PATH_MAX
