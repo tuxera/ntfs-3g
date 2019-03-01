@@ -518,99 +518,36 @@ static void set_fuse_error(int *err)
 }
 
 #if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
-static int ntfs_macfuse_getxtimes(const char *org_path,
-		struct timespec *bkuptime, struct timespec *crtime)
+
+static void ntfs_macfuse_getxtimes(fuse_req_t req, fuse_ino_t ino,
+			struct fuse_file_info *fi __attribute__((unused)))
 {
 	int res = 0;
 	ntfs_inode *ni;
-	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	struct timespec bkuptime;
+	struct timespec crtime;
 
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	memset(bkuptime, 0, sizeof(struct timespec));
-	memset(crtime, 0, sizeof(struct timespec));
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	memset(&bkuptime, 0, sizeof(struct timespec));
+	memset(&crtime, 0, sizeof(struct timespec));
+	ni = ntfs_inode_open(ctx->vol, INODE(ino));
 	if (!ni) {
 		res = -errno;
-		goto exit;
+	} else {
+		/* We have no backup timestamp in NTFS. */
+		crtime = ntfs2timespec(ni->creation_time);
+		if (ntfs_inode_close(ni))
+			set_fuse_error(&res);
 	}
-        
-	/* We have no backup timestamp in NTFS. */
-	crtime->tv_sec = ni->creation_time;
-exit:
-	if (ntfs_inode_close(ni))
-		set_fuse_error(&res);
-	free(path);
 	if (stream_name_len)
 		free(stream_name);
-	return res;
+	if (res < 0)
+		fuse_reply_err(req, -res);
+	else
+		fuse_reply_xtimes(req, &bkuptime, &crtime);
 }
 
-int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
-{
-	ntfs_inode *ni;
-	int res = 0;
-
-	if (ntfs_fuse_is_named_data_stream(path))
-		return -EINVAL; /* n/a for named data streams. */
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!ni)
-		return -errno;
-        
-	if (tv) {
-		ni->creation_time = tv->tv_sec;
-		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-	}
-
-	if (ntfs_inode_close(ni))
-		set_fuse_error(&res);
-	return res;
-}
-
-int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
-{
-	ntfs_inode *ni;
-	int res = 0;
-        
-	if (ntfs_fuse_is_named_data_stream(path))
-		return -EINVAL; /* n/a for named data streams. */
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!ni)
-		return -errno;
-        
-	/* 
-	 * Only pretending to set backup time successfully to please the APIs of
-	 * Mac OS X. In reality, NTFS has no backup time.
-	 */
-        
-	if (ntfs_inode_close(ni))
-		set_fuse_error(&res);
-	return res;
-}
-
-int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
-{
-	ntfs_inode *ni;
-	int res = 0;
-
-	if (ntfs_fuse_is_named_data_stream(path))
-		return -EINVAL; /* n/a for named data streams. */
-	ni = ntfs_pathname_to_inode(ctx-&gt;vol, NULL, path);
-	if (!ni)
-		return -errno;
-
-	if (tv) {
-		ni-&gt;last_mft_change_time = tv-&gt;tv_sec;
-		ntfs_fuse_update_times(ni, 0);
-	}
-
-	if (ntfs_inode_close(ni))
-		set_fuse_error(&amp;res);
-	return res;
-}
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
 static void ntfs_init(void *userdata __attribute__((unused)),
@@ -2193,6 +2130,277 @@ static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	else
 		fuse_reply_attr(req, &stbuf, ATTR_TIMEOUT);
 }
+
+#if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
+
+#if defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW)
+
+	/*
+	 *		utimens_x (MacOsX)
+	 *
+	 *	This is much similar to ntfs_fuse_utimens()
+	 */
+
+static int ntfs_fuse_utimens_x(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
+		struct setattr_x *stin, struct stat *stbuf, int to_set)
+{
+	ntfs_inode *ni;
+	int res = 0;
+
+	ni = ntfs_inode_open(ctx->vol, INODE(ino));
+	if (!ni)
+		return -errno;
+
+			/* no check or update if both UTIME_OMIT */
+	if (to_set & (FUSE_SET_ATTR_ATIME
+			+ FUSE_SET_ATTR_MTIME
+			+ FUSE_SET_ATTR_BKUPTIME
+			+ FUSE_SET_ATTR_CHGTIME
+			+ FUSE_SET_ATTR_CRTIME)) {
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		if (ntfs_allowed_as_owner(scx, ni)
+		    || ((to_set & FUSE_SET_ATTR_ATIME_NOW)
+			&& (to_set & FUSE_SET_ATTR_MTIME_NOW)
+			&& ntfs_allowed_access(scx, ni, S_IWRITE))) {
+#endif
+			ntfs_time_update_flags mask = 0;
+
+			if (to_set & FUSE_SET_ATTR_ATIME_NOW)
+				mask |= NTFS_UPDATE_ATIME;
+			else
+				if (to_set & FUSE_SET_ATTR_ATIME)
+					ni->last_access_time
+						= timespec2ntfs(stin->acctime);
+			if (to_set & FUSE_SET_ATTR_MTIME_NOW)
+				mask |= NTFS_UPDATE_MTIME;
+			else
+				if (to_set & FUSE_SET_ATTR_MTIME)
+					ni->last_data_change_time 
+						= timespec2ntfs(stin->modtime);
+			if (to_set & FUSE_SET_ATTR_CRTIME)
+				ni->creation_time 
+					= timespec2ntfs(stin->crtime);
+			if (to_set & FUSE_SET_ATTR_BKUPTIME) {
+				/* does not exist */
+			}
+			if (to_set & FUSE_SET_ATTR_CHGTIME) {
+				ni->last_mft_change_time 
+					= timespec2ntfs(stin->chgtime);
+			} else
+				mask |= FUSE_SET_ATTR_CTIME;
+			ntfs_inode_update_times(ni, mask);
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		} else
+			res = -errno;
+#endif
+	}
+	if (!res)
+		res = ntfs_fuse_getstat(scx, ni, stbuf);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+#else /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+
+	/*
+	 *		utime_x (MacOsX)
+	 *
+	 *	This is somewhat similar to ntfs_fuse_utime()
+	 *
+	 *	TODO : check whether there is any need for this function
+	 *	HAVE_UTIMENSAT may be always defined on MacOsX
+	 */
+
+static int ntfs_fuse_utime_x(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
+		struct setattr_x *stin, struct stat *stbuf)
+{
+	ntfs_inode *ni;
+	int res = 0;
+	ntfs_time_update_flags mask = 0;
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+	BOOL ownerok;
+	BOOL writeok;
+#endif
+
+	ni = ntfs_inode_open(ctx->vol, INODE(ino));
+	if (!ni)
+		return -errno;
+        
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+	ownerok = ntfs_allowed_as_owner(scx, ni);
+	if (stin) {
+		/*
+		 * fuse never calls with a NULL buf and we do not
+		 * know whether the specific condition can be applied
+		 * So we have to accept updating by a non-owner having
+		 * write access.
+		 */
+		writeok = !ownerok
+			&& (stin->st_atime == stin->st_mtime)
+			&& ntfs_allowed_access(scx, ni, S_IWRITE);
+			/* Must be owner */
+		if (!ownerok && !writeok)
+			res = (stin->acctime.tv_sec == stin->modtime.tv_sec
+					? -EACCES : -EPERM);
+		else {
+			if (to_set & FUSE_SET_ATTR_ATIME)
+				ni->last_access_time
+					= timespec2ntfs(stin->acctime);
+			if (to_set & FUSE_SET_ATTR_CTIME)
+				ni->last_data_change_time
+					= timespec2ntfs(stin->modtime);
+			if (to_set & FUSE_SET_ATTR_CHGTIME)
+				ni->last_mft_change_time
+					= timespec2ntfs(stin->chgtime);
+			else
+				flags |= NTFS_UPDATE_CTIME;
+			if (to_set & FUSE_SET_ATTR_CRTIME)
+				ni->creation_time
+					= timespec2ntfs(stin->crtime);
+			ntfs_fuse_update_times(ni, mask);
+		}
+	} else {
+			/* Must be owner or have write access */
+		writeok = !ownerok
+			&& ntfs_allowed_access(scx, ni, S_IWRITE);
+		if (!ownerok && !writeok)
+			res = -EACCES;
+		else
+			ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
+	}
+#else
+	if (stin) {
+		if (to_set & FUSE_SET_ATTR_ATIME)
+			ni->last_access_time
+				= timespec2ntfs(stin->acctime);
+		if (to_set & FUSE_SET_ATTR_CTIME)
+			ni->last_data_change_time
+				= timespec2ntfs(stin->modtime);
+		if (to_set & FUSE_SET_ATTR_CHGTIME)
+			ni->last_mft_change_time
+				= timespec2ntfs(stin->chgtime);
+		else
+			flags |= NTFS_UPDATE_CTIME;
+		if (to_set & FUSE_SET_ATTR_CRTIME)
+			ni->creation_time
+				= timespec2ntfs(stin->crtime);
+		ntfs_fuse_update_times(ni, mask);
+	} else
+		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
+#endif
+
+	res = ntfs_fuse_getstat(scx, ni, stbuf);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+#endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+
+	/*
+	 *		setattr_x (MacOsX)
+	 *
+	 *	This is much similar to ntfs_fuse_setattr()
+	 *
+	 *	TODO : check whether ntfs_fuse_setattr() is needed when
+	 *	ntfs_fuse_setattr_x() is defined
+	 */
+
+static void ntfs_macfuse_setattr_x(fuse_req_t req, fuse_ino_t ino,
+			 struct setattr_x *attr, int to_set,
+			 struct fuse_file_info *fi __attribute__((unused)))
+{
+	struct stat stbuf;
+	ntfs_inode *ni;
+	int res;
+	struct SECURITY_CONTEXT security;
+
+	res = 0;
+	ntfs_fuse_fill_security_context(req, &security);
+						/* no flags */
+	if (!(to_set
+		    & (FUSE_SET_ATTR_MODE
+			| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID
+			| FUSE_SET_ATTR_SIZE
+			| FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME
+			| FUSE_SET_ATTR_BKUPTIME
+			| FUSE_SET_ATTR_CHGTIME
+			| FUSE_SET_ATTR_CRTIME))) {
+		ni = ntfs_inode_open(ctx->vol, INODE(ino));
+		if (!ni)
+			res = -errno;
+		else {
+			res = ntfs_fuse_getstat(&security, ni, &stbuf);
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		}
+	}
+						/* some set of uid/gid/mode */
+	if (to_set
+		    & (FUSE_SET_ATTR_MODE
+			| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
+		switch (to_set
+			    & (FUSE_SET_ATTR_MODE
+				| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
+		case FUSE_SET_ATTR_MODE :
+			res = ntfs_fuse_chmod(&security, ino,
+						attr->st_mode & 07777, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID :
+			res = ntfs_fuse_chown(&security, ino, attr->st_uid,
+						(gid_t)-1, &stbuf);
+			break;
+		case FUSE_SET_ATTR_GID :
+			res = ntfs_fuse_chown(&security, ino, (uid_t)-1,
+						attr->st_gid, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID :
+			res = ntfs_fuse_chown(&security, ino, attr->st_uid,
+						attr->st_gid, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
+						(gid_t)-1,attr->st_mode,
+						&stbuf);
+			break;
+		case FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, (uid_t)-1,
+						attr->st_gid,attr->st_mode,
+						&stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
+					attr->st_gid,attr->st_mode, &stbuf);
+			break;
+		default :
+			break;
+		}
+	}
+						/* size */
+	if (!res && (to_set & FUSE_SET_ATTR_SIZE)) {
+		res = ntfs_fuse_trunc(&security, ino, attr->st_size,
+					!fi, &stbuf);
+	}
+						/* some set of times */
+	if (!res && (to_set & (FUSE_SET_ATTR_ATIME
+				+ FUSE_SET_ATTR_MTIME
+				+ FUSE_SET_ATTR_BKUPTIME
+				+ FUSE_SET_ATTR_CHGTIME
+				+ FUSE_SET_ATTR_CRTIME))) {
+#if defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW)
+		res = ntfs_fuse_utimens_x(&security, ino, attr, &stbuf, to_set);
+#else /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+		res = ntfs_fuse_utime_x(&security, ino, attr, &stbuf);
+#endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
+	}
+	if (res)
+		fuse_reply_err(req, -res);
+	else
+		fuse_reply_attr(req, &stbuf, ATTR_TIMEOUT);
+}
+
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 
@@ -4029,9 +4237,7 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 #if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
 	/* MacFUSE extensions. */
 	.getxtimes	= ntfs_macfuse_getxtimes,
-	.setcrtime	= ntfs_macfuse_setcrtime,
-	.setbkuptime	= ntfs_macfuse_setbkuptime,
-	.setchgtime	= ntfs_macfuse_setchgtime,
+	.setattr_x	= ntfs_macfuse_setattr_x,
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 	.init		= ntfs_init
 };

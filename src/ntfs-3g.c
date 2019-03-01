@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2017 Jean-Pierre Andre
+ * Copyright (c) 2007-2019 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -196,7 +196,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2017 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2019 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -595,7 +595,7 @@ static int ntfs_macfuse_getxtimes(const char *org_path,
 	}
 	
 	/* We have no backup timestamp in NTFS. */
-	crtime->tv_sec = sle64_to_cpu(ni->creation_time);
+	*crtime = ntfs2timespec(ni->creation_time);
 exit:
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -605,7 +605,7 @@ exit:
 	return res;
 }
 
-int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -617,7 +617,7 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 		return -errno;
 	
 	if (tv) {
-		ni->creation_time = cpu_to_sle64(tv->tv_sec);
+		ni->creation_time = timespec2ntfs(*tv);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	}
 
@@ -626,7 +626,7 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 	return res;
 }
 
-int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -647,7 +647,7 @@ int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 	return res;
 }
 
-int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
+static int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -659,7 +659,7 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 		return -errno;
 
 	if (tv) {
-		ni->last_mft_change_time = cpu_to_sle64(tv->tv_sec);
+		ni->last_mft_change_time = timespec2ntfs(*tv);
 		ntfs_fuse_update_times(ni, 0);
 	}
 
