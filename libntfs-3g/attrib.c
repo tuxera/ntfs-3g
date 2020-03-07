@@ -6902,7 +6902,9 @@ s64 ntfs_attr_get_free_bits(ntfs_attr *na)
 		}
 		switch (br % 4) {
 			case 3:  nr_free += lut[*(buf + br - 3)];
+			/* FALLTHRU */
 			case 2:  nr_free += lut[*(buf + br - 2)];
+			/* FALLTHRU */
 			case 1:  nr_free += lut[*(buf + br - 1)];
 		}
 	}
