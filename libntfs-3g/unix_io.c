@@ -369,8 +369,8 @@ static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
  *
  * Returns:
  */
-static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev, int request,
-		void *argp)
+static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev,
+		unsigned long request, void *argp)
 {
 	return ioctl(DEV_FD(dev), request, argp);
 }

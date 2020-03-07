@@ -2777,7 +2777,13 @@ static int ntfs_fuse_ioctl(const char *path,
 	if (!ni)
 		return -errno;
 
-	ret = ntfs_ioctl(ni, cmd, arg, flags, data);
+	/*
+	 * Linux defines the request argument of ioctl() to be an
+	 * unsigned long, which fuse 2.x forwards as a signed int into
+	 * which the request sometimes does not fit.
+	 * So we must expand the value and make sure it is not sign-extended.
+	 */
+	ret = ntfs_ioctl(ni, (unsigned int)cmd, arg, flags, data);
 
 	if (ntfs_inode_close (ni))
 		set_fuse_error(&ret);

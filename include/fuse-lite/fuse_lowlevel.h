@@ -814,6 +814,9 @@ struct fuse_lowlevel_ops {
 	 *
 	 * Introduced in version 2.8
 	 *
+	 * Note : the unsigned long request submitted by the application        
+	 * is truncated to 32 bits, and forwarded as a signed int.
+	 *
 	 * Valid replies:
 	 *   fuse_reply_ioctl_retry
 	 *   fuse_reply_ioctl

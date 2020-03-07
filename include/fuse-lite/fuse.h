@@ -432,6 +432,9 @@ struct fuse_operations {
 	 * non-NULL cases, the area is of _IOC_SIZE(cmd) bytes.
 	 *
 	 * Introduced in version 2.8
+	 *
+	 * Note : the unsigned long request submitted by the application        
+	 * is truncated to 32 bits, and forwarded as a signed int.
 	 */
 	int (*ioctl) (const char *, int cmd, void *arg,
 		      struct fuse_file_info *, unsigned int flags, void *data); 
