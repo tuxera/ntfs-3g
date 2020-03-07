@@ -247,7 +247,7 @@ char *fuse_add_dirent(char *buf, const char *name, const struct stat *stbuf,
     dirent->off = off;
     dirent->namelen = namelen;
     dirent->type = (stbuf->st_mode & 0170000) >> 12;
-    strncpy(dirent->name, name, namelen);
+    memcpy(dirent->name, name, namelen);
     if (padlen)
         memset(buf + entlen, 0, padlen);
 

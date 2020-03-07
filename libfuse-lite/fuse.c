@@ -463,7 +463,7 @@ static char *add_name(char *buf, char *s, const char *name)
         return NULL;
     }
 #endif /* __SOLARIS__ */
-    strncpy(s, name, len);
+    memcpy(s, name, len);
     s--;
     *s = '/';
 
