@@ -86,10 +86,6 @@
 #include <sys/param.h>
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 
-#ifdef HAVE_LINUX_FS_H
-#include <linux/fs.h>
-#endif
-
 #ifndef FUSE_CAP_POSIX_ACL  /* until defined in <fuse/fuse_common.h> */
 #define FUSE_CAP_POSIX_ACL (1 << 18)
 #endif /* FUSE_CAP_POSIX_ACL */
