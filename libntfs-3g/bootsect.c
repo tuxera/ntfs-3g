@@ -86,7 +86,7 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b)
 		break;
 	default:
 		if ((b->bpb.sectors_per_cluster < 240)
-		    || (b->bpb.sectors_per_cluster > 249)) {
+		    || (b->bpb.sectors_per_cluster > 253)) {
 			if (b->bpb.sectors_per_cluster > 128)
 				ntfs_log_error("Unexpected sectors"
 					" per cluster value (code 0x%x)\n",
