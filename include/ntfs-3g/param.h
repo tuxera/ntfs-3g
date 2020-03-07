@@ -126,8 +126,8 @@ enum {
  *		7 : no cache, kernel control for ACLs
  *
  *	Possible values for low level :
- *		2 : no cache, kernel control
- *		3 : use kernel/fuse cache, kernel control  (recommended)
+ *		2 : no cache, kernel control  (recommended)
+ *		3 : use kernel/fuse cache, kernel control
  *		5 : no cache, file system control
  *		6 : kernel/fuse cache, file system control (OpenIndiana only)
  *		8 : no cache, kernel control for ACLs
@@ -150,9 +150,10 @@ enum {
  *	Cacheing by kernel is buggy on Linux when access control is done
  *	by the file system, and also when using hard-linked files on
  *	the fuse high level interface.
+ *	Also ACL checks by recent kernels do not prove satisfactory.
  */
 #define HPERMSCONFIG 1
-#define LPERMSCONFIG 3 /* Use 9 when ACLs are supported by fuse kernel */
+#define LPERMSCONFIG 2
 #endif /* defined(__sun) && defined(__SVR4) */
 
 #endif /* defined _NTFS_PARAM_H */
