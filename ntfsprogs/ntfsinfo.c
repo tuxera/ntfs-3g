@@ -439,6 +439,9 @@ static const char *reparse_type_name(le32 tag)
 	case IO_REPARSE_TAG_LX_SYMLINK :
 		name = " (Linux symlink)";
 		break;
+	case IO_REPARSE_TAG_APPEXECLINK :
+		name = " (Exec link)";
+		break;
 	default :
 		name = "";
 		break;

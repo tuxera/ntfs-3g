@@ -2443,6 +2443,7 @@ typedef enum {
 	IO_REPARSE_TAG_WOF		= const_cpu_to_le32(0x80000017),
 	IO_REPARSE_TAG_WCI		= const_cpu_to_le32(0x80000018),
 	IO_REPARSE_TAG_CLOUD		= const_cpu_to_le32(0x9000001A),
+	IO_REPARSE_TAG_APPEXECLINK	= const_cpu_to_le32(0x8000001B),
 	IO_REPARSE_TAG_GVFS             = const_cpu_to_le32(0x9000001C),
 	IO_REPARSE_TAG_LX_SYMLINK       = const_cpu_to_le32(0xA000001D),
 
