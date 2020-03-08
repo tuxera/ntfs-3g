@@ -141,7 +141,8 @@ static int fstrim_limits(ntfs_volume *vol,
 			u64 *discard_max_bytes)
 {
 	struct stat statbuf;
-	char path1[80], path2[80];
+	char path1[40]; /* holds "/sys/dev/block/%d:%d" */
+	char path2[40 + sizeof(path1)]; /* less than 40 bytes more than path1 */
 	int ret;
 
 	/* Stat the backing device.  Caller has ensured it is a block device. */
