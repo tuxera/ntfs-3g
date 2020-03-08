@@ -214,10 +214,15 @@ static s64 option_value(const char *arg)
 		count = 0;
 		switch (*s++) {
 		case 'E' : count++;
+			/* FALLTHRU */
 		case 'P' : count++;
+			/* FALLTHRU */
 		case 'T' : count++;
+			/* FALLTHRU */
 		case 'G' : count++;
+			/* FALLTHRU */
 		case 'M' : count++;
+			/* FALLTHRU */
 		case 'K' : count++;
 			switch (*s++) {
 			case 'i' :

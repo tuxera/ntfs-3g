@@ -364,9 +364,13 @@ int utils_parse_size(const char *value, s64 *size, BOOL scale)
 	if (scale) {
 		switch (suffix[0]) {
 			case 't': case 'T': result *= 1000;
+				/* FALLTHRU */
 			case 'g': case 'G': result *= 1000;
+				/* FALLTHRU */
 			case 'm': case 'M': result *= 1000;
+				/* FALLTHRU */
 			case 'k': case 'K': result *= 1000;
+				/* FALLTHRU */
 			case '-': case 0:
 				break;
 			default:

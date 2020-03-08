@@ -453,8 +453,10 @@ static s64 get_new_volume_size(char *s)
 	switch (*suffix) {
 	case 'G':
 		size *= prefix_kind;
+		/* FALLTHRU */
 	case 'M':
 		size *= prefix_kind;
+		/* FALLTHRU */
 	case 'k':
 		size *= prefix_kind;
 		break;

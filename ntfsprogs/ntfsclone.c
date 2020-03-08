@@ -465,6 +465,7 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 'O':
 			opt.overwrite++;
+			/* FALLTHRU */
 		case 'o':
 			if (opt.output)
 				usage(1);

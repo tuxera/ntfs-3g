@@ -314,6 +314,7 @@ static int parse_options(int argc, char *argv[])
 
 		case 'i':
 			opts.info++;		/* and fall through */
+			/* FALLTHRU */
 		case 'a':
 			opts.directory++;
 			opts.logfile++;

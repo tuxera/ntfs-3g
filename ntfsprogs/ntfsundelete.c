@@ -567,10 +567,15 @@ static int parse_time(const char *value, time_t *since)
 
 	switch (suffix[0]) {
 		case 'y': case 'Y': result *=   12;
+			/* FALLTHRU */
 		case 'm': case 'M': result *=    4;
+			/* FALLTHRU */
 		case 'w': case 'W': result *=    7;
+			/* FALLTHRU */
 		case 'd': case 'D': result *=   24;
+			/* FALLTHRU */
 		case 'h': case 'H': result *= 3600;
+			/* FALLTHRU */
 		case 0:
 		    break;
 
