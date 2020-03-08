@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2019 Jean-Pierre Andre
+ * Copyright (c) 2007-2020 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -259,7 +259,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2019 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2020 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -1167,6 +1167,9 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		/* never return inodes 0 and 1 */
 	if (MREF(mref) > 1) {
 		struct stat st = { .st_ino = MREF(mref) };
+#ifndef DISABLE_PLUGINS
+		ntfs_inode *ni;
+#endif /* DISABLE_PLUGINS */
 		 
 		switch (dt_type) {
 		case NTFS_DT_DIR :
@@ -1186,6 +1189,26 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 			break;
 		case NTFS_DT_CHR :
 			st.st_mode = S_IFCHR;
+			break;
+		case NTFS_DT_REPARSE :
+			st.st_mode = S_IFLNK | 0777; /* default */
+#ifndef DISABLE_PLUGINS
+			/* get emulated type from plugin if available */
+			ni = ntfs_inode_open(ctx->vol, mref);
+			if (ni && (ni->flags & FILE_ATTR_REPARSE_POINT)) {
+				const plugin_operations_t *ops;
+				REPARSE_POINT *reparse;
+				int res;
+
+				res = CALL_REPARSE_PLUGIN(ni, getattr, &st);
+				if (!res)
+					apply_umask(&st);
+				else
+					st.st_mode = S_IFLNK;
+			}
+			if (ni)
+				ntfs_inode_close(ni);
+#endif /* DISABLE_PLUGINS */
 			break;
 		default : /* unexpected types shown as plain files */
 		case NTFS_DT_REG :

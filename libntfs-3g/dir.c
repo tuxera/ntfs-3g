@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2005-2007 Yura Pakhuchiy
- * Copyright (c) 2008-2014 Jean-Pierre Andre
+ * Copyright (c) 2008-2020 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -934,9 +934,9 @@ static u32 ntfs_dir_entry_type(ntfs_inode *dir_ni, MFT_REF mref,
 	dt_type = NTFS_DT_UNKNOWN;
 	ni = ntfs_inode_open(dir_ni->vol, mref);
 	if (ni) {
-		if ((attributes & FILE_ATTR_REPARSE_POINT)
-		    && ntfs_possible_symlink(ni))
-			dt_type = NTFS_DT_LNK;
+		if (attributes & FILE_ATTR_REPARSE_POINT)
+			dt_type = (ntfs_possible_symlink(ni)
+				? NTFS_DT_LNK : NTFS_DT_REPARSE);
 		else
 			if ((attributes & FILE_ATTR_SYSTEM)
 			   && !(attributes & FILE_ATTR_I30_INDEX_PRESENT))

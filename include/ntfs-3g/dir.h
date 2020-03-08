@@ -94,6 +94,7 @@ extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, const ntfschar *name,
 #define NTFS_DT_LNK		10
 #define NTFS_DT_SOCK		12
 #define NTFS_DT_WHT		14
+#define NTFS_DT_REPARSE		32
 
 /*
  * This is the "ntfs_filldir" function type, used by ntfs_readdir() to let
