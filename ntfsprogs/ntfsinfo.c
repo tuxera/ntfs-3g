@@ -8,7 +8,7 @@
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
- * Copyright (c) 2011-2018 Jean-Pierre Andre
+ * Copyright (c) 2011-2020 Jean-Pierre Andre
  *
  * This utility will dump a file's attributes.
  *
@@ -331,7 +331,7 @@ static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
 		    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" } ;
 	static const char *wdays[]
 		= { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" } ;
-	static char str[30];
+	static char str[50];
 	long long stamp;
 	u32 days;
 	u32 seconds;
@@ -371,7 +371,7 @@ static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
 		mon = days/31 + 1;
 		days -= 31*(mon - 1) - 1;
 	}
-	sprintf(str,"%3s %3s %2u %02u:%02u:%02u %4u UTC\n",
+	snprintf(str, sizeof(str), "%3s %3s %2u %02u:%02u:%02u %4u UTC\n",
 		wdays[wday],
 		months[mon-1],(unsigned int)days,
 		(unsigned int)(seconds/3600),
