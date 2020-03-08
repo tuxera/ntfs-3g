@@ -274,7 +274,7 @@ struct _ntfs_volume {
 #if CACHE_LEGACY_SIZE
 	struct CACHE_HEADER *legacy_cache;
 #endif
-
+	const char *abs_mnt_point; /* Mount point */
 };
 
 extern const char *ntfs_home;

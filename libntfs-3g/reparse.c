@@ -604,7 +604,7 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
  *		or NULL if there were some problem, as described by errno
  */
 
-static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
+char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			int count, const char *mnt_point, BOOL isdir)
 {
 	char *target;

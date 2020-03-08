@@ -4516,6 +4516,7 @@ int main(int argc, char *argv[])
 	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
 		goto err_out;
 
+	ctx->vol->abs_mnt_point = ctx->abs_mnt_point;
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
