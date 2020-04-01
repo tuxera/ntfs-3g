@@ -24,8 +24,8 @@
 
 # Autoconf
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[2017.3.23],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION="88"
+AC_INIT([ntfs-3g],[2017.3.23AR.5],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION="885"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
@@ -33,7 +33,7 @@ AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
 # Automake
-AM_INIT_AUTOMAKE([${PACKAGE_NAME}], [${PACKAGE_VERSION}])
+AM_INIT_AUTOMAKE()
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AM_MAINTAINER_MODE
@@ -497,7 +497,7 @@ AC_C_BIGENDIAN(
 	]
 	,
 )
-AC_C_CONST
+# AC_C_CONST
 AC_C_INLINE
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
