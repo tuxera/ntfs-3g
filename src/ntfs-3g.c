@@ -2026,7 +2026,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		free(path);
 		res = -errno;
-		if (dir_ni->mft_no == FILE_Extend)
+		if (dir_ni)
 			res = -EPERM;
 		goto exit;
 	}
@@ -2373,7 +2373,7 @@ static int ntfs_fuse_rm(const char *org_path)
 		/* deny unlinking metadata files from $Extend */
 	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		res = -errno;
-		if (dir_ni->mft_no == FILE_Extend)
+		if (dir_ni)
 			res = -EPERM;
 		goto exit;
 	}
