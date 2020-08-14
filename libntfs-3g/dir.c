@@ -2792,3 +2792,82 @@ int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 	}
 	return (res);
 }
+
+/*
+ *		Increment the count of subdirectories
+ *		(excluding entries with a short name)
+ */
+
+static int nlink_increment(void *nlink_ptr,
+			const ntfschar *name __attribute__((unused)),
+			const int len __attribute__((unused)),
+			const int type,
+			const s64 pos __attribute__((unused)),
+			const MFT_REF mref __attribute__((unused)),
+			const unsigned int dt_type)
+{
+	if ((dt_type == NTFS_DT_DIR) && (type != FILE_NAME_DOS))
+		(*((int*)nlink_ptr))++;
+	return (0);
+}
+
+/*
+ *		Compute the number of hard links according to Posix
+ *	For a directory count the subdirectories whose name is not
+ *		a short one, but count "." and ".."
+ *	Otherwise count the names, excluding the short ones.
+ *
+ *	if there is an error, a null count is returned.
+ */
+
+int ntfs_dir_link_cnt(ntfs_inode *ni)
+{
+	ntfs_attr_search_ctx *actx;
+	FILE_NAME_ATTR *fn;
+	s64 pos;
+	int err = 0;
+	int nlink = 0;
+
+	if (!ni) {
+		ntfs_log_error("Invalid argument.\n");
+		errno = EINVAL;
+		goto err_out;
+	}
+	if (ni->nr_extents == -1)
+		ni = ni->base_ni;
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		/*
+		 * Directory : scan the directory and count
+		 * subdirectories whose name is not DOS-only.
+		 * The directory names are ignored, but "." and ".."
+		 * are taken into account.
+		 */
+		pos = 0;
+		err = ntfs_readdir(ni, &pos, &nlink, nlink_increment);
+		if (err)
+			nlink = 0;
+	} else {
+		/*
+		 * Non-directory : search for FILE_NAME attributes,
+		 * and count those which are not DOS-only ones.
+		 */
+		actx = ntfs_attr_get_search_ctx(ni, NULL);
+		if (!actx)
+			goto err_out;
+		while (!(err = ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+					CASE_SENSITIVE, 0, NULL, 0, actx))) {
+			fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
+					le16_to_cpu(actx->attr->value_offset));
+			if (fn->file_name_type != FILE_NAME_DOS)
+				nlink++;
+		}
+		if (err && (errno != ENOENT))
+			nlink = 0;
+		ntfs_attr_put_search_ctx(actx);
+	}
+	if (!nlink)
+		ntfs_log_perror("Failed to compute nlink of inode %lld",
+			(long long)ni->mft_no);
+err_out :
+	return (nlink);
+}

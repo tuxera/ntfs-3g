@@ -708,6 +708,9 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 	memset(stbuf, 0, sizeof(struct stat));
 	withusermapping = (scx->mapping[MAPUSERS] != (struct MAPPING*)NULL);
 	stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+	if (ctx->posix_nlink
+	    && !(ni->flags & FILE_ATTR_REPARSE_POINT))
+		stbuf->st_nlink = ntfs_dir_link_cnt(ni);
 	if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 	    || (ni->flags & FILE_ATTR_REPARSE_POINT)) {
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
@@ -770,7 +773,8 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 			}
 			stbuf->st_size = ni->data_size;
 			stbuf->st_blocks = ni->allocated_size >> 9;
-			stbuf->st_nlink = 1;	/* Make find(1) work */
+			if (!ctx->posix_nlink)
+				stbuf->st_nlink = 1;	/* Make find(1) work */
 		}
 	} else {
 		/* Regular or Interix (INTX) file. */

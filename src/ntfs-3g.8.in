@@ -250,6 +250,13 @@ they do not appear in Windows directory displays either.
 When a file is renamed or linked with a new name, the hidden flag is
 adjusted to the latest name.
 .TP
+.B posix_nlink
+Compute the count of hard links of a file or directory according to
+the Posix specifications. When this option is not set, a count of 1
+is set for directories, and the short name of files is accounted for.
+Using the option entails some penalty as the count is not stored and
+has to be computed.
+.TP
 .B windows_names
 This option prevents files, directories and extended attributes to be
 created with a name not allowed by windows, because

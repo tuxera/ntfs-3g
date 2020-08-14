@@ -92,6 +92,7 @@ enum {
 	OPT_USERMAPPING,
 	OPT_XATTRMAPPING,
 	OPT_EFS_RAW,
+	OPT_POSIX_NLINK,
 } ;
 
 			/* Option flags */
@@ -153,6 +154,7 @@ typedef struct {
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
+	BOOL posix_nlink;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	BOOL efs_raw;
 #ifdef XATTR_MAPPINGS

@@ -117,6 +117,7 @@ int ntfs_get_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			const char *value, size_t size,	int flags);
 int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni);
+int ntfs_dir_link_cnt(ntfs_inode *ni);
 
 #if CACHE_INODE_SIZE
 
