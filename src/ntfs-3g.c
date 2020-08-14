@@ -4054,13 +4054,28 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+	if (ctx->ro) {
+		char buf[128];
+		int len;
+        
+		len = snprintf(buf, sizeof(buf), "-ouse_ino,kernel_cache"
+				",attr_timeout=%d,entry_timeout=%d",
+				(int)TIMEOUT_RO, (int)TIMEOUT_RO);
+		if ((len < 0)
+		    || (len >= (int)sizeof(buf))
+		    || (fuse_opt_add_arg(&args, buf) == -1))
+			goto err;
+	} else {
 #if !CACHEING
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=0") == -1)
-		goto err;
+		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+				",attr_timeout=0") == -1)
+			goto err;
 #else
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=1") == -1)
-		goto err;
+		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+				",attr_timeout=1") == -1)
+			goto err;
 #endif
+	}
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;

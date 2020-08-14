@@ -119,6 +119,9 @@ enum {
  *	having access control in the file system leads to fewer requests
  *	to the file system and fewer context switches.
  *
+ *	Irrespective of the selected mode, cacheing is always used
+ *	in read-only mounts
+ *
  *	Possible values for high level :
  *		1 : no cache, kernel control (recommended)
  *		4 : no cache, file system control
@@ -126,8 +129,8 @@ enum {
  *		7 : no cache, kernel control for ACLs
  *
  *	Possible values for low level :
- *		2 : no cache, kernel control  (recommended)
- *		3 : use kernel/fuse cache, kernel control
+ *		2 : no cache, kernel control
+ *		3 : use kernel/fuse cache, kernel control (recommended)
  *		5 : no cache, file system control
  *		6 : kernel/fuse cache, file system control (OpenIndiana only)
  *		8 : no cache, kernel control for ACLs
@@ -138,6 +141,7 @@ enum {
  *	of 6 is added in the mount report.
  */
 
+#define TIMEOUT_RO 600 /* Attribute time out for read-only mounts */
 #if defined(__sun) && defined(__SVR4)
 /*
  *	Access control by kernel is not implemented on OpenIndiana,
@@ -153,7 +157,7 @@ enum {
  *	Also ACL checks by recent kernels do not prove satisfactory.
  */
 #define HPERMSCONFIG 1
-#define LPERMSCONFIG 2
+#define LPERMSCONFIG 3
 #endif /* defined(__sun) && defined(__SVR4) */
 
 #endif /* defined _NTFS_PARAM_H */

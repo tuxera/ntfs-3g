@@ -129,12 +129,12 @@
 #endif
 
 #if !CACHEING
-#define ATTR_TIMEOUT 0.0
-#define ENTRY_TIMEOUT 0.0
+#define ATTR_TIMEOUT (ctx->ro ? TIMEOUT_RO : 0.0)
+#define ENTRY_TIMEOUT (ctx->ro ? TIMEOUT_RO : 0.0)
 #else
 #if defined(__sun) && defined (__SVR4)
-#define ATTR_TIMEOUT 10.0
-#define ENTRY_TIMEOUT 10.0
+#define ATTR_TIMEOUT (ctx->ro ? TIMEOUT_RO : 10.0)
+#define ENTRY_TIMEOUT (ctx->ro ? TIMEOUT_RO : 10.0)
 #else /* defined(__sun) && defined (__SVR4) */
 	/*
 	 * FUSE cacheing is only usable with basic permissions
@@ -144,11 +144,13 @@
 #warning "Fuse cacheing is only usable with basic permissions checked by kernel"
 #endif
 #if KERNELACLS
-#define ATTR_TIMEOUT 10.0
-#define ENTRY_TIMEOUT 10.0
+#define ATTR_TIMEOUT (ctx->ro ? TIMEOUT_RO : 10.0)
+#define ENTRY_TIMEOUT (ctx->ro ? TIMEOUT_RO : 10.0)
 #else /* KERNELACLS */
-#define ATTR_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0)
-#define ENTRY_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0)
+#define ATTR_TIMEOUT (ctx->ro ? TIMEOUT_RO : \
+	(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0))
+#define ENTRY_TIMEOUT (ctx->ro ? TIMEOUT_RO : \
+	(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 10.0 : 0.0))
 #endif /* KERNELACLS */
 #endif /* defined(__sun) && defined (__SVR4) */
 #endif /* !CACHEING */
