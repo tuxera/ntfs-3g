@@ -270,8 +270,11 @@ static const char *usage_msg =
 "          umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual (type: man ntfs-3g).\n"
 "\n"
-"Example: ntfs-3g /dev/sda1 /mnt/windows\n"
+"Example: lowntfs-3g /dev/sda1 /mnt/windows\n"
 "\n"
+#ifdef PLUGIN_DIR
+"Plugin path: " PLUGIN_DIR "\n\n"
+#endif /* PLUGIN_DIR */
 "%s";
 
 static const char ntfs_bad_reparse[] = "unsupported reparse point";

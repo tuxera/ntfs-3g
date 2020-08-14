@@ -207,6 +207,9 @@ static const char *usage_msg =
 "\n"
 "Example: ntfs-3g /dev/sda1 /mnt/windows\n"
 "\n"
+#ifdef PLUGIN_DIR 
+"Plugin path: " PLUGIN_DIR "\n\n"
+#endif /* PLUGIN_DIR */
 "%s";
 
 static const char ntfs_bad_reparse[] = "unsupported reparse point";
