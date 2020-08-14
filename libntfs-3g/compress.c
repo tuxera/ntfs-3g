@@ -491,6 +491,8 @@ do_next_sb:
 	 * first two checks do not detect it.
 	 */
 	if (cb == cb_end || !le16_to_cpup((le16*)cb) || dest == dest_end) {
+		if (dest_end > dest)
+			memset(dest, 0, dest_end - dest);
 		ntfs_log_debug("Completed. Returning success (0).\n");
 		return 0;
 	}
