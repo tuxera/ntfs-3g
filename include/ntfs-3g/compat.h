@@ -46,6 +46,16 @@
 #define ELIBACC ENOENT
 #endif
 
+/* xattr APIs in macOS differs from Linux ones in that they expect the special
+ * error code ENOATTR to be returned when an attribute cannot be found. So
+ * define NTFS_NOXATTR_ERRNO to the appropriate "no xattr found" errno value for
+ * the platform. */
+#if defined(__APPLE__) || defined(__DARWIN__)
+#define NTFS_NOXATTR_ERRNO ENOATTR
+#else
+#define NTFS_NOXATTR_ERRNO ENODATA
+#endif
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif

@@ -3236,14 +3236,14 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		/* trusted only readable by root */
 	if ((namespace == XATTRNS_TRUSTED)
 	    && security.uid)
-		    return -ENODATA;
+		    return -NTFS_NOXATTR_ERRNO;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
 	if (!user_xattrs_allowed(ctx, ni)) {
-		res = -ENODATA;
+		res = -NTFS_NOXATTR_ERRNO;
 		goto exit;
 	}
 		/* otherwise file must be readable */
@@ -3260,7 +3260,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	}
 	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 	if (!na) {
-		res = -ENODATA;
+		res = -NTFS_NOXATTR_ERRNO;
 		goto exit;
 	}
 	rsize = na->data_size;
@@ -3450,7 +3450,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	}
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
-			res = -ENODATA;
+			res = -NTFS_NOXATTR_ERRNO;
 			goto exit;
 		}
 		if (ntfs_attr_add(ni, AT_DATA, lename, lename_len, NULL, 0)) {
@@ -3680,7 +3680,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	}
 	if (ntfs_attr_remove(ni, AT_DATA, lename, lename_len)) {
 		if (errno == ENOENT)
-			errno = ENODATA;
+			errno = NTFS_NOXATTR_ERRNO;
 		res = -errno;
 	}
 	if (!res) {
