@@ -427,7 +427,14 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 				}
 				break;
 			case OPT_USER_XATTR :
+#if defined(__APPLE__) || defined(__DARWIN__)
+				/* macOS builds use non-namespaced extended
+				 * attributes by default since it matches the
+				 * standard behaviour of macOS filesystems. */
+				ctx->streams = NF_STREAMS_INTERFACE_OPENXATTR;
+#else
 				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+#endif
 				break;
 			case OPT_NOAUTO :
 				/* Don't pass noauto option to fuse. */
