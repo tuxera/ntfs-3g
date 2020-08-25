@@ -3151,9 +3151,18 @@ exit:
 	return ret;
 }
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+static int ntfs_fuse_getxattr(const char *path, const char *name,
+				char *value, size_t size, uint32_t position)
+#else
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
+#endif
 {
+#if !(defined(__APPLE__) || defined(__DARWIN__))
+	static const unsigned int position = 0U;
+#endif
+
 	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
 	ntfs_attr *na = NULL;
@@ -3163,6 +3172,15 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	enum SYSTEMXATTRS attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+	/* If the attribute is not a resource fork attribute and the position
+	 * parameter is non-zero, we return with EINVAL as requesting position
+	 * is not permitted for non-resource fork attributes. */
+	if (position && strcmp(name, XATTR_RESOURCEFORK_NAME)) {
+		return -EINVAL;
+	}
+#endif
 
 	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
@@ -3269,9 +3287,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	    && (na->data_flags & ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na))
 		rsize = ((na->data_size + 511) & ~511) + 2;
+	rsize -= position;
 	if (size) {
 		if (size >= (size_t)rsize) {
-			res = ntfs_attr_pread(na, 0, rsize, value);
+			res = ntfs_attr_pread(na, position, rsize, value);
 			if (res != rsize)
 				res = -errno;
 		} else
@@ -3287,9 +3306,21 @@ exit:
 	return res;
 }
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+static int ntfs_fuse_setxattr(const char *path, const char *name,
+				const char *value, size_t size, int flags,
+				uint32_t position)
+#else
 static int ntfs_fuse_setxattr(const char *path, const char *name,
 				const char *value, size_t size, int flags)
+#endif
 {
+#if !(defined(__APPLE__) || defined(__DARWIN__))
+	static const unsigned int position = 0U;
+#else
+	BOOL is_resource_fork;
+#endif
+
 	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
 	ntfs_attr *na = NULL;
@@ -3300,6 +3331,16 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	enum SYSTEMXATTRS attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+	/* If the attribute is not a resource fork attribute and the position
+	 * parameter is non-zero, we return with EINVAL as requesting position
+	 * is not permitted for non-resource fork attributes. */
+	is_resource_fork = strcmp(name, XATTR_RESOURCEFORK_NAME) ? FALSE : TRUE;
+	if (position && !is_resource_fork) {
+		return -EINVAL;
+	}
+#endif
 
 	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
@@ -3466,6 +3507,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
+#if defined(__APPLE__) || defined(__DARWIN__)
+	} else if (is_resource_fork) {
+		/* In macOS, the resource fork is a special case. It doesn't
+		 * ever shrink (it would have to be removed and re-added). */
+#endif
 	} else {
 			/* currently compressed streams can only be wiped out */
 		if (ntfs_attr_truncate(na, (s64)0 /* size */)) {
@@ -3477,8 +3523,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	res = 0;
 	if (size) {
 		do {
-			part = ntfs_attr_pwrite(na, total, size - total,
-					 &value[total]);
+			part = ntfs_attr_pwrite(na, position + total,
+					 size - total, &value[total]);
 			if (part > 0)
 				total += part;
 		} while ((part > 0) && (total < size));
