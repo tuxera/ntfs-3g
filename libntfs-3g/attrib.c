@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2015 Jean-Pierre Andre
+ * Copyright (c) 2007-2020 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -5850,6 +5850,9 @@ retry:
 				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 			if (spcomp)
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
+			/* Updating sizes taints the extent holding the attr */
+			if (ctx->ntfs_ino)
+				NInoSetDirty(ctx->ntfs_ino);
 			if ((na->type == AT_DATA) && (na->name == AT_UNNAMED)) {
 				na->ni->allocated_size
 					= (spcomp
