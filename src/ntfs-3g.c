@@ -212,7 +212,9 @@ static const char *usage_msg =
 #endif /* PLUGIN_DIR */
 "%s";
 
-static const char ntfs_bad_reparse[] = "unsupported reparse point";
+static const char ntfs_bad_reparse[] = "unsupported reparse tag 0x%08lx";
+	 /* exact length of target text, without the terminator */
+#define ntfs_bad_reparse_lth (sizeof(ntfs_bad_reparse) + 2)
 
 #ifdef FUSE_INTERNAL
 int drop_privs(void);
@@ -722,7 +724,7 @@ static int junction_getattr(ntfs_inode *ni,
 		if (target)
 			stbuf->st_size = strlen(target);
 		else
-			stbuf->st_size = sizeof(ntfs_bad_reparse) - 1;
+			stbuf->st_size = ntfs_bad_reparse_lth;
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_mode = S_IFLNK;
 		free(target);
@@ -807,8 +809,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				apply_umask(stbuf);
 				goto ok;
 			} else {
-				stbuf->st_size =
-					sizeof(ntfs_bad_reparse) - 1;
+				stbuf->st_size = ntfs_bad_reparse_lth;
 				stbuf->st_blocks =
 					(ni->allocated_size + 511) >> 9;
 				stbuf->st_mode = S_IFLNK;
@@ -830,7 +831,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				if (target)
 					stbuf->st_size = strlen(target);
 				else
-					stbuf->st_size = sizeof(ntfs_bad_reparse) - 1;
+					stbuf->st_size = ntfs_bad_reparse_lth;
 				stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 				stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 				stbuf->st_mode = S_IFLNK;
@@ -1052,15 +1053,30 @@ static int junction_readlink(ntfs_inode *ni,
 			char **pbuf)
 {
 	int res;
+	le32 tag;
+	int lth;
 
 	errno = 0;
 	res = 0;
 	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 	if (!*pbuf) {
 		if (errno == EOPNOTSUPP) {
-			*pbuf = strdup(ntfs_bad_reparse);
-			if (!*pbuf)
-				res = -errno;
+			*pbuf = (char*)ntfs_malloc(ntfs_bad_reparse_lth + 1);
+			if (*pbuf) {
+				if (reparse)
+					tag = reparse->reparse_tag;
+				else
+					tag = const_cpu_to_le32(0);
+				lth = snprintf(*pbuf, ntfs_bad_reparse_lth + 1,
+						ntfs_bad_reparse,
+						(long)le32_to_cpu(tag));
+				if (lth != ntfs_bad_reparse_lth) {
+					free(*pbuf);
+					*pbuf = (char*)NULL;
+					res = -errno;
+				}
+			} else
+				res = -ENOMEM;
 		} else
 			res = -errno;
 	}
@@ -1077,6 +1093,9 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 	ntfs_attr *na = NULL;
 	INTX_FILE *intx_file = NULL;
 	int stream_name_len, res = 0;
+	REPARSE_POINT *reparse;
+	le32 tag;
+	int lth;
 
 	/* Get inode. */
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
@@ -1098,16 +1117,16 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 #ifndef DISABLE_PLUGINS
 		char *gotlink;
 		const plugin_operations_t *ops;
-		REPARSE_POINT *reparse;
 
 		gotlink = (char*)NULL;
 		res = CALL_REPARSE_PLUGIN(ni, readlink, &gotlink);
 		if (gotlink) {
 			strncpy(buf, gotlink, buf_size);
 			free(gotlink);
-		} else {
-			strncpy(buf, ntfs_bad_reparse, buf_size);
 			res = 0;
+		} else {
+			errno = EOPNOTSUPP;
+			res = -EOPNOTSUPP;
 		}
 #else /* DISABLE_PLUGINS */
 		char *target;
@@ -1119,11 +1138,22 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 			strncpy(buf,target,buf_size);
 			free(target);
 		} else
-			if (errno == EOPNOTSUPP)
-				strcpy(buf,ntfs_bad_reparse);
-			else
-				res = -errno;
+			res = -errno;
 #endif /* DISABLE_PLUGINS */
+		if (res == -EOPNOTSUPP) {
+			reparse = ntfs_get_reparse_point(ni);
+			if (reparse) {
+				tag = reparse->reparse_tag;
+				free(reparse);
+			} else
+				tag = const_cpu_to_le32(0);
+			lth = snprintf(buf, ntfs_bad_reparse_lth + 1,
+					ntfs_bad_reparse,
+					(long)le32_to_cpu(tag));
+			res = 0;
+			if (lth != ntfs_bad_reparse_lth)
+				res = -errno;
+		}
 		goto exit;
 	}
 	/* Sanity checks. */
