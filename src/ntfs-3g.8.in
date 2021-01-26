@@ -316,6 +316,14 @@ data streams are mapped to xattrs and user can manipulate them using
 .B user_xattr
 Same as \fBstreams_interface=\fP\fIxattr\fP.
 .TP
+.BI special_files= value
+This option selects a mode for representing a special file to be created
+(symbolic link, socket, fifo, character or block device). The mode can
+be \fBinterix\fR or \fBwsl\fR, and existing files in either mode are
+recognized irrespective of the selected mode. Interix is the traditional
+mode, used by default, and wsl is interoperable with Windows WSL, but
+it is not compatible with Windows versions earlier than Windows 10.
+.TP
 .B efs_raw
 This option should only be used in backup or restore situation.
 It changes the apparent size of files and the behavior of read and

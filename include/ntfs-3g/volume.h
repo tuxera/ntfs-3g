@@ -98,6 +98,11 @@ typedef enum {
 	NTFS_VOLUME_INSECURE		= 22
 } ntfs_volume_status;
 
+typedef enum {
+	NTFS_FILES_INTERIX,
+	NTFS_FILES_WSL,
+} ntfs_volume_special_files;
+
 /**
  * enum ntfs_volume_state_bits -
  *
@@ -256,6 +261,7 @@ struct _ntfs_volume {
 	s64 free_mft_records; 	/* Same for free mft records (see above) */
 	BOOL efs_raw;		/* volume is mounted for raw access to
 				   efs-encrypted files */
+	ntfs_volume_special_files special_files; /* Implementation of special files */
 	const char *abs_mnt_point; /* Mount point */
 #ifdef XATTR_MAPPINGS
 	struct XATTRMAPPING *xattr_mapping;

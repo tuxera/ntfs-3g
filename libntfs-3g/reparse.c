@@ -1331,6 +1331,92 @@ int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 	return (res ? -1 : 0);
 }
 
+/*
+ *		Set reparse data for a WSL type symlink
+ */
+
+int ntfs_reparse_set_wsl_symlink(ntfs_inode *ni,
+			const ntfschar *target, int target_len)
+{
+	int res;
+	int len;
+	int reparse_len;
+	char *utarget;
+	REPARSE_POINT *reparse;
+	struct WSL_LINK_REPARSE_DATA *data;
+
+	res = -1;
+	utarget = (char*)NULL;
+	len = ntfs_ucstombs(target, target_len, &utarget, 0);
+	if (len > 0) {
+		reparse_len = sizeof(REPARSE_POINT) + sizeof(data->type) + len;
+		reparse = (REPARSE_POINT*)malloc(reparse_len);
+		if (reparse) {
+			data = (struct WSL_LINK_REPARSE_DATA*)
+					reparse->reparse_data;
+			reparse->reparse_tag = IO_REPARSE_TAG_LX_SYMLINK;
+			reparse->reparse_data_length
+				= cpu_to_le16(sizeof(data->type) + len);
+			reparse->reserved = const_cpu_to_le16(0);
+			data->type = const_cpu_to_le32(2);
+			memcpy(data->link, utarget, len);
+			res = ntfs_set_ntfs_reparse_data(ni,
+				(char*)reparse, reparse_len, 0);
+			free(reparse);
+		}
+	}
+	free(utarget);
+	return (res);
+}
+
+/*
+ *		Set reparse data for a WSL special file other than a symlink
+ *	(socket, fifo, character or block device)
+ */
+
+int ntfs_reparse_set_wsl_not_symlink(ntfs_inode *ni, mode_t mode)
+{
+	int res;
+	int len;
+	int reparse_len;
+	le32 reparse_tag;
+	REPARSE_POINT *reparse;
+
+	res = -1;
+	len = 0;
+	switch (mode) {
+	case S_IFSOCK :
+		reparse_tag = IO_REPARSE_TAG_AF_UNIX;
+		break;
+	case S_IFIFO :
+		reparse_tag = IO_REPARSE_TAG_LX_FIFO;
+		break;
+	case S_IFCHR :
+		reparse_tag = IO_REPARSE_TAG_LX_CHR;
+		break;
+	case S_IFBLK :
+		reparse_tag = IO_REPARSE_TAG_LX_BLK;
+		break;
+	default :
+		len = -1;
+		errno = EOPNOTSUPP;
+		break;
+	}
+	if (len >= 0) {
+		reparse_len = sizeof(REPARSE_POINT) + len;
+		reparse = (REPARSE_POINT*)malloc(reparse_len);
+		if (reparse) {
+			reparse->reparse_tag = reparse_tag;
+			reparse->reparse_data_length = cpu_to_le16(len);
+			reparse->reserved = const_cpu_to_le16(0);
+			res = ntfs_set_ntfs_reparse_data(ni,
+				(char*)reparse, reparse_len, 0);
+			free(reparse);
+		}
+	}
+	return (res);
+}
+
 
 /*
  *		Get the reparse data into a buffer

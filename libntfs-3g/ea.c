@@ -62,6 +62,7 @@
 #include "xattrs.h"
 
 static const char lxdev[] = "$LXDEV";
+static const char lxmod[] = "$LXMOD";
 
 
 /*
@@ -466,3 +467,53 @@ int ntfs_ea_check_wsldev(ntfs_inode *ni, dev_t *rdevp)
 	return (res);
 }
 
+int ntfs_ea_set_wsl_not_symlink(ntfs_inode *ni, mode_t type, dev_t dev)
+{
+	le32 mode;
+	struct {
+		le32 major;
+		le32 minor;
+	} device;
+	struct EA_WSL {
+		struct EA_LXMOD {	/* always inserted */
+			EA_ATTR base;
+			char name[sizeof(lxmod)];
+			char value[sizeof(mode)];
+			char stuff[3 & -(sizeof(lxmod) + sizeof(mode))];
+		} mod;
+		struct EA_LXDEV {	/* char or block devices only */
+			EA_ATTR base;
+			char name[sizeof(lxdev)];
+			char value[sizeof(device)];
+			char stuff[3 & -(sizeof(lxdev) + sizeof(device))];
+		} dev;
+	} attr;
+	int len;
+	int res;
+
+	memset(&attr, 0, sizeof(attr));
+	mode = cpu_to_le32((u32)(type | 0644));
+	attr.mod.base.next_entry_offset
+			= const_cpu_to_le32(sizeof(attr.mod));
+	attr.mod.base.flags = 0;
+	attr.mod.base.name_length = sizeof(lxmod) - 1;
+	attr.mod.base.value_length = const_cpu_to_le16(sizeof(mode));
+	memcpy(attr.mod.name, lxmod, sizeof(lxmod));
+	memcpy(attr.mod.value, &mode, sizeof(mode));
+	len = sizeof(attr.mod);
+
+	if (S_ISCHR(type) || S_ISBLK(type)) {
+		device.major = cpu_to_le32(major(dev));
+		device.minor = cpu_to_le32(minor(dev));
+		attr.dev.base.next_entry_offset
+			= const_cpu_to_le32(sizeof(attr.dev));
+		attr.dev.base.flags = 0;
+		attr.dev.base.name_length = sizeof(lxdev) - 1;
+		attr.dev.base.value_length = const_cpu_to_le16(sizeof(device));
+		memcpy(attr.dev.name, lxdev, sizeof(lxdev));
+		memcpy(attr.dev.value, &device, sizeof(device));
+		len += sizeof(attr.dev);
+		}
+	res = ntfs_set_ntfs_ea(ni, (char*)&attr, len, 0);
+	return (res);
+}

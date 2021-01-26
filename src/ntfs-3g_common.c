@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2020 Jean-Pierre Andre
+ * Copyright (c) 2010-2021 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -127,6 +127,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "xattrmapping", OPT_XATTRMAPPING, FLGOPT_STRING },
 	{ "efs_raw", OPT_EFS_RAW, FLGOPT_BOGUS },
 	{ "posix_nlink", OPT_POSIX_NLINK, FLGOPT_BOGUS },
+	{ "special_files", OPT_SPECIAL_FILES, FLGOPT_STRING },
 	{ (const char*)NULL, 0, 0 } /* end marker */
 } ;
 
@@ -502,6 +503,17 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 #endif /* HAVE_SETXATTR */
 			case OPT_POSIX_NLINK :
 				ctx->posix_nlink = TRUE;
+				break;
+			case OPT_SPECIAL_FILES :
+				if (!strcmp(val, "interix"))
+					ctx->special_files = NTFS_FILES_INTERIX;
+				else if (!strcmp(val, "wsl"))
+					ctx->special_files = NTFS_FILES_WSL;
+				else {
+					ntfs_log_error("Invalid special_files"
+						" mode.\n");
+					goto err_exit;
+				}
 				break;
 			case OPT_FSNAME : /* Filesystem name. */
 			/*

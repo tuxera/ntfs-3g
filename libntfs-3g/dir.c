@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2005-2007 Yura Pakhuchiy
- * Copyright (c) 2008-2020 Jean-Pierre Andre
+ * Copyright (c) 2008-2021 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -68,6 +68,7 @@
 #include "reparse.h"
 #include "object_id.h"
 #include "xattrs.h"
+#include "ea.h"
 
 /*
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
@@ -1496,9 +1497,11 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 {
 	ntfs_inode *ni;
 	int rollback_data = 0, rollback_sd = 0;
+	int rollback_dir = 0;
 	FILE_NAME_ATTR *fn = NULL;
 	STANDARD_INFORMATION *si = NULL;
 	int err, fn_len, si_len;
+	ntfs_volume_special_files special_files;
 
 	ntfs_log_trace("Entering.\n");
 	
@@ -1515,6 +1518,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 #if CACHE_NIDATA_SIZE
 	ntfs_inode_invalidate(dir_ni->vol, ni->mft_no);
 #endif
+	special_files = dir_ni->vol->special_files;	
 	/*
 	 * Create STANDARD_INFORMATION attribute.
 	 * JPA Depending on available inherited security descriptor,
@@ -1542,8 +1546,19 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	} else
 		clear_nino_flag(ni, v3_Extensions);
 	if (!S_ISREG(type) && !S_ISDIR(type)) {
-		si->file_attributes = FILE_ATTR_SYSTEM;
-		ni->flags = FILE_ATTR_SYSTEM;
+		switch (special_files) {
+		case NTFS_FILES_WSL :
+			if (!S_ISLNK(type)) {
+				si->file_attributes
+					= FILE_ATTRIBUTE_RECALL_ON_OPEN;
+				ni->flags = FILE_ATTRIBUTE_RECALL_ON_OPEN;
+			}
+			break;
+		default :
+			si->file_attributes = FILE_ATTR_SYSTEM;
+			ni->flags = FILE_ATTR_SYSTEM;
+			break;
+		}
 	}
 	ni->flags |= FILE_ATTR_ARCHIVE;
 	if (NVolHideDotFiles(dir_ni->vol)
@@ -1576,8 +1591,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 			err = errno;
 			goto err_out;
 		}
+		rollback_sd = 1;
 	}
-	rollback_sd = 1;
 
 	if (S_ISDIR(type)) {
 		INDEX_ROOT *ir = NULL;
@@ -1626,34 +1641,58 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		switch (type) {
 			case S_IFBLK:
 			case S_IFCHR:
-				data_len = offsetof(INTX_FILE, device_end);
-				data = ntfs_malloc(data_len);
-				if (!data) {
-					err = errno;
-					goto err_out;
+				switch (special_files) {
+				case NTFS_FILES_WSL :
+					data_len = 0;
+					data = (INTX_FILE*)NULL;
+					break;
+				default :
+					data_len = offsetof(INTX_FILE,
+								device_end);
+					data = (INTX_FILE*)ntfs_malloc(
+								data_len);
+					if (!data) {
+						err = errno;
+						goto err_out;
+					}
+					data->major = cpu_to_le64(major(dev));
+					data->minor = cpu_to_le64(minor(dev));
+					if (type == S_IFBLK)
+						data->magic
+							= INTX_BLOCK_DEVICE;
+					if (type == S_IFCHR)
+						data->magic
+							= INTX_CHARACTER_DEVICE;
+					break;
 				}
-				data->major = cpu_to_le64(major(dev));
-				data->minor = cpu_to_le64(minor(dev));
-				if (type == S_IFBLK)
-					data->magic = INTX_BLOCK_DEVICE;
-				if (type == S_IFCHR)
-					data->magic = INTX_CHARACTER_DEVICE;
 				break;
 			case S_IFLNK:
-				data_len = sizeof(INTX_FILE_TYPES) +
+				switch (special_files) {
+				case NTFS_FILES_WSL :
+					data_len = 0;
+					data = (INTX_FILE*)NULL;
+					break;
+				default :
+					data_len = sizeof(INTX_FILE_TYPES) +
 						target_len * sizeof(ntfschar);
-				data = ntfs_malloc(data_len);
-				if (!data) {
-					err = errno;
-					goto err_out;
-				}
-				data->magic = INTX_SYMBOLIC_LINK;
-				memcpy(data->target, target,
+					data = (INTX_FILE*)ntfs_malloc(
+								data_len);
+					if (!data) {
+						err = errno;
+						goto err_out;
+					}
+					data->magic = INTX_SYMBOLIC_LINK;
+					memcpy(data->target, target,
 						target_len * sizeof(ntfschar));
+					break;
+				}
 				break;
 			case S_IFSOCK:
 				data = NULL;
-				data_len = 1;
+				if (special_files == NTFS_FILES_WSL)
+					data_len = 0;
+				else
+					data_len = 1;
 				break;
 			default: /* FIFO or regular file. */
 				data = NULL;
@@ -1684,9 +1723,10 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	fn->file_name_type = FILE_NAME_POSIX;
 	if (S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_I30_INDEX_PRESENT;
-	if (!S_ISREG(type) && !S_ISDIR(type))
-		fn->file_attributes = FILE_ATTR_SYSTEM;
-	else
+	if (!S_ISREG(type) && !S_ISDIR(type)) {
+		if (special_files == NTFS_FILES_INTERIX)
+			fn->file_attributes = FILE_ATTR_SYSTEM;
+	} else
 		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
 	fn->file_attributes |= FILE_ATTR_ARCHIVE;
 	fn->file_attributes |= ni->flags & FILE_ATTR_HIDDEN;
@@ -1714,10 +1754,40 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		ntfs_log_perror("Failed to add entry to the index");
 		goto err_out;
 	}
+	rollback_dir = 1;
 	/* Set hard links count and directory flag. */
 	ni->mrec->link_count = const_cpu_to_le16(1);
 	if (S_ISDIR(type))
 		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
+	/* Add reparse data */
+	if (special_files == NTFS_FILES_WSL) {
+		switch (type) {
+		case S_IFLNK :
+			err = ntfs_reparse_set_wsl_symlink(ni, target,
+					target_len);
+			break;
+		case S_IFIFO :
+		case S_IFSOCK :
+		case S_IFCHR :
+		case S_IFBLK :
+			err = ntfs_reparse_set_wsl_not_symlink(ni,
+					type);
+			if (!err) {
+				err = ntfs_ea_set_wsl_not_symlink(ni,
+						type, dev);
+				if (err)
+					ntfs_remove_ntfs_reparse_data(ni);
+			}
+			break;
+		default :
+			err = 0;
+			break;
+		}
+		if (err) {
+			err = errno;
+			goto err_out;
+		}
+	}
 	ntfs_inode_mark_dirty(ni);
 	/* Done! */
 	free(fn);
@@ -1726,6 +1796,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	return ni;
 err_out:
 	ntfs_log_trace("Failed.\n");
+
+	if (rollback_dir)
+		ntfs_index_remove(dir_ni, ni, fn, fn_len);
 
 	if (rollback_sd)
 		ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0);

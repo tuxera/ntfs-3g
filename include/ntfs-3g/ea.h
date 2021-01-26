@@ -26,6 +26,8 @@
 
 int ntfs_ea_check_wsldev(ntfs_inode *ni, dev_t *rdevp);
 
+int ntfs_ea_set_wsl_not_symlink(ntfs_inode *ni, mode_t mode, dev_t dev);
+
 int ntfs_get_ntfs_ea(ntfs_inode *ni, char *value, size_t size);
 
 int ntfs_set_ntfs_ea(ntfs_inode *ni, const char *value, size_t size, int flags);

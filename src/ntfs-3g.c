@@ -2117,7 +2117,11 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			perm = (typemode & ~ctx->dmask & 0777)
 				| (dsetgid & S_ISGID);
 		else
-			perm = typemode & ~ctx->fmask & 0777;
+			if ((ctx->special_files == NTFS_FILES_WSL)
+			    && S_ISLNK(type))
+				perm = typemode | 0777;
+			else
+				perm = typemode & ~ctx->fmask & 0777;
 			/*
 			 * Try to get a security id available for
 			 * file creation (from inheritance or argument).
@@ -4464,6 +4468,7 @@ int main(int argc, char *argv[])
 	ctx->vol->abs_mnt_point = ctx->abs_mnt_point;
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
+	ctx->vol->special_files = ctx->special_files;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->vol->efs_raw = ctx->efs_raw;
 #endif /* HAVE_SETXATTR */

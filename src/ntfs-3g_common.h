@@ -93,6 +93,7 @@ enum {
 	OPT_XATTRMAPPING,
 	OPT_EFS_RAW,
 	OPT_POSIX_NLINK,
+	OPT_SPECIAL_FILES,
 } ;
 
 			/* Option flags */
@@ -155,6 +156,7 @@ typedef struct {
 	BOOL blkdev;
 	BOOL mounted;
 	BOOL posix_nlink;
+	ntfs_volume_special_files special_files;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	BOOL efs_raw;
 #ifdef XATTR_MAPPINGS
