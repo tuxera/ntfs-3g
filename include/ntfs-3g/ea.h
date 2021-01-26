@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2014 Jean-Pierre Andre
+ * Copyright (c) 2014-2021 Jean-Pierre Andre
  *
  */
 
@@ -23,6 +23,8 @@
 
 #ifndef EA_H
 #define EA_H
+
+int ntfs_ea_check_wsldev(ntfs_inode *ni, dev_t *rdevp);
 
 int ntfs_get_ntfs_ea(ntfs_inode *ni, char *value, size_t size);
 

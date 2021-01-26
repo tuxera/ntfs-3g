@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2008-2016 Jean-Pierre Andre
+ * Copyright (c) 2008-2021 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -37,7 +37,10 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_SYSMACROS_H
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
 #include <sys/sysmacros.h>
 #endif
 
@@ -56,6 +59,7 @@
 #include "misc.h"
 #include "reparse.h"
 #include "xattrs.h"
+#include "ea.h"
 
 struct MOUNT_POINT_REPARSE_DATA {      /* reparse data for junctions */
 	le16	subst_name_offset;
@@ -72,6 +76,11 @@ struct SYMLINK_REPARSE_DATA {          /* reparse data for symlinks */
 	le16	print_name_length;
 	le32	flags;		     /* 1 for full target, otherwise 0 */
 	char	path_buffer[0];      /* above data assume this is char array */
+} ;
+
+struct WSL_LINK_REPARSE_DATA {
+	le32	type;
+	char	link[0];
 } ;
 
 struct REPARSE_INDEX {			/* index entry in $Extend/$Reparse */
@@ -416,6 +425,35 @@ static int ntfs_drive_letter(ntfs_volume *vol, ntfschar letter)
 }
 
 /*
+ *		Check whether reparse data describes a valid wsl special file
+ *	which is either a socket, a fifo, or a character or block device 
+ *
+ *	Return zero if valid, otherwise returns a negative error code
+ */
+
+int ntfs_reparse_check_wsl(ntfs_inode *ni, const REPARSE_POINT *reparse)
+{
+	int res;
+
+	res = -EOPNOTSUPP;
+	switch (reparse->reparse_tag) {
+	case IO_REPARSE_TAG_AF_UNIX :
+	case IO_REPARSE_TAG_LX_FIFO :
+	case IO_REPARSE_TAG_LX_CHR :
+	case IO_REPARSE_TAG_LX_BLK :
+		if (!reparse->reparse_data_length
+		    && (ni->flags & FILE_ATTRIBUTE_RECALL_ON_OPEN))
+			res = 0;
+		break;
+	default :
+		break;
+	}
+	if (res)
+		errno = EOPNOTSUPP;
+	return (res);
+}
+
+/*
  *		Do some sanity checks on reparse data
  *
  *	Microsoft reparse points have an 8-byte header whereas
@@ -435,6 +473,7 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 	unsigned int lth;
 	const struct MOUNT_POINT_REPARSE_DATA *mount_point_data;
 	const struct SYMLINK_REPARSE_DATA *symlink_data;
+	const struct WSL_LINK_REPARSE_DATA *wsl_reparse_data;
 
 	ok = ni && reparse_attr
 		&& (size >= sizeof(REPARSE_POINT))
@@ -475,6 +514,22 @@ static BOOL valid_reparse_data(ntfs_inode *ni,
 			if ((size_t)((sizeof(REPARSE_POINT)
 				 + sizeof(struct SYMLINK_REPARSE_DATA)
 				 + offs + lth)) > size)
+				ok = FALSE;
+			break;
+		case IO_REPARSE_TAG_LX_SYMLINK :
+			wsl_reparse_data = (const struct WSL_LINK_REPARSE_DATA*)
+						reparse_attr->reparse_data;
+			if ((le16_to_cpu(reparse_attr->reparse_data_length)
+					<= sizeof(wsl_reparse_data->type))
+			    || (wsl_reparse_data->type != const_cpu_to_le32(2)))
+				ok = FALSE;
+			break;
+		case IO_REPARSE_TAG_AF_UNIX :
+		case IO_REPARSE_TAG_LX_FIFO :
+		case IO_REPARSE_TAG_LX_CHR :
+		case IO_REPARSE_TAG_LX_BLK :
+			if (reparse_attr->reparse_data_length
+			    || !(ni->flags & FILE_ATTRIBUTE_RECALL_ON_OPEN))
 				ok = FALSE;
 			break;
 		default :
@@ -737,6 +792,7 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point)
 	REPARSE_POINT *reparse_attr;
 	struct MOUNT_POINT_REPARSE_DATA *mount_point_data;
 	struct SYMLINK_REPARSE_DATA *symlink_data;
+	struct WSL_LINK_REPARSE_DATA *wsl_link_data;
 	enum { FULL_TARGET, ABS_TARGET, REL_TARGET } kind;
 	ntfschar *p;
 	BOOL bad;
@@ -819,6 +875,22 @@ char *ntfs_make_symlink(ntfs_inode *ni, const char *mnt_point)
 				break;
 			}
 			break;
+		case IO_REPARSE_TAG_LX_SYMLINK :
+			wsl_link_data = (struct WSL_LINK_REPARSE_DATA*)
+						reparse_attr->reparse_data;
+			if (wsl_link_data->type == const_cpu_to_le32(2)) {
+				lth = le16_to_cpu(
+					reparse_attr->reparse_data_length)
+					- sizeof(wsl_link_data->type);
+				target = (char*)ntfs_malloc(lth + 1);
+				if (target) {
+					memcpy(target, wsl_link_data->link,
+						lth);
+					target[lth] = 0;
+					bad = FALSE;
+				}
+			}
+			break;
 		}
 		free(reparse_attr);
 	}
@@ -848,6 +920,7 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 		switch (reparse_attr->reparse_tag) {
 		case IO_REPARSE_TAG_MOUNT_POINT :
 		case IO_REPARSE_TAG_SYMLINK :
+		case IO_REPARSE_TAG_LX_SYMLINK :
 			possible = TRUE;
 		default : ;
 		}
@@ -1279,7 +1352,7 @@ REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni)
 		    && !valid_reparse_data(ni, reparse_attr, attr_size)) {
 			free(reparse_attr);
 			reparse_attr = (REPARSE_POINT*)NULL;
-			errno = ENOENT;
+			errno = EINVAL;
 		}
 	} else
 		errno = EINVAL;

@@ -3,7 +3,7 @@
  *
  *      This module is part of ntfs-3g library
  *
- * Copyright (c) 2014 Jean-Pierre Andre
+ * Copyright (c) 2014-2021 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -43,6 +43,12 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
+#endif
 
 #include "types.h"
 #include "param.h"
@@ -54,6 +60,9 @@
 #include "misc.h"
 #include "logging.h"
 #include "xattrs.h"
+
+static const char lxdev[] = "$LXDEV";
+
 
 /*
  *		Create a needed attribute (EA or EA_INFORMATION)
@@ -393,3 +402,68 @@ int ntfs_remove_ntfs_ea(ntfs_inode *ni)
 	}
 	return (res ? -1 : 0);
 }
+
+/*
+ *		Check for the presence of an EA "$LXDEV" (used by WSL)
+ *	and return its value as a device address
+ *
+ *	Returns zero if successful
+ *		-1 if failed, with errno set
+ */
+
+int ntfs_ea_check_wsldev(ntfs_inode *ni, dev_t *rdevp)
+{
+	const EA_ATTR *p_ea;
+	int bufsize;
+	char *buf;
+	int lth;
+	int res;
+	int offset;
+	int next;
+	BOOL found;
+	struct {
+		le32 major;
+		le32 minor;
+	} device;
+
+	res = -EOPNOTSUPP;
+	bufsize = 256; /* expected to be enough */
+	buf = (char*)malloc(bufsize);
+	if (buf) {
+		lth = ntfs_get_ntfs_ea(ni, buf, bufsize);
+			/* retry if short buf */
+		if (lth > bufsize) {
+			free(buf);
+			bufsize = lth;
+			buf = (char*)malloc(bufsize);
+			if (buf)
+				lth = ntfs_get_ntfs_ea(ni, buf, bufsize);
+		}
+	}
+	if (buf && (lth > 0) && (lth <= bufsize)) {
+		offset = 0;
+		found = FALSE;
+		do {
+			p_ea = (const EA_ATTR*)&buf[offset];
+			next = le32_to_cpu(p_ea->next_entry_offset);
+			found = ((next > (int)(sizeof(lxdev) + sizeof(device)))
+				&& (p_ea->name_length == (sizeof(lxdev) - 1))
+				&& (p_ea->value_length
+					== const_cpu_to_le16(sizeof(device)))
+				&& !memcmp(p_ea->name, lxdev, sizeof(lxdev)));
+			if (!found)
+				offset += next;
+		} while (!found && (next > 0) && (offset < lth));
+		if (found) {
+				/* beware of alignment */
+			memcpy(&device, &p_ea->name[p_ea->name_length + 1],
+					sizeof(device));
+			*rdevp = makedev(le32_to_cpu(device.major),
+					le32_to_cpu(device.minor));
+			res = 0;
+		}
+	}
+	free(buf);
+	return (res);
+}
+

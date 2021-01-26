@@ -850,8 +850,10 @@ typedef enum {
 	FILE_ATTR_OFFLINE		= const_cpu_to_le32(0x00001000),
 	FILE_ATTR_NOT_CONTENT_INDEXED	= const_cpu_to_le32(0x00002000),
 	FILE_ATTR_ENCRYPTED		= const_cpu_to_le32(0x00004000),
+		/* Supposed to mean no data locally, possibly repurposed */
+	FILE_ATTRIBUTE_RECALL_ON_OPEN	= const_cpu_to_le32(0x00040000),
 
-	FILE_ATTR_VALID_FLAGS		= const_cpu_to_le32(0x00007fb7),
+	FILE_ATTR_VALID_FLAGS		= const_cpu_to_le32(0x00047fb7),
 	/* FILE_ATTR_VALID_FLAGS masks out the old DOS VolId and the
 	   FILE_ATTR_DEVICE and preserves everything else. This mask
 	   is used to obtain all flags that are valid for reading. */
@@ -2444,8 +2446,12 @@ typedef enum {
 	IO_REPARSE_TAG_WCI		= const_cpu_to_le32(0x80000018),
 	IO_REPARSE_TAG_CLOUD		= const_cpu_to_le32(0x9000001A),
 	IO_REPARSE_TAG_APPEXECLINK	= const_cpu_to_le32(0x8000001B),
-	IO_REPARSE_TAG_GVFS             = const_cpu_to_le32(0x9000001C),
-	IO_REPARSE_TAG_LX_SYMLINK       = const_cpu_to_le32(0xA000001D),
+	IO_REPARSE_TAG_GVFS		= const_cpu_to_le32(0x9000001C),
+	IO_REPARSE_TAG_LX_SYMLINK	= const_cpu_to_le32(0xA000001D),
+	IO_REPARSE_TAG_AF_UNIX		= const_cpu_to_le32(0x80000023),
+	IO_REPARSE_TAG_LX_FIFO		= const_cpu_to_le32(0x80000024),
+	IO_REPARSE_TAG_LX_CHR		= const_cpu_to_le32(0x80000025),
+	IO_REPARSE_TAG_LX_BLK		= const_cpu_to_le32(0x80000026),
 
 	IO_REPARSE_TAG_VALID_VALUES	= const_cpu_to_le32(0xf000ffff),
 	IO_REPARSE_PLUGIN_SELECT	= const_cpu_to_le32(0xffff0fff),

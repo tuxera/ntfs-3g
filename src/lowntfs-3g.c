@@ -102,6 +102,7 @@
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
+#include "ea.h"
 #include "object_id.h"
 #include "efs.h"
 #include "logging.h"
@@ -677,6 +678,49 @@ static int junction_getstat(ntfs_inode *ni,
 	return (res);
 }
 
+static int wsl_getstat(ntfs_inode *ni, const REPARSE_POINT *reparse,
+			struct stat *stbuf)
+{
+	dev_t rdev;
+	int res;
+
+	res = ntfs_reparse_check_wsl(ni, reparse);
+	if (!res) {
+		switch (reparse->reparse_tag) {
+		case IO_REPARSE_TAG_AF_UNIX :
+			stbuf->st_mode = S_IFSOCK;
+			break;
+		case IO_REPARSE_TAG_LX_FIFO :
+			stbuf->st_mode = S_IFIFO;
+			break;
+		case IO_REPARSE_TAG_LX_CHR :
+			stbuf->st_mode = S_IFCHR;
+			res = ntfs_ea_check_wsldev(ni, &rdev);
+			stbuf->st_rdev = rdev;
+			break;
+		case IO_REPARSE_TAG_LX_BLK :
+			stbuf->st_mode = S_IFBLK;
+			res = ntfs_ea_check_wsldev(ni, &rdev);
+			stbuf->st_rdev = rdev;
+			break;
+		default :
+			stbuf->st_size = ntfs_bad_reparse_lth;
+			stbuf->st_mode = S_IFLNK;
+			break;
+		}
+	}
+		/*
+		 * If the reparse point is not a valid wsl special file
+		 * we display as a symlink
+		 */
+	if (res) {
+		stbuf->st_size = ntfs_bad_reparse_lth;
+		stbuf->st_mode = S_IFLNK;
+		res = 0;
+	}
+	return (res);
+}
+
 /*
  *		Apply permission masks to st_mode returned by reparse handler
  */
@@ -1095,7 +1139,8 @@ static void ntfs_fuse_readlink(fuse_req_t req, fuse_ino_t ino)
 		const plugin_operations_t *ops;
 
 		res = CALL_REPARSE_PLUGIN(ni, readlink, &buf);
-		if (res && (errno == ELIBACC))
+			/* plugin missing or reparse tag failing the check */
+		if (res && ((errno == ELIBACC) || (errno == EINVAL)))
 			errno = EOPNOTSUPP;
 #else /* DISABLE_PLUGINS */
 		errno = 0;
@@ -4131,10 +4176,23 @@ static void register_internal_reparse_plugins(void)
 		.getattr = junction_getstat,
 		.readlink = junction_readlink,
 	} ;
+	static const plugin_operations_t wsl_ops = {
+		.getattr = wsl_getstat,
+	} ;
 	register_reparse_plugin(ctx, IO_REPARSE_TAG_MOUNT_POINT,
 					&ops, (void*)NULL);
 	register_reparse_plugin(ctx, IO_REPARSE_TAG_SYMLINK,
 					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_SYMLINK,
+					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_AF_UNIX,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_FIFO,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_CHR,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_BLK,
+					&wsl_ops, (void*)NULL);
 }
 #endif /* DISABLE_PLUGINS */
 

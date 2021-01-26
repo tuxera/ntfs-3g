@@ -439,6 +439,18 @@ static const char *reparse_type_name(le32 tag)
 	case IO_REPARSE_TAG_LX_SYMLINK :
 		name = " (Linux symlink)";
 		break;
+	case IO_REPARSE_TAG_LX_FIFO :
+		name = " (Linux fifo)";
+		break;
+	case IO_REPARSE_TAG_LX_CHR :
+		name = " (Linux character device)";
+		break;
+	case IO_REPARSE_TAG_LX_BLK :
+		name = " (Linux block device)";
+		break;
+	case IO_REPARSE_TAG_AF_UNIX :
+		name = " (Unix socket)";
+		break;
 	case IO_REPARSE_TAG_APPEXECLINK :
 		name = " (Exec link)";
 		break;
@@ -621,6 +633,10 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 	if (flags & FILE_ATTR_VIEW_INDEX_PRESENT) {
 		printf(" VIEW_INDEX");
 		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
+	}
+	if (flags & FILE_ATTRIBUTE_RECALL_ON_OPEN) {
+		printf(" RECALL_ON_OPEN");
+		flags &= ~FILE_ATTRIBUTE_RECALL_ON_OPEN;
 	}
 	if (flags)
 		printf(" UNKNOWN: 0x%08x", (unsigned int)le32_to_cpu(flags));

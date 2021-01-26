@@ -35,6 +35,8 @@ char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 
 REPARSE_POINT *ntfs_get_reparse_point(ntfs_inode *ni);
 
+int ntfs_reparse_check_wsl(ntfs_inode *ni, const REPARSE_POINT *reparse);
+
 int ntfs_set_ntfs_reparse_data(ntfs_inode *ni, const char *value,
 			size_t size, int flags);
 int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni);
