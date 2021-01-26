@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2020 Jean-Pierre Andre
+ * Copyright (c) 2007-2021 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -196,7 +196,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2020 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2021 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -2067,26 +2067,47 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					perm & ~security.umask, S_ISDIR(type));
 #endif
 		/* Create object specified in @type. */
-		switch (type) {
-			case S_IFCHR:
-			case S_IFBLK:
-				ni = ntfs_create_device(dir_ni, securid,
+		if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			reparse = (REPARSE_POINT*)NULL;
+			ops = select_reparse_plugin(ctx, dir_ni, &reparse);
+			if (ops && ops->create) {
+				ni = (*ops->create)(dir_ni, reparse,
+					securid, uname, uname_len, type);
+			} else {
+				ni = (ntfs_inode*)NULL;
+				errno = EOPNOTSUPP;
+			}
+			free(reparse);
+#else /* DISABLE_PLUGINS */
+			errno = EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+		} else {
+			switch (type) {
+				case S_IFCHR:
+				case S_IFBLK:
+					ni = ntfs_create_device(dir_ni, securid,
 						uname, uname_len, type,	dev);
-				break;
-			case S_IFLNK:
-				utarget_len = ntfs_mbstoucs(target, &utarget);
-				if (utarget_len < 0) {
-					res = -errno;
-					goto exit;
-				}
-				ni = ntfs_create_symlink(dir_ni, securid,
-						uname, uname_len,
+					break;
+				case S_IFLNK:
+					utarget_len = ntfs_mbstoucs(target,
+							&utarget);
+					if (utarget_len < 0) {
+						res = -errno;
+						goto exit;
+					}
+					ni = ntfs_create_symlink(dir_ni,
+						securid, uname, uname_len,
 						utarget, utarget_len);
-				break;
-			default:
-				ni = ntfs_create(dir_ni, securid, uname,
-						uname_len, type);
-				break;
+					break;
+				default:
+					ni = ntfs_create(dir_ni, securid,
+						uname, uname_len, type);
+					break;
+			}
 		}
 		if (ni) {
 				/*
@@ -2309,10 +2330,24 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	else
 #endif
 	{
-		if (ntfs_link(ni, dir_ni, uname, uname_len)) {
-				res = -errno;
-			goto exit;
-		}
+		if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			res = CALL_REPARSE_PLUGIN(dir_ni, link,
+					ni, uname, uname_len);
+#else /* DISABLE_PLUGINS */
+			errno = EOPNOTSUPP;
+			res = -errno;
+#endif /* DISABLE_PLUGINS */
+			if (res)
+				goto exit;
+		} else
+			if (ntfs_link(ni, dir_ni, uname, uname_len)) {
+					res = -errno;
+				goto exit;
+			}
 	
 		set_archive(ni);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
@@ -2384,9 +2419,20 @@ static int ntfs_fuse_rm(const char *org_path)
 	    || ntfs_allowed_dir_access(&security, org_path, dir_ni, ni,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 #endif
-		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
-				 uname, uname_len))
-			res = -errno;
+		if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			res = CALL_REPARSE_PLUGIN(dir_ni, unlink,
+					org_path, ni, uname, uname_len);
+#else /* DISABLE_PLUGINS */
+			res = -EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+		} else
+			if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
+					 uname, uname_len))
+				res = -errno;
 		/* ntfs_delete() always closes ni and dir_ni */
 		ni = dir_ni = NULL;
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)

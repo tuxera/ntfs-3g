@@ -1508,12 +1508,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		errno = EINVAL;
 		return NULL;
 	}
-	
-	if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
-		errno = EOPNOTSUPP;
-		return NULL;
-	}
-	
+
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni)
 		return NULL;

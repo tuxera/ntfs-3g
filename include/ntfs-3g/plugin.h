@@ -1,7 +1,7 @@
 /*
  *		plugin.h : define interface for plugin development
  *
- * Copyright (c) 2015 Jean-Pierre Andre
+ * Copyright (c) 2015-2021 Jean-Pierre Andre
  *
  */
 
@@ -151,6 +151,34 @@ typedef struct plugin_operations {
 	int (*readdir)(ntfs_inode *ni, const REPARSE_POINT *reparse,
 			s64 *pos, void *fillctx, ntfs_filldir_t filldir,
 			struct fuse_file_info *fi);
+	/*
+	 *	Create a new file of any type
+	 *
+	 * The returned value is a pointer to the inode created, or
+	 * NULL if failed, with errno telling why.
+	 */
+	ntfs_inode *(*create)(ntfs_inode *dir_ni, const REPARSE_POINT *reparse,
+			le32 securid, ntfschar *name, int name_len,
+			mode_t type);
+	/*
+	 *	Link a new name to a file or directory
+	 * Linking a directory is needed for renaming a directory
+	 * The returned value is zero for success or a negative errno
+	 * value for failure.
+	 * If the returned value is zero, the modified time stamp
+	 * will be updated after the call.
+	 */
+	int (*link)(ntfs_inode *dir_ni, const REPARSE_POINT *reparse,
+			ntfs_inode *ni, ntfschar *name, int name_len);
+	/*
+	 *	Unlink a name from a directory
+	 * The argument pathname may be NULL
+	 * The returned value is zero for success or a negative errno
+	 * value for failure.
+	 */
+	int (*unlink)(ntfs_inode *dir_ni, const REPARSE_POINT *reparse,
+			const char *pathname,
+			ntfs_inode *ni, ntfschar *name, int name_len);
 } plugin_operations_t;
 
 
