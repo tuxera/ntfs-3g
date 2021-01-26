@@ -2650,6 +2650,9 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	struct SECURITY_CONTEXT security;
 #endif
+#if defined(__sun) && defined (__SVR4)
+	int isdir;
+#endif /* defined(__sun) && defined (__SVR4) */
 
 	/* Deny removing from $Extend */
 	if (parent == FILE_Extend) {
@@ -2689,9 +2692,32 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
         
 #if defined(__sun) && defined (__SVR4)
 	/* on Solaris : deny unlinking directories */
-	if (rm_type
-	    == (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? RM_LINK : RM_DIR)) {
-		errno = EPERM;
+	isdir = ni->mrec->flags & MFT_RECORD_IS_DIRECTORY;
+#ifndef DISABLE_PLUGINS
+		/* get emulated type from plugin if available */
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		struct stat st;
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+			/* Avoid double opening of parent directory */
+		res = ntfs_inode_close(dir_ni);
+		if (res)
+			goto exit;
+		dir_ni = (ntfs_inode*)NULL;
+		res = CALL_REPARSE_PLUGIN(ni, getattr, &st);
+		if (res)
+			goto exit;
+		isdir = S_ISDIR(st.st_mode);
+		dir_ni = ntfs_inode_open(ctx->vol, INODE(parent));
+		if (!dir_ni) {
+			res = -errno;
+			goto exit;
+		}
+	}
+#endif /* DISABLE_PLUGINS */
+	if (rm_type == (isdir ? RM_LINK : RM_DIR)) {
+		errno = (isdir ? EISDIR : ENOTDIR);
 		res = -errno;
 		goto exit;
 	}
