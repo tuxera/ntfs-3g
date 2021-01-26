@@ -1197,11 +1197,12 @@ int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
 	ntfs_index_context *xr;
 
 	res = 0;
-			/* reparse data is not compatible with EA */
-	if (ni
-	    && !ntfs_attr_exist(ni, AT_EA_INFORMATION, AT_UNNAMED, 0)
-	    && !ntfs_attr_exist(ni, AT_EA, AT_UNNAMED, 0)
-	    && valid_reparse_data(ni, (const REPARSE_POINT*)value, size)) {
+			/*
+			 * reparse data compatibily with EA is not checked
+			 * any more, it is required by Windows 10, but may
+			 * lead to problems with earlier versions.
+			 */
+	if (ni && valid_reparse_data(ni, (const REPARSE_POINT*)value, size)) {
 		xr = open_reparse_index(ni->vol);
 		if (xr) {
 			if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,

@@ -293,12 +293,11 @@ int ntfs_set_ntfs_ea(ntfs_inode *ni, const char *value, size_t size, int flags)
 			}
 		}
 		/*
-		 * EA and REPARSE_POINT exclude each other
-		 * see http://msdn.microsoft.com/en-us/library/windows/desktop/aa364404(v=vs.85).aspx
-		 * Also return EINVAL if REPARSE_POINT is present.
+		 * EA and REPARSE_POINT compatibility not checked any more,
+		 * required by Windows 10, but having both may lead to
+		 * problems with earlier versions.
 		 */
-		if (ok
-		    && !ntfs_attr_exist(ni, AT_REPARSE_POINT, AT_UNNAMED,0)) {
+		if (ok) {
 			ea_info.ea_length = cpu_to_le16(ea_packed);
 			ea_info.need_ea_count = cpu_to_le16(ea_count);
 			ea_info.ea_query_length = cpu_to_le32(nextoffs);
