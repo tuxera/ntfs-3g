@@ -604,8 +604,9 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
  *		or NULL if there were some problem, as described by errno
  */
 
-char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
-			int count, const char *mnt_point, BOOL isdir)
+char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction, int count,
+			const char *mnt_point __attribute__((unused)),
+			BOOL isdir)
 {
 	char *target;
 	char *fulltarget;
@@ -651,10 +652,11 @@ char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			target = search_absolute(vol, &junction[3],
 				count - 3, isdir);
 		if (target) {
-			fulltarget = (char*)ntfs_malloc(strlen(mnt_point)
+			fulltarget = (char*)ntfs_malloc(
+					strlen(vol->abs_mnt_point)
 					+ strlen(target) + 2);
 			if (fulltarget) {
-				strcpy(fulltarget,mnt_point);
+				strcpy(fulltarget,vol->abs_mnt_point);
 				strcat(fulltarget,"/");
 				strcat(fulltarget,target);
 			}
@@ -679,10 +681,11 @@ char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			    && (target[0] >= 'a')
 			    && (target[0] <= 'z'))
 				target[0] += 'A' - 'a';
-			fulltarget = (char*)ntfs_malloc(strlen(mnt_point)
+			fulltarget = (char*)ntfs_malloc(
+				strlen(vol->abs_mnt_point)
 				    + sizeof(mappingdir) + strlen(target) + 1);
 			if (fulltarget) {
-				strcpy(fulltarget,mnt_point);
+				strcpy(fulltarget,vol->abs_mnt_point);
 				strcat(fulltarget,"/");
 				strcat(fulltarget,mappingdir);
 				strcat(fulltarget,target);
