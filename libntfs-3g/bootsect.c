@@ -154,6 +154,12 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b)
 		}
 	}
 
+	/* MFT and MFTMirr may not overlap the boot sector or be the same */
+	if (!b->mft_lcn || !b->mftmirr_lcn || (b->mft_lcn == b->mftmirr_lcn)) {
+		ntfs_log_error("Invalid location of MFT or MFTMirr.\n");
+		goto not_ntfs;
+	}
+
 	if (b->end_of_sector_marker != const_cpu_to_le16(0xaa55))
 		ntfs_log_debug("Warning: Bootsector has invalid end of sector "
 			       "marker.\n");
