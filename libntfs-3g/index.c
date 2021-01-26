@@ -1584,7 +1584,7 @@ static int ntfs_ih_takeout(ntfs_index_context *icx, INDEX_HEADER *ih,
 		freed_space = le32_to_cpu(ih->allocated_size)
 				- le32_to_cpu(ih->index_length);
 		if (full && (freed_space > 0) && !(freed_space & 7)) {
-			ntfs_ir_truncate(icx, cpu_to_le32(ih->index_length));
+			ntfs_ir_truncate(icx, le32_to_cpu(ih->index_length));
 			/* do nothing if truncation fails */
 		}
 		ntfs_inode_mark_dirty(icx->actx->ntfs_ino);
