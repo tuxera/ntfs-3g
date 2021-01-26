@@ -256,6 +256,7 @@ struct _ntfs_volume {
 	s64 free_mft_records; 	/* Same for free mft records (see above) */
 	BOOL efs_raw;		/* volume is mounted for raw access to
 				   efs-encrypted files */
+	const char *abs_mnt_point; /* Mount point */
 #ifdef XATTR_MAPPINGS
 	struct XATTRMAPPING *xattr_mapping;
 #endif /* XATTR_MAPPINGS */
@@ -274,7 +275,6 @@ struct _ntfs_volume {
 #if CACHE_LEGACY_SIZE
 	struct CACHE_HEADER *legacy_cache;
 #endif
-	const char *abs_mnt_point; /* Mount point */
 };
 
 extern const char *ntfs_home;
