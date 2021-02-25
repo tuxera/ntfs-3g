@@ -3809,7 +3809,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		} else
 			res = -errno;
 #endif
-#if CACHEING && !defined(FUSE_INTERNAL)
+#if CACHEING && !defined(FUSE_INTERNAL) && FUSE_VERSION >= 28
 		/*
 		 * Most of system xattr settings cause changes to some
 		 * file attribute (st_mode, st_nlink, st_mtime, etc.),
@@ -4056,7 +4056,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 			} else
 				res = -errno;
 #endif
-#if CACHEING && !defined(FUSE_INTERNAL)
+#if CACHEING && !defined(FUSE_INTERNAL) && FUSE_VERSION >= 28
 		/*
 		 * Some allowed system xattr removals cause changes to
 		 * some file attribute (st_mode, st_nlink, etc.),
