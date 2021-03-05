@@ -355,6 +355,11 @@ mft_has_no_attr_list:
 			ntfs_log_perror("ntfs_mapping_pairs_decompress() failed");
 			goto error_exit;
 		}
+		/* Make sure $DATA is the MFT itself */
+		if (nrl->lcn != vol->mft_lcn) {
+			ntfs_log_perror("The MFT is not self-contained");
+			goto error_exit;
+		}
 		vol->mft_na->rl = nrl;
 
 		/* Get the lowest vcn for the next extent. */
@@ -601,6 +606,10 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 	vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
 	while (vol->mft_zone_end >= vol->nr_clusters) {
 		mft_zone_size >>= 1;
+		if (!mft_zone_size) {
+			errno = EINVAL;
+			goto error_exit;
+		}
 		vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
 	}
 	ntfs_log_debug("mft_zone_end = 0x%llx\n", (long long)vol->mft_zone_end);
