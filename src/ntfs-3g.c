@@ -3965,6 +3965,9 @@ static struct fuse_operations ntfs_3g_ops = {
 	.rmdir		= ntfs_fuse_rmdir,
 #ifdef HAVE_UTIMENSAT
 	.utimens	= ntfs_fuse_utimens,
+#if defined(linux) & !defined(FUSE_INTERNAL) & (FUSE_VERSION < 30)
+	.flag_utime_omit_ok = 1,
+#endif /* defined(linux) & !defined(FUSE_INTERNAL) */
 #else
 	.utime		= ntfs_fuse_utime,
 #endif
