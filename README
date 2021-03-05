@@ -160,6 +160,6 @@ ntfscat - Concatenate files and print their contents on the standard output.
 
 ntfscp - Overwrite files on an NTFS partition.
 
-ntfssecaudit : audit the security metadata.
+ntfssecaudit - Audit the security metadata.
 
-ntfsusermap : assistance for building a user mapping file.
+ntfsusermap - Assistance for building a user mapping file.
