@@ -567,6 +567,7 @@ check_again:
 		switch (err) {
 		case GNUTLS_BAG_PKCS8_KEY:
 			flags = GNUTLS_PKCS_PLAIN;
+			/* FALLTHRU */
 		case GNUTLS_BAG_PKCS8_ENCRYPTED_KEY:
 			err = gnutls_pkcs12_bag_get_data(bag, 0, &dkey);
 			if (err < 0) {
@@ -1491,12 +1492,15 @@ static int ntfs_feed_encrypt(ntfs_inode *inode, ntfs_fek *fek)
 						default :
 							*b++ = val;
 							val >>= 8;
+							/* FALLTHRU */
 						case 3 :
 							*b++ = val;
 							val >>= 8;
+							/* FALLTHRU */
 						case 2 :
 							*b++ = val;
 							val >>= 8;
+							/* FALLTHRU */
 						case 1 :
 							*b++ = val;
 							val >>= 8;

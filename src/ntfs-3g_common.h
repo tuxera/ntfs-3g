@@ -51,6 +51,7 @@ enum {
 	OPT_ATIME,
 	OPT_RELATIME,
 	OPT_DMTIME,
+	OPT_RW,
 	OPT_FAKE_RW,
 	OPT_FSNAME,
 	OPT_NO_DEF_OPTS,
@@ -91,6 +92,8 @@ enum {
 	OPT_USERMAPPING,
 	OPT_XATTRMAPPING,
 	OPT_EFS_RAW,
+	OPT_POSIX_NLINK,
+	OPT_SPECIAL_FILES,
 } ;
 
 			/* Option flags */
@@ -135,6 +138,7 @@ typedef struct {
 	ntfs_atime_t atime;
 	s64 dmtime;
 	BOOL ro;
+	BOOL rw;
 	BOOL show_sys_files;
 	BOOL hide_hid_files;
 	BOOL hide_dot_files;
@@ -151,6 +155,8 @@ typedef struct {
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
+	BOOL posix_nlink;
+	ntfs_volume_special_files special_files;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	BOOL efs_raw;
 #ifdef XATTR_MAPPINGS

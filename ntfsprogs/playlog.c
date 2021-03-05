@@ -1,7 +1,7 @@
 /*
  *		Redo or undo a list of logged actions
  *
- * Copyright (c) 2014-2016 Jean-Pierre Andre
+ * Copyright (c) 2014-2017 Jean-Pierre Andre
  *
  */
 
@@ -229,7 +229,7 @@ static int sanity_indx_list(const char *buffer, u32 k, u32 end)
 
 	err = 0;
 	done = FALSE;
-	while ((k <= end) && !done) {
+	while ((k <= end) && !done && !err) {
 		lth = getle16(buffer,k+8);
 		if (optv > 1)
 			/* Usual indexes can be determined from size */
@@ -270,9 +270,20 @@ static int sanity_indx_list(const char *buffer, u32 k, u32 end)
 					(long long)getle64(buffer,k),
 					(int)lth,
 					(int)getle16(buffer,k+12),(int)k);
+				if ((lth < 80) || (lth & 7)) {
+					printf("** Invalid index record"
+						" length %d\n",lth);
+					err = 1;
+				}
 			}
 		done = !le16_andz(feedle16(buffer,k+12), INDEX_ENTRY_END) || !lth;
-	   	k += lth;
+		if (lth & 7) {
+			if (optv <= 1) /* Do not repeat the warning */
+				printf("** Invalid index record length %d\n",
+								lth);
+			err = 1;
+		} else
+	   		k += lth;
    	}
 	if (k != end) {
 		printf("** Bad index record length %ld (computed %ld)\n",
@@ -795,7 +806,9 @@ static int adjust_high_vcn(ntfs_volume *vol, ATTR_RECORD *attr)
 	rl = ntfs_mapping_pairs_decompress(vol, attr, (runlist_element*)NULL);
 	if (rl) {
 		xrl = rl;
-		while (xrl->length)
+		if (xrl->length)
+			xrl++;
+		while ((xrl->length) && (xrl->lcn != LCN_RL_NOT_MAPPED))
 			xrl++;
 		high_vcn = xrl->vcn - 1;
 		attr->highest_vcn = cpu_to_sle64(high_vcn);
@@ -2117,7 +2130,7 @@ static int redo_delete_file(ntfs_volume *vol,
 	record = (MFT_RECORD*)buffer;
 	if ((target + length) <= mftrecsz) {
 		/* write a void mft entry (needed ?) */
-		changed = memcmp(buffer + target, data, length)
+		changed = (length && memcmp(buffer + target, data, length))
 			|| !le16_andz(record->flags, MFT_RECORD_IN_USE);
 		err = 0;
 		if (changed) {
@@ -2157,7 +2170,6 @@ static int redo_delete_index(ntfs_volume *vol,
 	data = ((const char*)&action->record)
 			+ get_undo_offset(&action->record);
 	length = le16_to_cpu(action->record.undo_length);
-// TODO merge with undo_add_index ?
 	target = le16_to_cpu(action->record.record_offset)
 		+ le16_to_cpu(action->record.attribute_offset);
 	if (optv > 1) {
@@ -2176,7 +2188,9 @@ static int redo_delete_index(ntfs_volume *vol,
 	    && !(length & 7)
 	    && ((target + length) <= xsize)) {
 		/* This has to be an idempotent action */
-		found = !memcmp(buffer + target, data, length);
+		found = (action->record.undo_operation
+				== const_cpu_to_le16(CompensationlogRecord))
+		    || !memcmp(buffer + target, data, length);
 		err = 0;
 		if (found) {
 			/* Remove the entry */
@@ -2191,7 +2205,7 @@ static int redo_delete_index(ntfs_volume *vol,
 		}
 		if (optv > 1) {
 			printf("-> INDX record %s\n",
-				(found ? "unchanged" : "removed"));
+				(found ? "removed" : "unchanged"));
 		}
 	}
 	return (err);
@@ -2238,7 +2252,9 @@ static int redo_delete_root_index(ntfs_volume *vol,
 	    && !(length & 7)
 	    && ((target + length) <= mftrecsz)) {
 		/* This has to be an idempotent action */
-		found = !memcmp(buffer + target, data, length);
+		found = (action->record.undo_operation
+				== const_cpu_to_le16(CompensationlogRecord))
+			|| !memcmp(buffer + target, data, length);
 		err = 0;
 		/* Only delete if present */
 		if (found) {
@@ -2578,7 +2594,9 @@ static int redo_update_resident(ntfs_volume *vol,
 			dump(&buffer[target], length);
 		}
 		if ((target + length) <= mftrecsz) {
-			changed = memcmp(buffer + target, data, length);
+			changed = (action->record.undo_operation
+				    == const_cpu_to_le16(CompensationlogRecord))
+				|| memcmp(buffer + target, data, length);
 			err = 0;
 			if (changed) {
 				memcpy(buffer + target, data, length);
@@ -2627,8 +2645,13 @@ static int redo_update_root_index(ntfs_volume *vol,
 		+ le16_to_cpu(action->record.attribute_offset)
 		+ offsetof(INDEX_ENTRY, key.file_name.file_name_length)
 		- length;
-	err = change_resident_expect(vol, action, buffer, data, expected,
-			target, length, AT_INDEX_ROOT);
+	if (action->record.undo_operation
+			== const_cpu_to_le16(CompensationlogRecord))
+		err = change_resident(vol, action, buffer, data,
+			target, length);
+	else
+		err = change_resident_expect(vol, action, buffer, data,
+			expected, target, length, AT_INDEX_ROOT);
 	return (err);
 }
 
@@ -2649,12 +2672,14 @@ static int redo_update_root_vcn(ntfs_volume *vol,
 	expected = ((const char*)&action->record)
 			+ get_undo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
-// length must be 8
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-+ 16; // explanation needed (right justified ?)
-	err = change_resident_expect(vol, action, buffer, data, expected,
-			target, length, AT_INDEX_ROOT);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = change_resident_expect(vol, action, buffer, data,
+				expected, target, length, AT_INDEX_ROOT);
+	}
 	return (err);
 }
 
@@ -2738,11 +2763,13 @@ static int redo_update_vcn(ntfs_volume *vol,
 	data = ((const char*)&action->record)
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.redo_length);
-			/* target is left-justified to creation time */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // to better describe
-	err = update_index(vol, action, buffer, data, target, length);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = update_index(vol, action, buffer, data, target, length);
+	}
 	return (err);
 }
 
@@ -3568,11 +3595,13 @@ static int undo_update_vcn(ntfs_volume *vol, const struct ACTION_RECORD *action,
 	data = ((const char*)&action->record)
 			+ get_undo_offset(&action->record);
 	length = le16_to_cpu(action->record.undo_length);
-			/* target is left-justified to creation time */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // to better describe
-	err = update_index(vol, action, buffer, data, target, length);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = update_index(vol, action, buffer, data, target, length);
+	}
 	return (err);
 }
 
@@ -3775,12 +3804,14 @@ static int undo_update_root_vcn(ntfs_volume *vol,
 	expected = ((const char*)&action->record)
 			+ get_redo_offset(&action->record);
 	length = le16_to_cpu(action->record.undo_length);
-		/* the fixup is right-justified to the name length */
-	target = le16_to_cpu(action->record.record_offset)
-		+ le16_to_cpu(action->record.attribute_offset)
-		+ 16; // explanation needed
-	err = change_resident_expect(vol, action, buffer, data, expected,
-			target, length, AT_INDEX_ROOT);
+	if (length == 8) {
+		target = le16_to_cpu(action->record.record_offset)
+			+ le16_to_cpu(action->record.attribute_offset);
+		/* target is right-justified to end of attribute */
+		target += getle16(buffer, target + 8) - length;
+		err = change_resident_expect(vol, action, buffer, data,
+				expected, target, length, AT_INDEX_ROOT);
+	}
 	return (err);
 }
 
@@ -4085,7 +4116,9 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case ClearBitsInNonResidentBitMap :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(SetBitsInNonResidentBitMap)))
+		    const_cpu_to_le16(SetBitsInNonResidentBitMap))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_force_bits(vol, action, buffer);
 		break;
 	case CompensationlogRecord :
@@ -4095,27 +4128,37 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case CreateAttribute :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(DeleteAttribute)))
+		    const_cpu_to_le16(DeleteAttribute))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_create_attribute(vol, action, buffer);
 		break;
 	case DeallocateFileRecordSegment :
 		if (le16_eq(action->record.undo_operation,
-			const_cpu_to_le16(InitializeFileRecordSegment)))
+			const_cpu_to_le16(InitializeFileRecordSegment))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_delete_file(vol, action, buffer);
 		break;
 	case DeleteAttribute :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(CreateAttribute)))
+			const_cpu_to_le16(CreateAttribute))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_delete_attribute(vol, action, buffer);
 		break;
 	case DeleteIndexEntryAllocation :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(AddIndexEntryAllocation)))
+			const_cpu_to_le16(AddIndexEntryAllocation))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_delete_index(vol, action, buffer);
 		break;
 	case DeleteIndexEntryRoot :
 		if (le16_eq(action->record.undo_operation,
-		        const_cpu_to_le16(AddIndexEntryRoot)))
+			const_cpu_to_le16(AddIndexEntryRoot))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_delete_root_index(vol, action, buffer);
 		break;
 	case InitializeFileRecordSegment :
@@ -4135,7 +4178,9 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case SetIndexEntryVcnAllocation :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(SetIndexEntryVcnAllocation)))
+			const_cpu_to_le16(SetIndexEntryVcnAllocation))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_update_vcn(vol, action, buffer);
 		break;
 	case SetIndexEntryVcnRoot :
@@ -4145,17 +4190,23 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case SetNewAttributeSizes :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(SetNewAttributeSizes)))
+			const_cpu_to_le16(SetNewAttributeSizes))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_sizes(vol, action, buffer);
 		break;
 	case UpdateFileNameAllocation :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(UpdateFileNameAllocation)))
+			const_cpu_to_le16(UpdateFileNameAllocation))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_update_index(vol, action, buffer);
 		break;
 	case UpdateFileNameRoot :
 		if (le16_eq(action->record.undo_operation,
-		        const_cpu_to_le16(UpdateFileNameRoot)))
+			const_cpu_to_le16(UpdateFileNameRoot))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_update_root_index(vol, action, buffer);
 		break;
 	case UpdateMappingPairs :
@@ -4178,7 +4229,9 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case UpdateResidentValue :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(UpdateResidentValue)))
+			const_cpu_to_le16(UpdateResidentValue))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_update_resident(vol, action, buffer);
 		break;
 	case Win10Action37 :
@@ -4193,7 +4246,9 @@ static int distribute_redos(ntfs_volume *vol,
 		break;
 	case WriteEndOfIndexBuffer :
 		if (le16_eq(action->record.undo_operation,
-		    const_cpu_to_le16(WriteEndOfIndexBuffer)))
+			const_cpu_to_le16(WriteEndOfIndexBuffer))
+		    || le16_eq(action->record.undo_operation,
+			const_cpu_to_le16(CompensationlogRecord)))
 			err = redo_write_index(vol, action, buffer);
 		break;
 	case AttributeNamesDump :

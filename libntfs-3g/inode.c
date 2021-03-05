@@ -837,7 +837,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 			if (!err)
 				err = errno;
 			ntfs_log_perror("Failed to open inode %lld with index",
-				(long long)le64_to_cpu(fn->parent_directory));
+				(long long)MREF_LE(fn->parent_directory));
 			continue;
 		}
 		ictx = ntfs_index_ctx_get(index_ni, NTFS_INDEX_I30, 4);
@@ -1518,14 +1518,16 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
 	FILE_NAME_ATTR *fn;
-	const u64 *times;
+	u64 times[4];
 	ntfs_time now;
 	int cnt;
 	int ret;
 
 	ret = -1;
 	if ((size >= 8) && !(flags & XATTR_CREATE)) {
-		times = (const u64*)value;
+		/* Copy, to avoid alignment issue encountered on ARM */
+		memcpy(times, value,
+			(size < sizeof(times) ? size : sizeof(times)));
 		now = ntfs_current_time();
 			/* update the standard information attribute */
 		ctx = ntfs_attr_get_search_ctx(ni, NULL);

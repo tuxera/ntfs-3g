@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011-2016 Jean-Pierre Andre
+ * Copyright (c) 2011-2018 Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -59,6 +59,7 @@
 #include <fcntl.h>
 #endif
 
+#include "param.h"
 #include "debug.h"
 #include "types.h"
 #include "support.h"
@@ -136,6 +137,8 @@ static const char *many_bad_sectors_msg =
 "* on the disk surface caused by deterioration, manufacturing faults or    *\n"
 "* other reason. We suggest to get a replacement disk as soon as possible. *\n"
 "***************************************************************************\n";
+
+enum mirror_source { MIRR_OLD, MIRR_NEWMFT, MIRR_MFT };
 
 static struct {
 	int verbose;
@@ -226,6 +229,7 @@ typedef struct {
 	struct llcn_t last_compressed;
 	struct llcn_t last_lcn;
 	s64 last_unsupp;	     /* last unsupported cluster */
+	enum mirror_source mirr_from;
 } ntfs_resize_t;
 
 /* FIXME: This, lcn_bitmap and pos from find_free_cluster() will make a cluster
@@ -242,8 +246,6 @@ static s64 max_free_cluster_range = 0;
 #define DIRTY_NONE		(0)
 #define DIRTY_INODE		(1)
 #define DIRTY_ATTRIB		(2)
-
-#define NTFS_MAX_CLUSTER_SIZE	(65536)
 
 static s64 rounded_up_division(s64 numer, s64 denom)
 {
@@ -404,7 +406,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
-	printf("Copyright (c) 2011-2016  Jean-Pierre Andre\n");
+	printf("Copyright (c) 2011-2018  Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -451,8 +453,10 @@ static s64 get_new_volume_size(char *s)
 	switch (*suffix) {
 	case 'G':
 		size *= prefix_kind;
+		/* FALLTHRU */
 	case 'M':
 		size *= prefix_kind;
+		/* FALLTHRU */
 	case 'k':
 		size *= prefix_kind;
 		break;
@@ -1459,10 +1463,13 @@ static int record_mft_in_bitmap(ntfs_resize_t *resize)
 static void delayed_updates(ntfs_resize_t *resize)
 {
 	struct DELAYED *delayed;
+	struct DELAYED *delayed_mft_data;
+	int nr_extents;
 
 	if (ntfs_volume_get_free_space(resize->vol))
 		err_exit("Failed to determine free space\n");
 
+	delayed_mft_data = (struct DELAYED*)NULL;
 	if (resize->delayed_runlists && reload_mft(resize))
 		err_exit("Failed to reload the MFT for delayed updates\n");
 
@@ -1476,18 +1483,54 @@ static void delayed_updates(ntfs_resize_t *resize)
 		 * So we update MFT data first, and we record the MFT
 		 * extents again in the MFT bitmap if they were recorded
 		 * in the old location.
+		 *
+		 * However, if we are operating in "no action" mode, the
+		 * MFT records to update are not written to their new location
+		 * and the MFT data runlist has to be updated last in order
+		 * to have the entries read from their old location.
+		 * In this situation the MFT bitmap is never written to
+		 * disk, so the same extents are reallocated repeatedly,
+		 * which is not what would be done in a real resizing.
 		 */
+
+	if (opt.ro_flag
+	    && resize->delayed_runlists
+	    && (resize->delayed_runlists->mref == FILE_MFT)
+	    && le32_eq(resize->delayed_runlists->type, AT_DATA)) {
+			/* Update the MFT data runlist later */
+		delayed_mft_data = resize->delayed_runlists;
+		resize->delayed_runlists = resize->delayed_runlists->next;
+	}
 
 	while (resize->delayed_runlists) {
 		delayed = resize->delayed_runlists;
 		expand_attribute_runlist(resize->vol, delayed);
-		if ((delayed->mref == FILE_MFT) && le32_eq(delayed->type, AT_BITMAP))
-			record_mft_in_bitmap(resize);
+		if (delayed->mref == FILE_MFT) {
+			if (le32_eq(delayed->type, AT_BITMAP))
+				record_mft_in_bitmap(resize);
+			if (le32_eq(delayed->type, AT_DATA))
+				resize->mirr_from = MIRR_MFT;
+		}
 		resize->delayed_runlists = resize->delayed_runlists->next;
 		if (delayed->attr_name)
 			free(delayed->attr_name);
 		free(delayed->head_rl);
 		free(delayed);
+	}
+	if (opt.ro_flag && delayed_mft_data) {
+		/* in "no action" mode, check updating the MFT runlist now */
+		expand_attribute_runlist(resize->vol, delayed_mft_data);
+		resize->mirr_from = MIRR_MFT;
+		if (delayed_mft_data->attr_name)
+			free(delayed_mft_data->attr_name);
+		free(delayed_mft_data->head_rl);
+		free(delayed_mft_data);
+	}
+	/* Beware of MFT fragmentation when the target size is too small */
+	nr_extents = resize->vol->mft_ni->nr_extents;
+	if (nr_extents > 2) {
+		printf("WARNING: The MFT is now severely fragmented"
+			" (%d extents)\n", nr_extents);
 	}
 }
 
@@ -1849,8 +1892,12 @@ static void lseek_to_cluster(ntfs_volume *vol, s64 lcn)
 static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 {
 	s64 i;
-	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	char *buff;
 	ntfs_volume *vol = resize->vol;
+
+	buff = (char*)ntfs_malloc(vol->cluster_size);
+	if (!buff)
+		perr_exit("ntfs_malloc");
 
 	for (i = 0; i < len; i++) {
 
@@ -1875,6 +1922,7 @@ static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 		resize->relocations++;
 		progress_update(&resize->progress, resize->relocations);
 	}
+	free(buff);
 }
 
 static void relocate_clusters(ntfs_resize_t *r, runlist *dest_rl, s64 src_lcn)
@@ -2262,6 +2310,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 			err_exit("Could not allocate 16 records in"
 					" the first MFT chunk\n");
 		}
+		resize->mirr_from = MIRR_NEWMFT;
 	}
 
 	for (mref = 0; mref < (MFT_REF)nr_mft_records; mref++)
@@ -2716,19 +2765,34 @@ static void update_bootsector(ntfs_resize_t *r)
 	if (vol->dev->d_ops->read(vol->dev, bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs->number_of_sectors = cpu_to_sle64(r->new_volume_size *
-			bs->bpb.sectors_per_cluster);
+	if (bs->bpb.sectors_per_cluster > 128)
+		bs->number_of_sectors = cpu_to_sle64(r->new_volume_size
+				<< (256 - bs->bpb.sectors_per_cluster));
+	else
+		bs->number_of_sectors = cpu_to_sle64(r->new_volume_size *
+				bs->bpb.sectors_per_cluster);
 
-	if (r->mftmir_old) {
+	if (r->mftmir_old || (r->mirr_from == MIRR_MFT)) {
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
 		/* Be sure the MFTMirr holds the updated MFT runlist */
-		if (r->new_mft_start)
+		switch (r->mirr_from) {
+		case MIRR_MFT :
+			/* The late updates of MFT have not been synced */
+			ntfs_inode_sync(vol->mft_ni);
+			copy_clusters(r, r->mftmir_rl.lcn,
+				vol->mft_na->rl->lcn, r->mftmir_rl.length);
+			break;
+		case MIRR_NEWMFT :
 			copy_clusters(r, r->mftmir_rl.lcn,
 				 r->new_mft_start->lcn, r->mftmir_rl.length);
-		else
+			break;
+		default :
 			copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
 				      r->mftmir_rl.length);
-		bs->mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
+			break;
+		}
+		if (r->mftmir_old)
+			bs->mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
 		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
 	}
 		/* Set the start of the relocated MFT */
@@ -3905,6 +3969,7 @@ static int update_runlist(expand_t *expand, s64 inum,
 			ctx.mrec = mrec;
 			resize.mref = inum;
 			resize.delayed_runlists = expand->delayed_runlists;
+			resize.mirr_from = MIRR_OLD;
 			must_delay = 1;
 			replace_later(&resize,rl,head_rl);
 			expand->delayed_runlists = resize.delayed_runlists;
@@ -4578,6 +4643,7 @@ int main(int argc, char **argv)
 
 	resize.inuse = fsck.inuse;
 	resize.lcn_bitmap = fsck.lcn_bitmap;
+	resize.mirr_from = MIRR_OLD;
 
 	set_resize_constraints(&resize);
 	set_disk_usage_constraint(&resize);

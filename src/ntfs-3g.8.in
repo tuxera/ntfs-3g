@@ -52,6 +52,8 @@ hibernation and fast restarting :
 powercfg /h off
 .sp
 .RE
+If either Windows is hibernated or its fast restart is enabled, partitions
+on internal disks are forced to be mounted in read-only mode.
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process, and everybody has
@@ -248,6 +250,13 @@ they do not appear in Windows directory displays either.
 When a file is renamed or linked with a new name, the hidden flag is
 adjusted to the latest name.
 .TP
+.B posix_nlink
+Compute the count of hard links of a file or directory according to
+the Posix specifications. When this option is not set, a count of 1
+is set for directories, and the short name of files is accounted for.
+Using the option entails some penalty as the count is not stored and
+has to be computed.
+.TP
 .B windows_names
 This option prevents files, directories and extended attributes to be
 created with a name not allowed by windows, because
@@ -306,6 +315,14 @@ data streams are mapped to xattrs and user can manipulate them using
 .TP
 .B user_xattr
 Same as \fBstreams_interface=\fP\fIxattr\fP.
+.TP
+.BI special_files= value
+This option selects a mode for representing a special file to be created
+(symbolic link, socket, fifo, character or block device). The mode can
+be \fBinterix\fR or \fBwsl\fR, and existing files in either mode are
+recognized irrespective of the selected mode. Interix is the traditional
+mode, used by default, and wsl is interoperable with Windows WSL, but
+it is not compatible with Windows versions earlier than Windows 10.
 .TP
 .B efs_raw
 This option should only be used in backup or restore situation.

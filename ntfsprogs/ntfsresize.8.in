@@ -243,10 +243,9 @@ Display help and exit.
 .SH EXIT CODES
 The exit code is 0 on success, non\-zero otherwise.
 .SH KNOWN ISSUES
-No reliability problem is known. If you need
-help please try the Ntfsresize FAQ first (see below) and if you
-don't find your answer then send your question, comment or bug report to
-the development team:
+No reliability problem is known.
+If you find a bug please send an email describing the problem to the
+development team at:
 .br
 .nh
 ntfs\-3g\-devel@lists.sf.net
@@ -307,14 +306,6 @@ package and is available from:
 .br
 .nh
 http://www.tuxera.com/community/
-.hy
-.sp
-.B Ntfsresize
-related news, example of usage, troubleshooting, statically linked binary and
-FAQ (frequently asked questions) are maintained at:
-.br
-.nh
-http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .hy
 .SH SEE ALSO
 .BR fdisk (8),

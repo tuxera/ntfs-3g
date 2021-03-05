@@ -236,6 +236,7 @@ static int parse_options(int argc, char **argv)
 						optarg);
 				usage();
 			}
+			break;
 
 		case 'q':
 			opts.quiet++;

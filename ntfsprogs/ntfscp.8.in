@@ -59,6 +59,10 @@ Show a list of options with a brief description of each one.
 \fB\-q\fR, \fB\-\-quiet\fR
 Suppress some debug/warning/error messages.
 .TP
+\fB\-t\fR, \fB\-\-timestamp\fR
+Copy the modification time of source_file to destination. This is
+not compatible with \fB\-\-attr\-name\fR and \fB\-\-attribute\fR.
+.TP
 \fB\-V\fR, \fB\-\-version\fR
 Show the version number, copyright and license
 .BR ntfscp .

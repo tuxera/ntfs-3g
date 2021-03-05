@@ -132,7 +132,7 @@ actual writing to the device.
 .TP
 \fB\-c\fR, \fB\-\-cluster\-size\fR BYTES
 Specify the size of clusters in bytes. Valid cluster size values are powers of
-two, with at least 256, and at most 65536 bytes per cluster. If omitted,
+two, with at least 256, and at most 2097152 bytes (2MB) per cluster. If omitted,
 .B mkntfs
 uses 4096 bytes as the default cluster size.
 .sp

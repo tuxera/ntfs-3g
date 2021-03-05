@@ -1,7 +1,7 @@
 /**
  * ntfsfallocate
  *
- * Copyright (c) 2013-2014 Jean-Pierre Andre
+ * Copyright (c) 2013-2020 Jean-Pierre Andre
  *
  * This utility will allocate clusters to a specified attribute belonging
  * to a specified file or directory, to a specified length.
@@ -214,10 +214,15 @@ static s64 option_value(const char *arg)
 		count = 0;
 		switch (*s++) {
 		case 'E' : count++;
+			/* FALLTHRU */
 		case 'P' : count++;
+			/* FALLTHRU */
 		case 'T' : count++;
+			/* FALLTHRU */
 		case 'G' : count++;
+			/* FALLTHRU */
 		case 'M' : count++;
+			/* FALLTHRU */
 		case 'K' : count++;
 			switch (*s++) {
 			case 'i' :
@@ -770,10 +775,14 @@ static int ntfs_fallocate(ntfs_inode *ni, s64 alloc_offs, s64 alloc_len)
 			/* Get and save the initial allocations */
 			allocated_size = na->allocated_size;
 			data_size = ni->data_size;
-			err = ntfs_attr_map_whole_runlist(na);
+			if (na->rl)
+				err = ntfs_attr_map_whole_runlist(na);
 			if (!err) {
-				oldrl = ntfs_save_rl(na->rl);
-				if (oldrl) {
+				if (na->rl)
+					oldrl = ntfs_save_rl(na->rl);
+				else
+					oldrl = (runlist_element*)NULL;
+				if (!na->rl || oldrl) {
 					err = ntfs_full_allocation(na, ctx,
 							alloc_offs, alloc_len);
 					if (err) {

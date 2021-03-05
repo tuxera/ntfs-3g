@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005-2008 Szabolcs Szakacsits
- * Copyright (c) 2007 Jean-Pierre Andre
+ * Copyright (c) 2007-2020 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1563,19 +1563,32 @@ static int ntfs_ih_takeout(ntfs_index_context *icx, INDEX_HEADER *ih,
 			   INDEX_ENTRY *ie, INDEX_BLOCK *ib)
 {
 	INDEX_ENTRY *ie_roam;
+	int freed_space;
+	BOOL full;
 	int ret = STATUS_ERROR;
 	
 	ntfs_log_trace("Entering\n");
 	
+	full = le32_eq(ih->index_length, ih->allocated_size);
 	ie_roam = ntfs_ie_dup_novcn(ie);
 	if (!ie_roam)
 		return STATUS_ERROR;
 
 	ntfs_ie_delete(ih, ie);
 
-	if (ntfs_icx_parent_vcn(icx) == VCN_INDEX_ROOT_PARENT)
+	if (ntfs_icx_parent_vcn(icx) == VCN_INDEX_ROOT_PARENT) {
+		/*
+		 * Recover the space which may have been freed
+		 * while deleting an entry from root index
+		 */
+		freed_space = le32_to_cpu(ih->allocated_size)
+				- le32_to_cpu(ih->index_length);
+		if (full && (freed_space > 0) && !(freed_space & 7)) {
+			ntfs_ir_truncate(icx, le32_to_cpu(ih->index_length));
+			/* do nothing if truncation fails */
+		}
 		ntfs_inode_mark_dirty(icx->actx->ntfs_ino);
-	else
+	} else
 		if (ntfs_ib_write(icx, ib))
 			goto out;
 	

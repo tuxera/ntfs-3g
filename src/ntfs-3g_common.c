@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2016 Jean-Pierre Andre
+ * Copyright (c) 2010-2021 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -85,6 +85,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "atime", OPT_ATIME, FLGOPT_BOGUS },
 	{ "relatime", OPT_RELATIME, FLGOPT_BOGUS },
 	{ "delay_mtime", OPT_DMTIME, FLGOPT_DECIMAL | FLGOPT_OPTIONAL },
+	{ "rw", OPT_RW, FLGOPT_BOGUS },
 	{ "fake_rw", OPT_FAKE_RW, FLGOPT_BOGUS },
 	{ "fsname", OPT_FSNAME, FLGOPT_NOSUPPORT },
 	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
@@ -125,6 +126,8 @@ const struct DEFOPTION optionlist[] = {
 	{ "usermapping", OPT_USERMAPPING, FLGOPT_STRING },
 	{ "xattrmapping", OPT_XATTRMAPPING, FLGOPT_STRING },
 	{ "efs_raw", OPT_EFS_RAW, FLGOPT_BOGUS },
+	{ "posix_nlink", OPT_POSIX_NLINK, FLGOPT_BOGUS },
+	{ "special_files", OPT_SPECIAL_FILES, FLGOPT_STRING },
 	{ (const char*)NULL, 0, 0 } /* end marker */
 } ;
 
@@ -291,6 +294,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			case OPT_FAKE_RW :
 				ctx->ro = TRUE;
 				break;
+			case OPT_RW :
+				ctx->rw = TRUE;
+				break;
 			case OPT_NOATIME :
 				ctx->atime = ATIME_DISABLED;
 				break;
@@ -422,7 +428,14 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 				}
 				break;
 			case OPT_USER_XATTR :
+#if defined(__APPLE__) || defined(__DARWIN__)
+				/* macOS builds use non-namespaced extended
+				 * attributes by default since it matches the
+				 * standard behaviour of macOS filesystems. */
+				ctx->streams = NF_STREAMS_INTERFACE_OPENXATTR;
+#else
 				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+#endif
 				break;
 			case OPT_NOAUTO :
 				/* Don't pass noauto option to fuse. */
@@ -488,6 +501,20 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 				ctx->efs_raw = TRUE;
 				break;
 #endif /* HAVE_SETXATTR */
+			case OPT_POSIX_NLINK :
+				ctx->posix_nlink = TRUE;
+				break;
+			case OPT_SPECIAL_FILES :
+				if (!strcmp(val, "interix"))
+					ctx->special_files = NTFS_FILES_INTERIX;
+				else if (!strcmp(val, "wsl"))
+					ctx->special_files = NTFS_FILES_WSL;
+				else {
+					ntfs_log_error("Invalid special_files"
+						" mode.\n");
+					goto err_exit;
+				}
+				break;
 			case OPT_FSNAME : /* Filesystem name. */
 			/*
 			 * We need this to be able to check whether filesystem
@@ -542,6 +569,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	if (ctx->ro) {
 		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
 		ctx->hiberfile = FALSE;
+		ctx->rw = FALSE;
 	}
 exit:
 	free(options);
@@ -796,7 +824,7 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 	const struct plugin_operations *ops;
 	void *handle;
 	REPARSE_POINT *reparse;
-	le32 tag;
+	le32 tag, seltag;
 	plugin_list_t *plugin;
 	plugin_init_t pinit;
 
@@ -804,7 +832,8 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 	reparse = ntfs_get_reparse_point(ni);
 	if (reparse) {
 		tag = reparse->reparse_tag;
-		for (plugin=ctx->plugins; plugin && !le32_eq(plugin->tag, tag);
+		seltag = le32_and(tag, IO_REPARSE_PLUGIN_SELECT);
+		for (plugin=ctx->plugins; plugin && !le32_eq(plugin->tag, seltag);
 						plugin = plugin->next) { }
 		if (plugin) {
 			ops = plugin->ops;
@@ -814,12 +843,12 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 
 			snprintf(name,sizeof(name), PLUGIN_DIR
 					"/ntfs-plugin-%08lx.so",
-					(long)le32_to_cpu(tag));
+					(long)le32_to_cpu(seltag));
 #else
 			char name[64];
 
 			snprintf(name,sizeof(name), "ntfs-plugin-%08lx.so",
-					(long)le32_to_cpu(tag));
+					(long)le32_to_cpu(seltag));
 #endif
 			handle = dlopen(name, RTLD_LAZY);
 			if (handle) {
@@ -828,13 +857,14 @@ const struct plugin_operations *select_reparse_plugin(ntfs_fuse_context_t *ctx,
 				/* pinit() should set errno if it fails */
 					ops = (*pinit)(tag);
 					if (ops && register_reparse_plugin(ctx,
-							tag, ops, handle))
+							seltag, ops, handle))
 						ops = (struct plugin_operations*)NULL;
 				} else
 					errno = ELIBBAD;
 				if (!ops)
 					dlclose(handle);
 			} else {
+				errno = ELIBACC;
 				if (!(ctx->errors_logged & ERR_PLUGIN)) {
 					ntfs_log_perror(
 						"Could not load plugin %s",

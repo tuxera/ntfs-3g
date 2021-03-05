@@ -75,7 +75,7 @@
 #include "logging.h"
 #include "misc.h"
 
-const char *ntfs_bugs = "Developers' email address: "NTFS_DEV_LIST"\n";
+const char *ntfs_bugs = "Developers' email address: " NTFS_DEV_LIST "\n";
 const char *ntfs_gpl = "This program is free software, released under the GNU "
 	"General Public License\nand you are welcome to redistribute it under "
 	"certain conditions.  It comes with\nABSOLUTELY NO WARRANTY; for "
@@ -364,9 +364,13 @@ int utils_parse_size(const char *value, s64 *size, BOOL scale)
 	if (scale) {
 		switch (suffix[0]) {
 			case 't': case 'T': result *= 1000;
+				/* FALLTHRU */
 			case 'g': case 'G': result *= 1000;
+				/* FALLTHRU */
 			case 'm': case 'M': result *= 1000;
+				/* FALLTHRU */
 			case 'k': case 'K': result *= 1000;
+				/* FALLTHRU */
 			case '-': case 0:
 				break;
 			default:

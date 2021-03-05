@@ -506,6 +506,11 @@ static int fix_mftmirr(ntfs_volume *vol)
 
 	ntfs_log_info("Comparing $MFTMirr to $MFT... ");
 	done = FALSE;
+	/*
+	 * Since 2017, Windows 10 does not mirror to full $MFTMirr when
+	 * using big clusters, and some records may be found different.
+	 * Nevertheless chkdsk.exe mirrors it fully, so we do similarly.
+	 */
 	for (i = 0; i < vol->mftmirr_size; ++i) {
 		MFT_RECORD *mrec, *mrec2;
 		const char *ESTR[12] = { "$MFT", "$MFTMirr", "$LogFile",

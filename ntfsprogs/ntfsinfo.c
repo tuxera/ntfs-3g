@@ -8,7 +8,7 @@
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
- * Copyright (c) 2011-2015 Jean-Pierre Andre
+ * Copyright (c) 2011-2020 Jean-Pierre Andre
  *
  * This utility will dump a file's attributes.
  *
@@ -119,7 +119,7 @@ static void version(void)
 	printf("    2003      Leonard Norrgård\n");
 	printf("    2004-2005 Yuval Fledel\n");
 	printf("    2004-2007 Yura Pakhuchiy\n");
-	printf("    2011-2014 Jean-Pierre Andre\n");
+	printf("    2011-2018 Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -331,7 +331,7 @@ static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
 		    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" } ;
 	static const char *wdays[]
 		= { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" } ;
-	static char str[30];
+	static char str[50];
 	long long stamp;
 	u32 days;
 	u32 seconds;
@@ -371,7 +371,7 @@ static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
 		mon = days/31 + 1;
 		days -= 31*(mon - 1) - 1;
 	}
-	sprintf(str,"%3s %3s %2u %02u:%02u:%02u %4u UTC\n",
+	snprintf(str, sizeof(str), "%3s %3s %2u %02u:%02u:%02u %4u UTC\n",
 		wdays[wday],
 		months[mon-1],(unsigned int)days,
 		(unsigned int)(seconds/3600),
@@ -411,19 +411,48 @@ static char *ntfs_attr_get_name_mbs(ATTR_RECORD *attr)
 static const char *reparse_type_name(le32 tag)
 {
 	const char *name;
+	le32 seltag;
 
+	seltag = le32_and(tag, IO_REPARSE_PLUGIN_SELECT);
 	do {
-	if (le32_eq(tag, IO_REPARSE_TAG_MOUNT_POINT)) {
+	if (le32_eq(seltag, IO_REPARSE_TAG_MOUNT_POINT)) {
 		name = " (mount point)";
 		break;
-	} else if (le32_eq(tag, IO_REPARSE_TAG_SYMLINK)) {
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_SYMLINK)) {
 		name = " (symlink)";
 		break;
-	} else if (le32_eq(tag, IO_REPARSE_TAG_WOF)) {
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_WOF)) {
 		name = " (Wof compressed)";
 		break;
-	} else if (le32_eq(tag, IO_REPARSE_TAG_DEDUP)) {
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_DEDUP)) {
 		name = " (deduplicated)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_WCI)) {
+		name = " (Windows container)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_CLOUD)) {
+		name = " (Cloud)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_NFS)) {
+		name = " (NFS symlink)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_LX_SYMLINK)) {
+		name = " (Linux symlink)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_LX_FIFO)) {
+		name = " (Linux fifo)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_LX_CHR)) {
+		name = " (Linux character device)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_LX_BLK)) {
+		name = " (Linux block device)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_AF_UNIX)) {
+		name = " (Unix socket)";
+		break;
+	} else if (le32_eq(seltag, IO_REPARSE_TAG_APPEXECLINK)) {
+		name = " (Exec link)";
 		break;
 	} else {
 		name = "";
@@ -604,6 +633,10 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 	if (!le32_andz(flags, FILE_ATTR_VIEW_INDEX_PRESENT)) {
 		printf(" VIEW_INDEX");
 		flags = le32_and(flags, le32_not(FILE_ATTR_VIEW_INDEX_PRESENT));
+	}
+	if (!le32_andz(flags, FILE_ATTRIBUTE_RECALL_ON_OPEN)) {
+		printf(" RECALL_ON_OPEN");
+		flags = le32_and(flags, le32_not(FILE_ATTRIBUTE_RECALL_ON_OPEN));
 	}
 	if (!le32_cmpz(flags))
 		printf(" UNKNOWN: 0x%08x", (unsigned int)le32_to_cpu(flags));

@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2016 Jean-Pierre Andre
+ * Copyright (c) 2010-2018 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -71,6 +71,7 @@
  */
 #define NTFS_DO_NOT_CHECK_ENDIANS
 
+#include "param.h"
 #include "debug.h"
 #include "types.h"
 #include "support.h"
@@ -270,7 +271,6 @@ static int compare_bitmaps(struct bitmap *a, BOOL copy);
 
 #define LAST_METADATA_INODE	11
 
-#define NTFS_MAX_CLUSTER_SIZE	65536
 #define NTFS_SECTOR_SIZE	  512
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
@@ -393,7 +393,7 @@ static void version(void)
 		   "Efficiently clone, image, restore or rescue an NTFS Volume.\n\n"
 		   "Copyright (c) 2003-2006 Szabolcs Szakacsits\n"
 		   "Copyright (c) 2004-2006 Anton Altaparmakov\n"
-		   "Copyright (c) 2010-2016 Jean-Pierre Andre\n\n");
+		   "Copyright (c) 2010-2018 Jean-Pierre Andre\n\n");
 	fprintf(stderr, "%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(0);
 }
@@ -465,6 +465,7 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 'O':
 			opt.overwrite++;
+			/* FALLTHRU */
 		case 'o':
 			if (opt.output)
 				usage(1);
@@ -756,7 +757,7 @@ static void read_rescue(void *fd, char *buff, u32 csize, u32 bytes_per_sector,
 
 static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 {
-	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	char *buff;
 	/* vol is NULL if opt.restore_image is set */
 	s32 csize = le32_to_cpu(image_hdr.cluster_size);
 	BOOL backup_bootsector;
@@ -773,6 +774,9 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	}
 
 	rescue_pos = (off_t)(rescue_lcn * csize);
+	buff = (char*)ntfs_malloc(csize);
+	if (!buff)
+		err_exit("Not enough memory");
 
 		/* possible partial cluster holding the backup boot sector */
 	backup_bootsector = (lcn + 1)*csize >= full_device_size;
@@ -858,6 +862,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 		perr_printf("Write failed");
 #endif
 	}
+	free(buff);
 }
 
 static s64 lseek_out(int fd, s64 pos, int mode)
@@ -995,7 +1000,11 @@ static void write_empty_clusters(s32 csize, s64 count,
 				 struct progress_bar *progress, u64 *p_counter)
 {
 	s64 i;
-	char buff[NTFS_MAX_CLUSTER_SIZE];
+	char *buff;
+
+	buff = (char*)ntfs_malloc(csize);
+	if (!buff)
+		err_exit("Not enough memory");
 
 	memset(buff, 0, csize);
 
@@ -1004,6 +1013,7 @@ static void write_empty_clusters(s32 csize, s64 count,
 			perr_exit("write_all");
 		progress_update(progress, ++(*p_counter));
 	}
+	free(buff);
 }
 
 static void restore_image(void)
@@ -1492,11 +1502,12 @@ static void write_set(char *buff, u32 csize, s64 *current_lcn,
 
 static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
-	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	char *buff;
 	void *fd;
 	s64 mft_no;
 	u32 mft_record_size;
 	u32 csize;
+	u32 buff_size;
 	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
@@ -1514,14 +1525,21 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 		/*
 		 * Depending on the sizes, there may be several records
 		 * per cluster, or several clusters per record.
+		 * Anyway, records are read and rescued by full clusters.
 		 */
 	if (csize >= mft_record_size) {
 		records_per_set = csize/mft_record_size;
 		clusters_per_set = 1;
+		buff_size = csize;
 	} else {
 		clusters_per_set = mft_record_size/csize;
 		records_per_set = 1;
+		buff_size = mft_record_size;
 	}
+	buff = (char*)ntfs_malloc(buff_size);
+	if (!buff)
+		err_exit("Not enough memory");
+
 	mft_no = 0;
 	ri = rj = 0;
 	wi = wj = 0;
@@ -1554,6 +1572,7 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 		}
 	}
 	image->current_lcn = current_lcn;
+	free(buff);
 }
 
 /*
@@ -1566,10 +1585,11 @@ static void copy_wipe_mft(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
-	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	char *buff;
 	void *fd;
 	u32 indx_record_size;
 	u32 csize;
+	u32 buff_size;
 	u32 bytes_per_sector;
 	u32 records_per_set;
 	u32 clusters_per_set;
@@ -1586,15 +1606,22 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 		/*
 		 * Depending on the sizes, there may be several records
 		 * per cluster, or several clusters per record.
+		 * Anyway, records are read and rescued by full clusters.
 		 */
 	indx_record_size = image->ni->vol->indx_record_size;
 	if (csize >= indx_record_size) {
 		records_per_set = csize/indx_record_size;
 		clusters_per_set = 1;
+		buff_size = csize;
 	} else {
 		clusters_per_set = indx_record_size/csize;
 		records_per_set = 1;
+		buff_size = indx_record_size;
 	}
+	buff = (char*)ntfs_malloc(buff_size);
+	if (!buff)
+		err_exit("Not enough memory");
+
 	ri = rj = 0;
 	wi = wj = 0;
 	if (rl[ri].length)
@@ -1627,6 +1654,7 @@ static void copy_wipe_i30(ntfs_walk_clusters_ctx *image, runlist *rl)
 		}
 	}
 	image->current_lcn = current_lcn;
+	free(buff);
 }
 
 static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
@@ -1711,10 +1739,17 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
-			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
-				err_exit("Cluster %llu referenced twice!\n"
-					 "You didn't shutdown your Windows "
-					 "properly?\n", (unsigned long long)k);
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1)) {
+				if (opt.ignore_fs_check)
+					Printf("Cluster %llu is referenced"
+						" twice!\n",
+						(unsigned long long)k);
+				else
+					err_exit("Cluster %llu referenced"
+						" twice!\nYou didn't shutdown"
+						" your Windows properly?\n",
+						(unsigned long long)k);
+			}
 		}
 
 		if (!opt.metadata_image)

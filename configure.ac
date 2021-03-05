@@ -33,7 +33,7 @@ AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
 # Automake
-AM_INIT_AUTOMAKE([${PACKAGE_NAME}], [${PACKAGE_VERSION}])
+AM_INIT_AUTOMAKE([])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AM_MAINTAINER_MODE
@@ -226,7 +226,9 @@ case "${target}" in
 	;;
 esac
 
-if test "x${enable_ntfs_3g}" = "xyes"; then
+if test "x${enable_ntfs_3g}" != "xyes"; then
+	with_fuse="none"
+elif test "x${with_fuse}" == "x"; then
 	AC_MSG_CHECKING([fuse compatibility])
 	case "${target_os}" in
 	linux*|solaris*)
@@ -248,8 +250,6 @@ if test "x${enable_ntfs_3g}" = "xyes"; then
 		;;
 	esac
 	AC_MSG_RESULT([${with_fuse}])
-else
-        with_fuse="none"
 fi
 
 case "${target_os}" in

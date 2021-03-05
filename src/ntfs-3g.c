@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2017 Jean-Pierre Andre
+ * Copyright (c) 2007-2021 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -100,6 +100,7 @@
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
+#include "ea.h"
 #include "object_id.h"
 #include "efs.h"
 #include "logging.h"
@@ -196,7 +197,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2017 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2021 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -207,9 +208,14 @@ static const char *usage_msg =
 "\n"
 "Example: ntfs-3g /dev/sda1 /mnt/windows\n"
 "\n"
+#ifdef PLUGIN_DIR 
+"Plugin path: " PLUGIN_DIR "\n\n"
+#endif /* PLUGIN_DIR */
 "%s";
 
-static const char ntfs_bad_reparse[] = "unsupported reparse point";
+static const char ntfs_bad_reparse[] = "unsupported reparse tag 0x%08lx";
+	 /* exact length of target text, without the terminator */
+#define ntfs_bad_reparse_lth (sizeof(ntfs_bad_reparse) + 2)
 
 #ifdef FUSE_INTERNAL
 int drop_privs(void);
@@ -719,13 +725,56 @@ static int junction_getattr(ntfs_inode *ni,
 		if (target)
 			stbuf->st_size = strlen(target);
 		else
-			stbuf->st_size = sizeof(ntfs_bad_reparse) - 1;
+			stbuf->st_size = ntfs_bad_reparse_lth;
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_mode = S_IFLNK;
 		free(target);
 		res = 0;
 	} else {
 		res = -errno;
+	}
+	return (res);
+}
+
+static int wsl_getattr(ntfs_inode *ni, const REPARSE_POINT *reparse,
+			struct stat *stbuf)
+{
+	dev_t rdev;
+	int res;
+
+	res = ntfs_reparse_check_wsl(ni, reparse);
+	if (!res) {
+		/* switch (reparse->reparse_tag) { */
+		if (le32_eq(reparse->reparse_tag, IO_REPARSE_TAG_AF_UNIX)) {
+			stbuf->st_mode = S_IFSOCK;
+		}
+		else if (le32_eq(reparse->reparse_tag, IO_REPARSE_TAG_LX_FIFO)) {
+			stbuf->st_mode = S_IFIFO;
+		}
+		else if (le32_eq(reparse->reparse_tag, IO_REPARSE_TAG_LX_CHR)) {
+			stbuf->st_mode = S_IFCHR;
+			res = ntfs_ea_check_wsldev(ni, &rdev);
+			stbuf->st_rdev = rdev;
+		}
+		else if (le32_eq(reparse->reparse_tag, IO_REPARSE_TAG_LX_BLK)) {
+			stbuf->st_mode = S_IFBLK;
+			res = ntfs_ea_check_wsldev(ni, &rdev);
+			stbuf->st_rdev = rdev;
+		}
+		else {
+			stbuf->st_size = ntfs_bad_reparse_lth;
+			stbuf->st_mode = S_IFLNK;
+		}
+		/* } */
+	}
+		/*
+		 * If the reparse point is not a valid wsl special file
+		 * we display as a symlink
+		 */
+	if (res) {
+		stbuf->st_size = ntfs_bad_reparse_lth;
+		stbuf->st_mode = S_IFLNK;
+		res = 0;
 	}
 	return (res);
 }
@@ -787,6 +836,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 #endif
 	stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+	if (ctx->posix_nlink
+	    && le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT))
+		stbuf->st_nlink = ntfs_dir_link_cnt(ni);
 
 	if ((!le16_andz(ni->mrec->flags, MFT_RECORD_IS_DIRECTORY)
 		|| !le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT))
@@ -801,8 +853,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				apply_umask(stbuf);
 				goto ok;
 			} else {
-				stbuf->st_size =
-					sizeof(ntfs_bad_reparse) - 1;
+				stbuf->st_size = ntfs_bad_reparse_lth;
 				stbuf->st_blocks =
 					(ni->allocated_size + 511) >> 9;
 				stbuf->st_mode = S_IFLNK;
@@ -824,7 +875,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				if (target)
 					stbuf->st_size = strlen(target);
 				else
-					stbuf->st_size = sizeof(ntfs_bad_reparse) - 1;
+					stbuf->st_size = ntfs_bad_reparse_lth;
 				stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 				stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 				stbuf->st_mode = S_IFLNK;
@@ -849,7 +900,8 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			}
 			stbuf->st_size = ni->data_size;
 			stbuf->st_blocks = ni->allocated_size >> 9;
-			stbuf->st_nlink = 1;	/* Make find(1) work */
+			if (!ctx->posix_nlink)
+				stbuf->st_nlink = 1;	/* Make find(1) work */
 		}
 	} else {
 		/* Regular or Interix (INTX) file. */
@@ -1045,15 +1097,30 @@ static int junction_readlink(ntfs_inode *ni,
 			char **pbuf)
 {
 	int res;
+	le32 tag;
+	int lth;
 
 	errno = 0;
 	res = 0;
 	*pbuf = ntfs_make_symlink(ni, ctx->abs_mnt_point);
 	if (!*pbuf) {
 		if (errno == EOPNOTSUPP) {
-			*pbuf = strdup(ntfs_bad_reparse);
-			if (!*pbuf)
-				res = -errno;
+			*pbuf = (char*)ntfs_malloc(ntfs_bad_reparse_lth + 1);
+			if (*pbuf) {
+				if (reparse)
+					tag = reparse->reparse_tag;
+				else
+					tag = const_cpu_to_le32(0);
+				lth = snprintf(*pbuf, ntfs_bad_reparse_lth + 1,
+						ntfs_bad_reparse,
+						(long)le32_to_cpu(tag));
+				if (lth != ntfs_bad_reparse_lth) {
+					free(*pbuf);
+					*pbuf = (char*)NULL;
+					res = -errno;
+				}
+			} else
+				res = -ENOMEM;
 		} else
 			res = -errno;
 	}
@@ -1070,6 +1137,9 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 	ntfs_attr *na = NULL;
 	INTX_FILE *intx_file = NULL;
 	int stream_name_len, res = 0;
+	REPARSE_POINT *reparse;
+	le32 tag;
+	int lth;
 
 	/* Get inode. */
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
@@ -1091,16 +1161,16 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 #ifndef DISABLE_PLUGINS
 		char *gotlink;
 		const plugin_operations_t *ops;
-		REPARSE_POINT *reparse;
 
 		gotlink = (char*)NULL;
 		res = CALL_REPARSE_PLUGIN(ni, readlink, &gotlink);
 		if (gotlink) {
 			strncpy(buf, gotlink, buf_size);
 			free(gotlink);
-		} else {
-			strncpy(buf, ntfs_bad_reparse, buf_size);
 			res = 0;
+		} else {
+			errno = EOPNOTSUPP;
+			res = -EOPNOTSUPP;
 		}
 #else /* DISABLE_PLUGINS */
 		char *target;
@@ -1112,11 +1182,22 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 			strncpy(buf,target,buf_size);
 			free(target);
 		} else
-			if (errno == EOPNOTSUPP)
-				strcpy(buf,ntfs_bad_reparse);
-			else
-				res = -errno;
+			res = -errno;
 #endif /* DISABLE_PLUGINS */
+		if (res == -EOPNOTSUPP) {
+			reparse = ntfs_get_reparse_point(ni);
+			if (reparse) {
+				tag = reparse->reparse_tag;
+				free(reparse);
+			} else
+				tag = const_cpu_to_le32(0);
+			lth = snprintf(buf, ntfs_bad_reparse_lth + 1,
+					ntfs_bad_reparse,
+					(long)le32_to_cpu(tag));
+			res = 0;
+			if (lth != ntfs_bad_reparse_lth)
+				res = -errno;
+		}
 		goto exit;
 	}
 	/* Sanity checks. */
@@ -1199,6 +1280,9 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		return 0;
 	} else {
 		struct stat st = { .st_ino = MREF(mref) };
+#ifndef DISABLE_PLUGINS
+		ntfs_inode *ni;
+#endif /* DISABLE_PLUGINS */
 		 
 		switch (dt_type) {
 		case NTFS_DT_DIR :
@@ -1218,6 +1302,26 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 			break;
 		case NTFS_DT_CHR :
 			st.st_mode = S_IFCHR;
+			break;
+		case NTFS_DT_REPARSE :
+			st.st_mode = S_IFLNK | 0777; /* default */
+#ifndef DISABLE_PLUGINS
+			/* get emulated type from plugin if available */
+			ni = ntfs_inode_open(ctx->vol, mref);
+			if (ni && !le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
+				const plugin_operations_t *ops;
+				REPARSE_POINT *reparse;
+				int res;
+
+				res = CALL_REPARSE_PLUGIN(ni, getattr, &st);
+				if (!res)
+					apply_umask(&st);
+				else
+					st.st_mode = S_IFLNK;
+			}
+			if (ni)
+				ntfs_inode_close(ni);
+#endif /* DISABLE_PLUGINS */
 			break;
 		default : /* unexpected types shown as plain files */
 		case NTFS_DT_REG :
@@ -1300,6 +1404,17 @@ static int ntfs_fuse_opendir(const char *path,
 						ni,accesstype))
 				res = -EACCES;
 		}
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			fi->fh = 0;
+			res = CALL_REPARSE_PLUGIN(ni, opendir, fi);
+#else /* DISABLE_PLUGINS */
+			res = -EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+		}
 		if (ntfs_inode_close(ni))
 			set_fuse_error(&res);
 	} else
@@ -1323,9 +1438,22 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_readdir(ni, &pos, &fill_ctx,
-			(ntfs_filldir_t)ntfs_fuse_filler))
-		err = -errno;
+
+	if (!le32_andz(ni->flags, FILE_ATTR_REPARSE_POINT)) {
+#ifndef DISABLE_PLUGINS
+		const plugin_operations_t *ops;
+		REPARSE_POINT *reparse;
+
+		err = CALL_REPARSE_PLUGIN(ni, readdir, &pos, &fill_ctx,
+				(ntfs_filldir_t)ntfs_fuse_filler, fi);
+#else /* DISABLE_PLUGINS */
+		err = -EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+	} else {
+		if (ntfs_readdir(ni, &pos, &fill_ctx,
+				(ntfs_filldir_t)ntfs_fuse_filler))
+			err = -errno;
+	}
 	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&err);
@@ -1972,7 +2100,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		free(path);
 		res = -errno;
-		if (dir_ni->mft_no == FILE_Extend)
+		if (dir_ni)
 			res = -EPERM;
 		goto exit;
 	}
@@ -1989,7 +2117,11 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			perm = (typemode & ~ctx->dmask & 0777)
 				| (dsetgid & S_ISGID);
 		else
-			perm = typemode & ~ctx->fmask & 0777;
+			if ((ctx->special_files == NTFS_FILES_WSL)
+			    && S_ISLNK(type))
+				perm = typemode | 0777;
+			else
+				perm = typemode & ~ctx->fmask & 0777;
 			/*
 			 * Try to get a security id available for
 			 * file creation (from inheritance or argument).
@@ -2013,26 +2145,47 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					perm & ~security.umask, S_ISDIR(type));
 #endif
 		/* Create object specified in @type. */
-		switch (type) {
-			case S_IFCHR:
-			case S_IFBLK:
-				ni = ntfs_create_device(dir_ni, securid,
+		if (!le32_andz(dir_ni->flags, FILE_ATTR_REPARSE_POINT)) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			reparse = (REPARSE_POINT*)NULL;
+			ops = select_reparse_plugin(ctx, dir_ni, &reparse);
+			if (ops && ops->create) {
+				ni = (*ops->create)(dir_ni, reparse,
+					securid, uname, uname_len, type);
+			} else {
+				ni = (ntfs_inode*)NULL;
+				errno = EOPNOTSUPP;
+			}
+			free(reparse);
+#else /* DISABLE_PLUGINS */
+			errno = EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+		} else {
+			switch (type) {
+				case S_IFCHR:
+				case S_IFBLK:
+					ni = ntfs_create_device(dir_ni, securid,
 						uname, uname_len, type,	dev);
-				break;
-			case S_IFLNK:
-				utarget_len = ntfs_mbstoucs(target, &utarget);
-				if (utarget_len < 0) {
-					res = -errno;
-					goto exit;
-				}
-				ni = ntfs_create_symlink(dir_ni, securid,
-						uname, uname_len,
+					break;
+				case S_IFLNK:
+					utarget_len = ntfs_mbstoucs(target,
+							&utarget);
+					if (utarget_len < 0) {
+						res = -errno;
+						goto exit;
+					}
+					ni = ntfs_create_symlink(dir_ni,
+						securid, uname, uname_len,
 						utarget, utarget_len);
-				break;
-			default:
-				ni = ntfs_create(dir_ni, securid, uname,
-						uname_len, type);
-				break;
+					break;
+				default:
+					ni = ntfs_create(dir_ni, securid,
+						uname, uname_len, type);
+					break;
+			}
 		}
 		if (ni) {
 				/*
@@ -2255,10 +2408,24 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	else
 #endif
 	{
-		if (ntfs_link(ni, dir_ni, uname, uname_len)) {
-				res = -errno;
-			goto exit;
-		}
+		if (!le32_andz(dir_ni->flags, FILE_ATTR_REPARSE_POINT)) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			res = CALL_REPARSE_PLUGIN(dir_ni, link,
+					ni, uname, uname_len);
+#else /* DISABLE_PLUGINS */
+			errno = EOPNOTSUPP;
+			res = -errno;
+#endif /* DISABLE_PLUGINS */
+			if (res)
+				goto exit;
+		} else
+			if (ntfs_link(ni, dir_ni, uname, uname_len)) {
+					res = -errno;
+				goto exit;
+			}
 	
 		set_archive(ni);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
@@ -2319,7 +2486,7 @@ static int ntfs_fuse_rm(const char *org_path)
 		/* deny unlinking metadata files from $Extend */
 	if (!dir_ni || (dir_ni->mft_no == FILE_Extend)) {
 		res = -errno;
-		if (dir_ni->mft_no == FILE_Extend)
+		if (dir_ni)
 			res = -EPERM;
 		goto exit;
 	}
@@ -2330,9 +2497,20 @@ static int ntfs_fuse_rm(const char *org_path)
 	    || ntfs_allowed_dir_access(&security, org_path, dir_ni, ni,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 #endif
-		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
-				 uname, uname_len))
-			res = -errno;
+		if (!le32_andz(dir_ni->flags, FILE_ATTR_REPARSE_POINT)) {
+#ifndef DISABLE_PLUGINS
+			const plugin_operations_t *ops;
+			REPARSE_POINT *reparse;
+
+			res = CALL_REPARSE_PLUGIN(dir_ni, unlink,
+					org_path, ni, uname, uname_len);
+#else /* DISABLE_PLUGINS */
+			res = -EOPNOTSUPP;
+#endif /* DISABLE_PLUGINS */
+		} else
+			if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
+					 uname, uname_len))
+				res = -errno;
 		/* ntfs_delete() always closes ni and dir_ni */
 		ni = dir_ni = NULL;
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2753,7 +2931,13 @@ static int ntfs_fuse_ioctl(const char *path,
 	if (!ni)
 		return -errno;
 
-	ret = ntfs_ioctl(ni, cmd, arg, flags, data);
+	/*
+	 * Linux defines the request argument of ioctl() to be an
+	 * unsigned long, which fuse 2.x forwards as a signed int into
+	 * which the request sometimes does not fit.
+	 * So we must expand the value and make sure it is not sign-extended.
+	 */
+	ret = ntfs_ioctl(ni, (unsigned int)cmd, arg, flags, data);
 
 	if (ntfs_inode_close (ni))
 		set_fuse_error(&ret);
@@ -2855,7 +3039,7 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 			|| !(ctx->secure_flags & (1 << SECURITY_ACL))
 			|| (setting && ctx->inherit))
 		    && foracl) {
-			if (ctx->silent)
+			if (ctx->silent && !ctx->security.mapping[MAPUSERS])
 				errno = 0;
 			else
 				errno = EOPNOTSUPP;
@@ -3091,9 +3275,18 @@ exit:
 	return ret;
 }
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+static int ntfs_fuse_getxattr(const char *path, const char *name,
+				char *value, size_t size, uint32_t position)
+#else
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
+#endif
 {
+#if !(defined(__APPLE__) || defined(__DARWIN__))
+	static const unsigned int position = 0U;
+#endif
+
 	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
 	ntfs_attr *na = NULL;
@@ -3103,6 +3296,15 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	enum SYSTEMXATTRS attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+	/* If the attribute is not a resource fork attribute and the position
+	 * parameter is non-zero, we return with EINVAL as requesting position
+	 * is not permitted for non-resource fork attributes. */
+	if (position && strcmp(name, XATTR_RESOURCEFORK_NAME)) {
+		return -EINVAL;
+	}
+#endif
 
 	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
@@ -3176,14 +3378,14 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		/* trusted only readable by root */
 	if ((namespace == XATTRNS_TRUSTED)
 	    && security.uid)
-		    return -ENODATA;
+		    return -NTFS_NOXATTR_ERRNO;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 		/* Return with no result for symlinks, fifo, etc. */
 	if (!user_xattrs_allowed(ctx, ni)) {
-		res = -ENODATA;
+		res = -NTFS_NOXATTR_ERRNO;
 		goto exit;
 	}
 		/* otherwise file must be readable */
@@ -3200,7 +3402,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	}
 	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 	if (!na) {
-		res = -ENODATA;
+		res = -NTFS_NOXATTR_ERRNO;
 		goto exit;
 	}
 	rsize = na->data_size;
@@ -3209,9 +3411,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	    && !le16_andz(na->data_flags, ATTR_IS_ENCRYPTED)
 	    && NAttrNonResident(na))
 		rsize = ((na->data_size + 511) & ~511) + 2;
+	rsize -= position;
 	if (size) {
 		if (size >= (size_t)rsize) {
-			res = ntfs_attr_pread(na, 0, rsize, value);
+			res = ntfs_attr_pread(na, position, rsize, value);
 			if (res != rsize)
 				res = -errno;
 		} else
@@ -3227,9 +3430,21 @@ exit:
 	return res;
 }
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+static int ntfs_fuse_setxattr(const char *path, const char *name,
+				const char *value, size_t size, int flags,
+				uint32_t position)
+#else
 static int ntfs_fuse_setxattr(const char *path, const char *name,
 				const char *value, size_t size, int flags)
+#endif
 {
+#if !(defined(__APPLE__) || defined(__DARWIN__))
+	static const unsigned int position = 0U;
+#else
+	BOOL is_resource_fork;
+#endif
+
 	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
 	ntfs_attr *na = NULL;
@@ -3240,6 +3455,16 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	enum SYSTEMXATTRS attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+	/* If the attribute is not a resource fork attribute and the position
+	 * parameter is non-zero, we return with EINVAL as requesting position
+	 * is not permitted for non-resource fork attributes. */
+	is_resource_fork = strcmp(name, XATTR_RESOURCEFORK_NAME) ? FALSE : TRUE;
+	if (position && !is_resource_fork) {
+		return -EINVAL;
+	}
+#endif
 
 	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
@@ -3390,7 +3615,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	}
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
-			res = -ENODATA;
+			res = -NTFS_NOXATTR_ERRNO;
 			goto exit;
 		}
 		if (ntfs_attr_add(ni, AT_DATA, lename, lename_len, NULL, 0)) {
@@ -3406,6 +3631,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
+#if defined(__APPLE__) || defined(__DARWIN__)
+	} else if (is_resource_fork) {
+		/* In macOS, the resource fork is a special case. It doesn't
+		 * ever shrink (it would have to be removed and re-added). */
+#endif
 	} else {
 			/* currently compressed streams can only be wiped out */
 		if (ntfs_attr_truncate(na, (s64)0 /* size */)) {
@@ -3417,8 +3647,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	res = 0;
 	if (size) {
 		do {
-			part = ntfs_attr_pwrite(na, total, size - total,
-					 &value[total]);
+			part = ntfs_attr_pwrite(na, position + total,
+					 size - total, &value[total]);
 			if (part > 0)
 				total += part;
 		} while ((part > 0) && (total < size));
@@ -3620,7 +3850,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	}
 	if (ntfs_attr_remove(ni, AT_DATA, lename, lename_len)) {
 		if (errno == ENOENT)
-			errno = ENODATA;
+			errno = NTFS_NOXATTR_ERRNO;
 		res = -errno;
 	}
 	if (!res) {
@@ -3650,10 +3880,26 @@ static void register_internal_reparse_plugins(void)
 		.getattr = junction_getattr,
 		.readlink = junction_readlink,
 	} ;
+	static const plugin_operations_t wsl_ops = {
+		.getattr = wsl_getattr,
+	} ;
+
 	register_reparse_plugin(ctx, IO_REPARSE_TAG_MOUNT_POINT,
 					&ops, (void*)NULL);
 	register_reparse_plugin(ctx, IO_REPARSE_TAG_SYMLINK,
 					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_SYMLINK,
+					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_SYMLINK,
+					&ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_AF_UNIX,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_FIFO,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_CHR,
+					&wsl_ops, (void*)NULL);
+	register_reparse_plugin(ctx, IO_REPARSE_TAG_LX_BLK,
+					&wsl_ops, (void*)NULL);
 }
 #endif /* DISABLE_PLUGINS */
 
@@ -3732,6 +3978,7 @@ static struct fuse_operations ntfs_3g_ops = {
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	.access		= ntfs_fuse_access,
 	.opendir	= ntfs_fuse_opendir,
+	.releasedir	= ntfs_fuse_release,
 #endif
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
@@ -4000,13 +4247,28 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+	if (ctx->ro) {
+		char buf[128];
+		int len;
+        
+		len = snprintf(buf, sizeof(buf), "-ouse_ino,kernel_cache"
+				",attr_timeout=%d,entry_timeout=%d",
+				(int)TIMEOUT_RO, (int)TIMEOUT_RO);
+		if ((len < 0)
+		    || (len >= (int)sizeof(buf))
+		    || (fuse_opt_add_arg(&args, buf) == -1))
+			goto err;
+	} else {
 #if !CACHEING
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=0") == -1)
-		goto err;
+		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+				",attr_timeout=0") == -1)
+			goto err;
 #else
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=1") == -1)
-		goto err;
+		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+				",attr_timeout=1") == -1)
+			goto err;
 #endif
+	}
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
@@ -4123,7 +4385,8 @@ int main(int argc, char *argv[])
 	else {
 		ctx->abs_mnt_point = (char*)ntfs_malloc(PATH_MAX);
 		if (ctx->abs_mnt_point) {
-			if (getcwd(ctx->abs_mnt_point,
+			if ((strlen(opts.mnt_point) < PATH_MAX)
+			    && getcwd(ctx->abs_mnt_point,
 				     PATH_MAX - strlen(opts.mnt_point) - 1)) {
 				strcat(ctx->abs_mnt_point, "/");
 				strcat(ctx->abs_mnt_point, opts.mnt_point);
@@ -4131,6 +4394,9 @@ int main(int argc, char *argv[])
 			/* Solaris also wants the absolute mount point */
 				opts.mnt_point = ctx->abs_mnt_point;
 #endif /* defined(__sun) && defined (__SVR4) */
+			} else {
+				free(ctx->abs_mnt_point);
+				ctx->abs_mnt_point = (char*)NULL;
 			}
 		}
 	}
@@ -4187,16 +4453,22 @@ int main(int argc, char *argv[])
 	
 	/* Force read-only mount if the device was found read-only */
 	if (!ctx->ro && NVolReadOnly(ctx->vol)) {
+		ctx->rw = FALSE;
 		ctx->ro = TRUE;
 		if (ntfs_strinsert(&parsed_options, ",ro")) 
                 	goto err_out;
-	}
+		ntfs_log_info("Could not mount read-write, trying read-only\n");
+	} else
+		if (ctx->rw && ntfs_strinsert(&parsed_options, ",rw"))
+			goto err_out;
 	/* We must do this after ntfs_open() to be able to set the blksize */
 	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
 		goto err_out;
 
+	ctx->vol->abs_mnt_point = ctx->abs_mnt_point;
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
+	ctx->vol->special_files = ctx->special_files;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->vol->efs_raw = ctx->efs_raw;
 #endif /* HAVE_SETXATTR */

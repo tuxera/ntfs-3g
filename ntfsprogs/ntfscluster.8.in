@@ -69,7 +69,7 @@ This option is not yet implemented.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Reduce the amount of output to a minimum.  Naturally, it doesn't make sense to
-combine this option with
+combine this option with \fB\-\-verbose\fR
 .TP
 \fB\-s\fR, \fB\-\-sector\fR RANGE
 Any files whose data is in this range of sectors will be displayed.

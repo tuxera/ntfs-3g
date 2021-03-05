@@ -74,10 +74,12 @@ enum ACTIONS {
 
 struct BUFFER {
 	unsigned int num;
+	unsigned int rnum;
 	unsigned int size;
 	unsigned int headsz;
 	BOOL safe;
 	union {
+		u64 alignment;
 		RESTART_PAGE_HEADER restart;
 		RECORD_PAGE_HEADER record;
 		char data[1];

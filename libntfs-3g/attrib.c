@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2015 Jean-Pierre Andre
+ * Copyright (c) 2007-2020 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -5850,6 +5850,9 @@ retry:
 				le16_or(ATTR_IS_COMPRESSED, ATTR_IS_SPARSE));
 			if (!le16_cmpz(spcomp))
 				a->compressed_size = cpu_to_sle64(na->compressed_size);
+			/* Updating sizes taints the extent holding the attr */
+			if (ctx->ntfs_ino)
+				NInoSetDirty(ctx->ntfs_ino);
 			if (le32_eq(na->type, AT_DATA) && (na->name == AT_UNNAMED)) {
 				na->ni->allocated_size
 					= (!le16_cmpz(spcomp)
@@ -6902,7 +6905,9 @@ s64 ntfs_attr_get_free_bits(ntfs_attr *na)
 		}
 		switch (br % 4) {
 			case 3:  nr_free += lut[*(buf + br - 3)];
+			/* FALLTHRU */
 			case 2:  nr_free += lut[*(buf + br - 2)];
+			/* FALLTHRU */
 			case 1:  nr_free += lut[*(buf + br - 1)];
 		}
 	}
