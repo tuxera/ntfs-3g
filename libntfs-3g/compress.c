@@ -1618,7 +1618,7 @@ static int ntfs_read_append(ntfs_attr *na, const runlist_element *rl,
  */
 
 static s32 ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
-			const char *outbuf, s32 count, BOOL compress,
+			char *outbuf, s32 count, BOOL compress,
 			BOOL appending, VCN *update_from)
 {
 	s32 rounded;
@@ -1639,6 +1639,8 @@ static s32 ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
 	if (!compress) {
 		clsz = 1 << na->ni->vol->cluster_size_bits;
 		rounded = ((count - 1) | (clsz - 1)) + 1;
+		if (rounded > count)
+			memset(&outbuf[count], 0, rounded - count);
 		written = write_clusters(na->ni->vol, rl,
 				offs, rounded, outbuf);
 		if (written != rounded)
