@@ -224,10 +224,13 @@ static int __ntfs_volume_release(ntfs_volume *v)
 static void ntfs_attr_setup_flag(ntfs_inode *ni)
 {
 	STANDARD_INFORMATION *si;
+	s64 lth;
 
-	si = ntfs_attr_readall(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0, NULL);
+	si = (STANDARD_INFORMATION*)ntfs_attr_readall(ni,
+			AT_STANDARD_INFORMATION, AT_UNNAMED, 0, &lth);
 	if (si) {
-		ni->flags = si->file_attributes;
+		if ((u64)lth >= offsetof(STANDARD_INFORMATION, owner_id))
+			ni->flags = si->file_attributes;
 		free(si);
 	}
 }
