@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2020 Jean-Pierre Andre
+ * Copyright (c) 2007-2021 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -2765,6 +2765,8 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	ATTR_RECORD *a;
 	ntfs_volume *vol;
 	ntfschar *upcase;
+	ptrdiff_t offs;
+	ptrdiff_t space;
 	u32 upcase_len;
 
 	ntfs_log_trace("attribute type 0x%x.\n", le32_to_cpu(type));
@@ -2794,8 +2796,17 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		a = (ATTR_RECORD*)((char*)ctx->attr +
 				le32_to_cpu(ctx->attr->length));
 	for (;;	a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length))) {
-		if (p2n(a) < p2n(ctx->mrec) || (char*)a > (char*)ctx->mrec +
-				le32_to_cpu(ctx->mrec->bytes_allocated))
+		/*
+		 * Make sure the attribute fully lies within the MFT record
+		 * and we can safely access its minimal fields.
+		 */
+		offs = p2n(a) - p2n(ctx->mrec);
+		space = le32_to_cpu(ctx->mrec->bytes_allocated) - offs;
+		if ((offs < 0)
+		    || (((space < (ptrdiff_t)offsetof(ATTR_RECORD,
+						resident_end))
+			|| (space < (ptrdiff_t)le32_to_cpu(a->length)))
+			    && ((space < 4) || (a->type != AT_END))))
 			break;
 		ctx->attr = a;
 		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
@@ -2986,6 +2997,8 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 	u8 *al_start, *al_end;
 	ATTR_RECORD *a;
 	ntfschar *al_name;
+	ptrdiff_t offs;
+	ptrdiff_t space;
 	u32 al_name_len;
 	BOOL is_first_search = FALSE;
 
@@ -3202,12 +3215,18 @@ is_enumeration:
 		 * with the same meanings as above.
 		 */
 do_next_attr_loop:
-		if ((char*)a < (char*)ctx->mrec || (char*)a > (char*)ctx->mrec +
-				le32_to_cpu(ctx->mrec->bytes_allocated))
+		/*
+		 * Make sure the attribute fully lies within the MFT record
+		 * and we can safely access its minimal fields.
+		 */
+		offs = p2n(a) - p2n(ctx->mrec);
+		space = le32_to_cpu(ctx->mrec->bytes_allocated) - offs;
+		if (offs < 0)
 			break;
-		if (a->type == AT_END)
+		if ((space >= 4) && (a->type == AT_END))
 			continue;
-		if (!a->length)
+		if ((space < (ptrdiff_t)offsetof(ATTR_RECORD, resident_end))
+		    || (space < (ptrdiff_t)le32_to_cpu(a->length)))
 			break;
 		if (al_entry->instance != a->instance)
 			goto do_next_attr;
@@ -3373,6 +3392,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 {
 	ntfs_volume *vol;
 	ntfs_inode *base_ni;
+	ATTR_RECORD *a;
 	int ret = -1;
 
 	ntfs_log_enter("Entering for attribute type 0x%x\n", le32_to_cpu(type));
@@ -3394,6 +3414,50 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 	else
 		ret = ntfs_external_attr_find(type, name, name_len, ic, 
 					      lowest_vcn, val, val_len, ctx);
+	if (!ret) {
+		/*
+		 * The attribute was found to fully lie within the MFT
+		 * record, now make sure its relevant parts (name, runlist,
+		 * value) also lie within. The first step is to make sure
+		 * the attribute has the minimum length so that accesses to
+		 * the lengths and offsets of these parts are safe.
+		 */
+		a = ctx->attr;
+		if (a->non_resident) {
+			if ((le32_to_cpu(a->length)
+				< offsetof(ATTR_RECORD, non_resident_end))
+			    || (le16_to_cpu(a->mapping_pairs_offset)
+					>= le32_to_cpu(a->length))
+			    || (a->name_length
+				 && ((le16_to_cpu(a->name_offset)
+					+ a->name_length)
+					> le32_to_cpu(a->length)))) {
+				ntfs_log_error("Corrupt non resident attribute"
+					" 0x%x in MFT record %lld\n",
+					(int)le32_to_cpu(a->type),
+					(long long)ctx->ntfs_ino->mft_no);
+				errno = EIO;
+				ret = -1;
+			}
+		} else {
+			if ((le32_to_cpu(a->length)
+				< offsetof(ATTR_RECORD, resident_end))
+			    || (le16_to_cpu(a->value_offset)
+					+ le32_to_cpu(a->value_length))
+					> le32_to_cpu(a->length)
+			    || (a->name_length
+				&& ((le16_to_cpu(a->name_offset)
+					+ a->name_length)
+					> le32_to_cpu(a->length)))) {
+				ntfs_log_error("Corrupt resident attribute 0x%x in"
+					" MFT record %lld\n",
+					(int)le32_to_cpu(a->type),
+					(long long)ctx->ntfs_ino->mft_no);
+				errno = EIO;
+				ret = -1;
+			}
+		}
+	}
 out:
 	ntfs_log_leave("\n");
 	return ret;
