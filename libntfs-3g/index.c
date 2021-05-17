@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005-2008 Szabolcs Szakacsits
- * Copyright (c) 2007-2020 Jean-Pierre Andre
+ * Copyright (c) 2007-2021 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -673,6 +673,7 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_BLOCK *ib = NULL;
+	ATTR_RECORD *a;
 	int ret, err = 0;
 
 	ntfs_log_trace("Entering\n");
@@ -712,10 +713,17 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 	}
 	
 	old_vcn = VCN_INDEX_ROOT_PARENT;
-	/* 
-	 * FIXME: check for both ir and ib that the first index entry is
-	 * within the index block.
-	 */
+	a = icx->actx->attr;
+	if (((offsetof(INDEX_ROOT,index)
+			+ le32_to_cpu(ir->index.index_length))
+			> le32_to_cpu(a->value_length))
+	    || (le32_to_cpu(ir->index.entries_offset)
+			> le32_to_cpu(ir->index.index_length))) {
+		ntfs_log_error("Index root is corrupt in MFT record %lld.\n",
+				(long long)icx->ni->mft_no);
+		err = errno = ERANGE;
+		goto err_lookup;
+	}
 	ret = ntfs_ie_lookup(key, key_len, icx, &ir->index, &vcn, &ie);
 	if (ret == STATUS_ERROR) {
 		err = errno;

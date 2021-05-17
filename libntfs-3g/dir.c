@@ -293,6 +293,16 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 				(unsigned)index_block_size);
 		goto put_err_out;
 	}
+	if (((offsetof(INDEX_ROOT,index)
+			+ le32_to_cpu(ir->index.allocated_size))
+			> le32_to_cpu(ctx->attr->value_length))
+	    || (le32_to_cpu(ir->index.entries_offset)
+			> le32_to_cpu(ir->index.index_length))
+	    || (le32_to_cpu(ir->index.index_length)
+			> le32_to_cpu(ir->index.allocated_size))) {
+		ntfs_log_error("Index root is corrupt.\n");
+		goto put_err_out;
+	}
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
