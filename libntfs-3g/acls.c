@@ -1330,6 +1330,10 @@ struct POSIX_SECURITY *ntfs_build_basic_posix(
 		pydesc->acccnt = 3;
 		pydesc->defcnt = 0;
 		pydesc->firstdef = 6;
+		pydesc->filler = 0;
+		pydesc->acl.version = POSIX_VERSION;
+		pydesc->acl.flags = 0;
+		pydesc->acl.filler = 0;
 	} else
 		errno = ENOMEM;
 	return (pydesc);
