@@ -240,7 +240,19 @@ int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref,
 			       le32_to_cpu(m->bytes_allocated));
 		goto err_out;
 	}
-	
+	if (le32_to_cpu(m->bytes_in_use) > vol->mft_record_size) {
+		ntfs_log_error("Record %llu has corrupt in-use size "
+			       "(%u > %u)\n", (unsigned long long)MREF(mref),
+			       (int)le32_to_cpu(m->bytes_in_use),
+			       (int)vol->mft_record_size);
+		goto err_out;
+	}
+	if (le16_to_cpu(m->attrs_offset) & 7) {
+		ntfs_log_error("Attributes badly aligned in record %llu\n",
+			       (unsigned long long)MREF(mref));
+		goto err_out;
+	}
+
 	a = (ATTR_RECORD *)((char *)m + le16_to_cpu(m->attrs_offset));
 	if (p2n(a) < p2n(m) || (char *)a > (char *)m + vol->mft_record_size) {
 		ntfs_log_error("Record %llu is corrupt\n",
