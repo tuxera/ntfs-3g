@@ -1057,19 +1057,19 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na) {
 		ntfs_log_perror("Failed to open ntfs attribute");
+		ntfs_inode_close(ni);
 		goto error_exit;
 	}
 	/*
 	 * Note: Normally, the upcase table has a length equal to 65536
-	 * 2-byte Unicode characters but allow for different cases, so no
-	 * checks done. Just check we don't overflow 32-bits worth of Unicode
-	 * characters.
+	 * 2-byte Unicode characters. Anyway we currently can only process
+	 * such characters.
 	 */
-	if (na->data_size & ~0x1ffffffffULL) {
-		ntfs_log_error("Error: Upcase table is too big (max 32-bit "
-				"allowed).\n");
+	if ((na->data_size - 2) & ~0x1fffeULL) {
+		ntfs_log_error("Error: Upcase table is invalid (want size even "
+				"<= 131072).\n");
 		errno = EINVAL;
-		goto error_exit;
+		goto bad_upcase;
 	}
 	if (vol->upcase_len != na->data_size >> 1) {
 		vol->upcase_len = na->data_size >> 1;
@@ -1077,7 +1077,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		free(vol->upcase);
 		vol->upcase = ntfs_malloc(na->data_size);
 		if (!vol->upcase)
-			goto error_exit;
+			goto bad_upcase;
 	}
 	/* Read in the $DATA attribute value into the buffer. */
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->upcase);
@@ -1086,7 +1086,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			       "(%lld != %lld).\n", (long long)l,
 			       (long long)na->data_size);
 		errno = EIO;
-		goto error_exit;
+		goto bad_upcase;
 	}
 	/* Done with the $UpCase mft record. */
 	ntfs_attr_close(na);
@@ -1291,6 +1291,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	}
 
 	return vol;
+bad_upcase :
+	ntfs_attr_close(na);
+	ntfs_inode_close(ni);
+	goto error_exit;
 io_error_exit:
 	errno = EIO;
 error_exit:
