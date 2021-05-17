@@ -172,6 +172,15 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		cnt = vol->mftmirr_size - m;
 		if (cnt > count)
 			cnt = count;
+		if ((m + cnt) > vol->mftmirr_na->initialized_size >>
+				vol->mft_record_size_bits) {
+			errno = ESPIPE;
+			ntfs_log_perror("Trying to write non-allocated mftmirr"
+				" records (%lld > %lld)", (long long)m + cnt,
+				(long long)vol->mftmirr_na->initialized_size >>
+				vol->mft_record_size_bits);
+			return -1;
+		}
 		bmirr = ntfs_malloc(cnt * vol->mft_record_size);
 		if (!bmirr)
 			return -1;
