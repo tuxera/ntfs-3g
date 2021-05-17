@@ -6728,6 +6728,19 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 				(long long)ni->mft_no,(long)le32_to_cpu(type));
 		goto err_exit;
 	}
+		/*
+		 * Consistency check : restrict to 65536 bytes.
+		 *   index bitmaps may need more, but still limited by
+		 *   the number of clusters.
+		 */
+	if ((na->data_size > 65536)
+	    && ((type != AT_BITMAP)
+			|| ((na->data_size << 3) > ni->vol->nr_clusters))) {
+		ntfs_log_error("Corrupt attribute 0x%lx in inode %lld\n",
+				(long)le32_to_cpu(type),(long long)ni->mft_no);
+		errno = EOVERFLOW;
+		goto out;
+	}
 	data = ntfs_malloc(na->data_size);
 	if (!data)
 		goto out;
