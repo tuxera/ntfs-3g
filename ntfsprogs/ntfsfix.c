@@ -823,7 +823,8 @@ static BOOL short_mft_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			vol->mft_record_size, mft0)
 				== vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft0,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, 0, mft0)) {
 		a = find_unnamed_attr(mft0,AT_DATA);
 		if (a
 		    && a->non_resident
@@ -961,7 +962,9 @@ static BOOL self_mapped_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 	if ((ntfs_pread(vol->dev, offs, vol->mft_record_size,
 			mft1) == vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft1,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, inum, mft1)) {
+
 		lowest_vcn = (SELFLOC_LIMIT*vol->mft_record_size)
 				>> vol->cluster_size_bits;
 		a = find_unnamed_attr(mft1,AT_DATA);
@@ -1017,7 +1020,8 @@ static BOOL spare_record_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 	if ((ntfs_pread(vol->dev, offs, vol->mft_record_size,
 			mft2) == vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft2,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, inum, mft2)) {
 		if (!mft2->base_mft_record
 		    && (mft2->flags & MFT_RECORD_IN_USE)
 		    && !find_unnamed_attr(mft2,AT_ATTRIBUTE_LIST)
