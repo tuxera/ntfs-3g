@@ -4076,9 +4076,12 @@ static int ntfs_open(const char *device)
 	}
 	
 	errno = 0;
+	goto out;
 err_out:
+	if (!errno)
+		errno = EIO;
+out :
 	return ntfs_volume_error(errno);
-	
 }
 
 static void usage(void)
