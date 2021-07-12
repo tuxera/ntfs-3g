@@ -306,10 +306,11 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
-			ntfs_log_error("Index entry out of bounds in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
+			ntfs_log_error("Index root entry out of bounds in"
+				" inode %lld\n",
+				(unsigned long long)dir_ni->mft_no);
 			goto put_err_out;
 		}
 		/*
@@ -446,7 +447,7 @@ descend_into_child_node:
 		/* Bounds check. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
 			ntfs_log_error("Index entry out of bounds in directory "
 				       "inode %lld.\n", 
@@ -1248,9 +1249,13 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
-				index_end)
+				(u8*)ie + le16_to_cpu(ie->length) >
+				index_end) {
+			ntfs_log_error("Index root entry out of bounds in"
+					" inode %lld\n",
+					(unsigned long long)dir_ni->mft_no);
 			goto dir_err_out;
+		}
 		/* The last entry cannot contain a name. */
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
@@ -1408,7 +1413,7 @@ find_next_index_buffer:
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
 			ntfs_log_error("Index entry out of bounds in directory inode "
 				"%lld.\n", (unsigned long long)dir_ni->mft_no);
