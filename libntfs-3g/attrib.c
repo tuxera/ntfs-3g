@@ -3217,6 +3217,12 @@ is_enumeration:
 				ctx->mrec = ctx->base_mrec;
 			} else {
 				/* We want an extent record. */
+				if (!vol->mft_na) {
+					ntfs_log_perror("$MFT not ready for "
+					    "opening an extent to inode %lld\n",
+					    (long long)base_ni->mft_no);
+					break;
+				}
 				ni = ntfs_extent_inode_open(base_ni,
 						al_entry->mft_reference);
 				if (!ni)
