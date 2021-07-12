@@ -400,8 +400,9 @@ descend_into_child_node:
 	if (br != 1) {
 		if (br != -1)
 			errno = EIO;
-		ntfs_log_perror("Failed to read vcn 0x%llx",
-			       	(unsigned long long)vcn);
+		ntfs_log_perror("Failed to read vcn 0x%llx from inode %lld",
+			       	(unsigned long long)vcn,
+				(unsigned long long)ia_na->ni->mft_no);
 		goto close_err_out;
 	}
 
