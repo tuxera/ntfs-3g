@@ -328,9 +328,10 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
 		
-		if (!le16_to_cpu(ie->length)) {
-			ntfs_log_error("Zero length index entry in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_consistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
 			goto put_err_out;
 		}
 		/*
@@ -467,10 +468,10 @@ descend_into_child_node:
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
 		
-		if (!le16_to_cpu(ie->length)) {
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_consistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
 			errno = EIO;
-			ntfs_log_error("Zero length index entry in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
 			goto close_err_out;
 		}
 		/*
@@ -1273,6 +1274,13 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* Skip index root entry if continuing previous readdir. */
 		if (ir_pos > (u8*)ie - (u8*)ir)
 			continue;
+
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_consistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
+			goto dir_err_out;
+		}
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
@@ -1429,6 +1437,13 @@ find_next_index_buffer:
 		/* Skip index entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)
 			continue;
+
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_consistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
+			goto dir_err_out;
+		}
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.

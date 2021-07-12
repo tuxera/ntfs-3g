@@ -469,6 +469,57 @@ static INDEX_ROOT *ntfs_ir_lookup2(ntfs_inode *ni, ntfschar *name, u32 len)
 	return ir;
 }
 
+/*
+ *		Check the consistency of an index entry
+ *
+ *	Make sure data and key do not overflow from entry.
+ *	As a side effect, an entry with zero length is rejected.
+ *	This entry must be a full one (no INDEX_ENTRY_END flag), and its
+ *	length must have been checked beforehand to not overflow from the
+ *	index record.
+ *
+ *	Returns 0 if no error was found
+ *		-1 otherwise (with errno unchanged)
+ */
+
+int ntfs_index_entry_consistent(const INDEX_ENTRY *ie,
+			COLLATION_RULES collation_rule, u64 inum)
+{
+	int ret;
+
+	ret = 0;
+	if (ie->key_length
+		&& ((le16_to_cpu(ie->key_length) + offsetof(INDEX_ENTRY, key))
+			    > le16_to_cpu(ie->length))) {
+		ntfs_log_error("Overflow from index entry in inode %lld\n",
+				(long long)inum);
+		ret = -1;
+
+	} else
+		if (collation_rule == COLLATION_FILE_NAME) {
+			if ((offsetof(INDEX_ENTRY, key.file_name.file_name)
+				    + ie->key.file_name.file_name_length
+						* sizeof(ntfschar))
+				> le16_to_cpu(ie->length)) {
+				ntfs_log_error("File name overflow from index"
+					" entry in inode %lld\n",
+					(long long)inum);
+				ret = -1;
+			}
+		} else {
+			if (ie->data_length
+				&& ((le16_to_cpu(ie->data_offset)
+				    + le16_to_cpu(ie->data_length))
+				    > le16_to_cpu(ie->length))) {
+				ntfs_log_error("Data overflow from index"
+					" entry in inode %lld\n",
+					(long long)inum);
+				ret = -1;
+			}
+		}
+	return (ret);
+}
+
 /** 
  * Find a key in the index block.
  * 
@@ -520,6 +571,12 @@ static int ntfs_ie_lookup(const void *key, const int key_len,
 		if (!icx->collate) {
 			ntfs_log_error("Collation function not defined\n");
 			errno = EOPNOTSUPP;
+			return STATUS_ERROR;
+		}
+			/* Make sure key and data do not overflow from entry */
+		if (ntfs_index_entry_consistent(ie, icx->ir->collation_rule,
+				icx->ni->mft_no)) {
+			errno = EIO;
 			return STATUS_ERROR;
 		}
 		rc = icx->collate(icx->ni->vol, key, key_len,
@@ -704,6 +761,7 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 	else
 		icx->vcn_size_bits = NTFS_BLOCK_SIZE_BITS;
 			/* get the appropriate collation function */
+	icx->ir = ir;
 	icx->collate = ntfs_get_collate_function(ir->collation_rule);
 	if (!icx->collate) {
 		err = errno = EOPNOTSUPP;
@@ -790,6 +848,10 @@ descend_into_child_node:
 err_out:
 	icx->bad_index = TRUE;	/* Force icx->* to be freed */
 err_lookup:
+	if (icx->actx) {
+		ntfs_attr_put_search_ctx(icx->actx);
+		icx->actx = NULL;
+	}
 	free(ib);
 	if (!err)
 		err = EIO;
