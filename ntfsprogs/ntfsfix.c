@@ -780,16 +780,19 @@ static ATTR_RECORD *find_unnamed_attr(MFT_RECORD *mrec, ATTR_TYPES type)
 {
 	ATTR_RECORD *a;
 	u32 offset;
+	s32 space;
 
 			/* fetch the requested attribute */
 	offset = le16_to_cpu(mrec->attrs_offset);
+	space = le32_to_cpu(mrec->bytes_in_use) - offset;
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while (((offset + le32_to_cpu(a->length))
-			< le32_to_cpu(mrec->bytes_in_use))
-	    && !(le32_to_cpu(a->length) & 7)
+	while ((space >= (s32)offsetof(ATTR_RECORD, resident_end))
 	    && (a->type != AT_END)
+	    && (le32_to_cpu(a->length) <= (u32)space)
+	    && !(le32_to_cpu(a->length) & 7)
 	    && ((a->type != type) || a->name_length)) {
 		offset += le32_to_cpu(a->length);
+		space -= le32_to_cpu(a->length);
 		a = (ATTR_RECORD*)((char*)mrec + offset);
 	}
 	if ((offset >= le32_to_cpu(mrec->bytes_in_use))
