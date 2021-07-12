@@ -2835,6 +2835,16 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			}
 		} else {
 			register int rc;
+
+			if (a->name_length
+			    && ((le16_to_cpu(a->name_offset)
+					+ a->name_length * sizeof(ntfschar))
+					> le32_to_cpu(a->length))) {
+				ntfs_log_error("Corrupt attribute name"
+					" in MFT record %lld\n",
+					(long long)ctx->ntfs_ino->mft_no);
+				break;
+			}
 			if (name && ((rc = ntfs_names_full_collate(name,
 					name_len, (ntfschar*)((char*)a +
 						le16_to_cpu(a->name_offset)),
