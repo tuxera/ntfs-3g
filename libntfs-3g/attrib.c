@@ -2801,7 +2801,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		 * and we can safely access its minimal fields.
 		 */
 		offs = p2n(a) - p2n(ctx->mrec);
-		space = le32_to_cpu(ctx->mrec->bytes_allocated) - offs;
+		space = le32_to_cpu(ctx->mrec->bytes_in_use) - offs;
 		if ((offs < 0)
 		    || (((space < (ptrdiff_t)offsetof(ATTR_RECORD,
 						resident_end))
@@ -3256,7 +3256,7 @@ do_next_attr_loop:
 		 * and we can safely access its minimal fields.
 		 */
 		offs = p2n(a) - p2n(ctx->mrec);
-		space = le32_to_cpu(ctx->mrec->bytes_allocated) - offs;
+		space = le32_to_cpu(ctx->mrec->bytes_in_use) - offs;
 		if (offs < 0)
 			break;
 		if ((space >= 4) && (a->type == AT_END))
