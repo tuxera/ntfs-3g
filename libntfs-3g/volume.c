@@ -1248,10 +1248,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Check we don't overflow 32-bits. */
-	if (na->data_size > 0xffffffffLL) {
+	/* Check we don't overflow 24-bits. */
+	if ((u64)na->data_size > 0xffffffLL) {
 		ntfs_log_error("Attribute definition table is too big (max "
-			       "32-bit allowed).\n");
+			       "24-bit allowed).\n");
 		errno = EINVAL;
 		goto error_exit;
 	}
