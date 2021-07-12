@@ -4635,6 +4635,13 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 		}
 		
 		/* Move attributes following @a to their new location. */
+		if (((u8 *)m + old_size) < ((u8 *)a + attr_size)) {
+			ntfs_log_error("Attribute 0x%x overflows"
+				" from MFT record\n",
+				(int)le32_to_cpu(a->type));
+			errno = EIO;
+			return (-1);
+		}
 		memmove((u8 *)a + new_size, (u8 *)a + attr_size,
 			old_size - ((u8 *)a - (u8 *)m) - attr_size);
 		
