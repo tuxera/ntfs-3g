@@ -221,10 +221,11 @@ static int __ntfs_volume_release(ntfs_volume *v)
 	return errno ? -1 : 0;
 }
 
-static void ntfs_attr_setup_flag(ntfs_inode *ni)
+static int ntfs_attr_setup_flag(ntfs_inode *ni)
 {
 	STANDARD_INFORMATION *si;
 	s64 lth;
+	int r;
 
 	si = (STANDARD_INFORMATION*)ntfs_attr_readall(ni,
 			AT_STANDARD_INFORMATION, AT_UNNAMED, 0, &lth);
@@ -232,7 +233,12 @@ static void ntfs_attr_setup_flag(ntfs_inode *ni)
 		if ((u64)lth >= offsetof(STANDARD_INFORMATION, owner_id))
 			ni->flags = si->file_attributes;
 		free(si);
+		r = 0;
+	} else {
+		ntfs_log_error("Failed to get standard information of $MFT\n");
+		r = -1;
 	}
+	return (r);
 }
 
 /**
@@ -317,7 +323,8 @@ static int ntfs_mft_load(ntfs_volume *vol)
 
 mft_has_no_attr_list:
 
-	ntfs_attr_setup_flag(vol->mft_ni);
+	if (ntfs_attr_setup_flag(vol->mft_ni))
+		goto error_exit;
 	
 	/* We now have a fully setup ntfs inode for $MFT in vol->mft_ni. */
 	
