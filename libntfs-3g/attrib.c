@@ -3049,8 +3049,21 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 				le32_to_cpu(AT_ATTRIBUTE_LIST))
 			goto find_attr_list_attr;
 	} else {
+			/* Check for small entry */
+		if (((p2n(al_end) - p2n(ctx->al_entry))
+				< (long)offsetof(ATTR_LIST_ENTRY, name))
+		    || (le16_to_cpu(ctx->al_entry->length) & 7)
+		    || (le16_to_cpu(ctx->al_entry->length)
+				< offsetof(ATTR_LIST_ENTRY, name)))
+			goto corrupt;
+
 		al_entry = (ATTR_LIST_ENTRY*)((char*)ctx->al_entry +
 				le16_to_cpu(ctx->al_entry->length));
+		if ((al_entry->name_length
+			&& ((u8*)al_entry + al_entry->name_offset
+				+ al_entry->name_length * sizeof(ntfschar))
+				> al_end))
+			goto corrupt;
 		/*
 		 * If this is an enumeration and the attribute list attribute
 		 * is the next one in the enumeration sequence, just return the
@@ -3113,11 +3126,18 @@ find_attr_list_attr:
 		/* Catch the end of the attribute list. */
 		if ((u8*)al_entry == al_end)
 			goto not_found;
-		if (!al_entry->length)
-			break;
-		if ((u8*)al_entry + 6 > al_end || (u8*)al_entry +
-				le16_to_cpu(al_entry->length) > al_end)
-			break;
+
+		if ((((u8*)al_entry + offsetof(ATTR_LIST_ENTRY, name)) > al_end)
+		    || ((u8*)al_entry + le16_to_cpu(al_entry->length) > al_end)
+		    || (le16_to_cpu(al_entry->length) & 7)
+		    || (le16_to_cpu(al_entry->length)
+				< offsetof(ATTR_LIST_ENTRY, name_length))
+		    || (al_entry->name_length
+			&& ((u8*)al_entry + al_entry->name_offset
+				+ al_entry->name_length * sizeof(ntfschar))
+				> al_end))
+			break; /* corrupt */
+
 		next_al_entry = (ATTR_LIST_ENTRY*)((u8*)al_entry +
 				le16_to_cpu(al_entry->length));
 		if (type != AT_UNUSED) {
@@ -3270,13 +3290,15 @@ do_next_attr:
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
 		goto do_next_attr_loop;
 	}
+corrupt :
 	if (ni != base_ni) {
 		ctx->ntfs_ino = base_ni;
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
 	}
 	errno = EIO;
-	ntfs_log_perror("Inode is corrupt (%lld)", (long long)base_ni->mft_no);
+	ntfs_log_error("Corrupt attribute list entry in MFT record %lld\n",
+			(long long)base_ni->mft_no);
 	return -1;
 not_found:
 	/*

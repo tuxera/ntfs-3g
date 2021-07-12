@@ -306,10 +306,12 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		ntfs_log_error("Failed to get value of $MFT/$ATTR_LIST.\n");
 		goto io_error_exit;
 	}
-	if (l != vol->mft_ni->attr_list_size) {
+	if ((l != vol->mft_ni->attr_list_size)
+	    || (l < (s64)offsetof(ATTR_LIST_ENTRY, name))) {
 		ntfs_log_error("Partial read of $MFT/$ATTR_LIST (%lld != "
-			       "%u).\n", (long long)l,
-			       vol->mft_ni->attr_list_size);
+				"%u or < %d).\n", (long long)l,
+				vol->mft_ni->attr_list_size,
+				(int)offsetof(ATTR_LIST_ENTRY, name));
 		goto io_error_exit;
 	}
 
