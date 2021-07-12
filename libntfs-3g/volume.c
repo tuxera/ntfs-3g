@@ -976,6 +976,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		goto error_exit;
 	}
+	for (i = 0; (i < l) && (i < FILE_first_user); ++i)
+		if (ntfs_mft_record_check(vol, FILE_MFT + i,
+				(MFT_RECORD*)(m + i*vol->mft_record_size)))
+			goto error_exit;
 	l = ntfs_attr_mst_pread(vol->mftmirr_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m2);
 	if (l != vol->mftmirr_size) {
@@ -985,6 +989,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		vol->mftmirr_size = l;
 	}
+	for (i = 0; (i < l) && (i < FILE_first_user); ++i)
+		if (ntfs_mft_record_check(vol, FILE_MFT + i,
+				(MFT_RECORD*)(m2 + i*vol->mft_record_size)))
+			goto error_exit;
 	ntfs_log_debug("Comparing $MFTMirr to $MFT...\n");
 		/* Windows 10 does not update the full $MFTMirr any more */
 	for (i = 0; (i < vol->mftmirr_size) && (i < FILE_first_user); ++i) {

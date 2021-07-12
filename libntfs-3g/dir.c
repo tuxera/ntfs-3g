@@ -293,16 +293,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 				(unsigned)index_block_size);
 		goto put_err_out;
 	}
-	if (((offsetof(INDEX_ROOT,index)
-			+ le32_to_cpu(ir->index.allocated_size))
-			> le32_to_cpu(ctx->attr->value_length))
-	    || (le32_to_cpu(ir->index.entries_offset)
-			> le32_to_cpu(ir->index.index_length))
-	    || (le32_to_cpu(ir->index.index_length)
-			> le32_to_cpu(ir->index.allocated_size))) {
-		ntfs_log_error("Index root is corrupt.\n");
-		goto put_err_out;
-	}
+		/* Consistency check of ir done while fetching attribute */
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
@@ -1097,12 +1088,6 @@ static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 	}
 	fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
-	if ((u8*)fn +	le32_to_cpu(ctx->attr->value_length) >
-			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length)) {
-		ntfs_log_error("Corrupt file name attribute in inode %lld.\n",
-			       (unsigned long long)ni->mft_no);
-		goto io_err_out;
-	}
 	mref = le64_to_cpu(fn->parent_directory);
 	ntfs_attr_put_search_ctx(ctx);
 	return mref;

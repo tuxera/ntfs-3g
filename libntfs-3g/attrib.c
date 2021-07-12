@@ -3356,6 +3356,170 @@ not_found:
 	}
 }
 
+/*
+ *		Check the consistency of an attribute
+ *
+ *	Do the general consistency checks of the selected attribute :
+ *	- the required fields can be accessed
+ *	- the variable fields do not overflow
+ *	- the attribute is [non-]resident if it must be
+ *	- miscelleaneous checks
+ *
+ *	Returns 0 if the checks pass
+ *		-1 with errno = EIO otherwise
+ */
+
+int ntfs_attr_consistent(const ATTR_RECORD *a, const MFT_REF mref)
+{
+	const FILE_NAME_ATTR *fn;
+	const INDEX_ROOT *ir;
+	u64 inum;
+	int ret;
+
+	/*
+	 * The attribute was found to fully lie within the MFT
+	 * record, now make sure its relevant parts (name, runlist,
+	 * value) also lie within. The first step is to make sure
+	 * the attribute has the minimum length so that accesses to
+	 * the lengths and offsets of these parts are safe.
+	 */
+	ret = 0;
+	inum = MREF(mref);
+	if (a->non_resident) {
+		if ((a->non_resident != 1)
+		    || (le32_to_cpu(a->length)
+			< offsetof(ATTR_RECORD, non_resident_end))
+		    || (le16_to_cpu(a->mapping_pairs_offset)
+				>= le32_to_cpu(a->length))
+		    || (a->name_length
+			 && (((u32)le16_to_cpu(a->name_offset)
+				+ a->name_length * sizeof(ntfschar))
+				> le32_to_cpu(a->length)))
+		    || (le64_to_cpu(a->highest_vcn)
+				< le64_to_cpu(a->lowest_vcn))) {
+			ntfs_log_error("Corrupt non resident attribute"
+				" 0x%x in MFT record %lld\n",
+				(int)le32_to_cpu(a->type),
+				(long long)inum);
+			errno = EIO;
+			ret = -1;
+		}
+	} else {
+		if ((le32_to_cpu(a->length)
+			< offsetof(ATTR_RECORD, resident_end))
+		    || (le32_to_cpu(a->value_length) & 0xff000000)
+		    || (a->value_length
+			&& ((le16_to_cpu(a->value_offset)
+				+ le32_to_cpu(a->value_length))
+				> le32_to_cpu(a->length)))
+		    || (a->name_length
+			&& (((u32)le16_to_cpu(a->name_offset)
+				+ a->name_length * sizeof(ntfschar))
+				> le32_to_cpu(a->length)))) {
+			ntfs_log_error("Corrupt resident attribute"
+				" 0x%x in MFT record %lld\n",
+				(int)le32_to_cpu(a->type),
+				(long long)inum);
+			errno = EIO;
+			ret = -1;
+		}
+	}
+	if (!ret) {
+		/*
+		 * Checking whether an attribute must be [non-]resident
+		 * is hard-coded for well-known ones. This should be
+		 * done through ntfs_attr_can_be_non_resident(), based on
+		 * $AttrDef, but this would give an easy way to bypass
+		 * the checks.
+		 * Attributes which are not well-known are not checked.
+		 *
+		 * Note : at this stage we know that a->length and
+		 * a->value_length cannot look like being negative.
+		 */
+		switch(a->type) {
+		case AT_FILE_NAME :
+			/* Check file names are resident and do not overflow */
+			fn = (const FILE_NAME_ATTR*)((const u8*)a
+				+ le16_to_cpu(a->value_offset));
+			if (a->non_resident
+			    || (le32_to_cpu(a->value_length)
+				< offsetof(FILE_NAME_ATTR, file_name))
+			    || !fn->file_name_length
+			    || ((fn->file_name_length * sizeof(ntfschar)
+				+ offsetof(FILE_NAME_ATTR, file_name))
+				> le32_to_cpu(a->value_length))) {
+				ntfs_log_error("Corrupt file name"
+					" attribute in MFT record %lld.\n",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
+		case AT_INDEX_ROOT :
+			/* Check root index is resident and does not overflow */
+			ir = (const INDEX_ROOT*)((const u8*)a +
+				le16_to_cpu(a->value_offset));
+			/* index.allocated_size may overflow while resizing */
+			if (a->non_resident
+			    || (le32_to_cpu(a->value_length)
+				< offsetof(INDEX_ROOT, index.reserved))
+			    || (le32_to_cpu(ir->index.index_length)
+					& 0xff000000)
+			    || ((le32_to_cpu(a->value_length)
+				- le32_to_cpu(ir->index.index_length))
+				< offsetof(INDEX_ROOT,index))
+			    || ((le32_to_cpu(a->value_length)
+				- le32_to_cpu(ir->index.index_length))
+				< le32_to_cpu(ir->index.entries_offset))
+			    || (le32_to_cpu(ir->index.index_length)
+				> le32_to_cpu(ir->index.allocated_size))) {
+				ntfs_log_error("Corrupt index root"
+					" in MFT record %lld.\n",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
+		case AT_STANDARD_INFORMATION :
+		case AT_OBJECT_ID :
+		case AT_VOLUME_NAME :
+		case AT_EA_INFORMATION :
+			if (a->non_resident) {
+				ntfs_log_error("Attribute 0x%x in MFT record"
+					" %lld should be resident.\n",
+					(int)le32_to_cpu(a->type),
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
+		case AT_VOLUME_INFORMATION :
+			if (a->non_resident
+			    || (le32_to_cpu(a->value_length)
+					< sizeof(VOLUME_INFORMATION))) {
+				ntfs_log_error("Corrupt volume information"
+					" in MFT record %lld\n",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
+		case AT_INDEX_ALLOCATION :
+			if (!a->non_resident) {
+				ntfs_log_error("Corrupt index allocation"
+					" in MFT record %lld",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
+		default :
+			break;
+		}
+	}
+	return (ret);
+}
+
 /**
  * ntfs_attr_lookup - find an attribute in an ntfs inode
  * @type:	attribute type to find
@@ -3430,7 +3594,6 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 {
 	ntfs_volume *vol;
 	ntfs_inode *base_ni;
-	ATTR_RECORD *a;
 	int ret = -1;
 
 	ntfs_log_enter("Entering for attribute type 0x%x\n", le32_to_cpu(type));
@@ -3452,50 +3615,6 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 	else
 		ret = ntfs_external_attr_find(type, name, name_len, ic, 
 					      lowest_vcn, val, val_len, ctx);
-	if (!ret) {
-		/*
-		 * The attribute was found to fully lie within the MFT
-		 * record, now make sure its relevant parts (name, runlist,
-		 * value) also lie within. The first step is to make sure
-		 * the attribute has the minimum length so that accesses to
-		 * the lengths and offsets of these parts are safe.
-		 */
-		a = ctx->attr;
-		if (a->non_resident) {
-			if ((le32_to_cpu(a->length)
-				< offsetof(ATTR_RECORD, non_resident_end))
-			    || (le16_to_cpu(a->mapping_pairs_offset)
-					>= le32_to_cpu(a->length))
-			    || (a->name_length
-				 && ((le16_to_cpu(a->name_offset)
-					+ a->name_length)
-					> le32_to_cpu(a->length)))) {
-				ntfs_log_error("Corrupt non resident attribute"
-					" 0x%x in MFT record %lld\n",
-					(int)le32_to_cpu(a->type),
-					(long long)ctx->ntfs_ino->mft_no);
-				errno = EIO;
-				ret = -1;
-			}
-		} else {
-			if ((le32_to_cpu(a->length)
-				< offsetof(ATTR_RECORD, resident_end))
-			    || (le16_to_cpu(a->value_offset)
-					+ le32_to_cpu(a->value_length))
-					> le32_to_cpu(a->length)
-			    || (a->name_length
-				&& ((le16_to_cpu(a->name_offset)
-					+ a->name_length)
-					> le32_to_cpu(a->length)))) {
-				ntfs_log_error("Corrupt resident attribute 0x%x in"
-					" MFT record %lld\n",
-					(int)le32_to_cpu(a->type),
-					(long long)ctx->ntfs_ino->mft_no);
-				errno = EIO;
-				ret = -1;
-			}
-		}
-	}
 out:
 	ntfs_log_leave("\n");
 	return ret;

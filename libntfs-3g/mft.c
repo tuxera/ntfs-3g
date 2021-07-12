@@ -219,11 +219,26 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	return -1;
 }
 
+/*
+ *		Check the consistency of an MFT record
+ *
+ *	Make sure its general fields are safe, then examine all its
+ *	attributes and apply generic checks to them.
+ *	The attribute checks are skipped when a record is being read in
+ *	order to collect its sequence number for creating a new record.
+ *
+ *	Returns 0 if the checks are successful
+ *		-1 with errno = EIO otherwise
+ */
+
 int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref, 
 			  MFT_RECORD *m)
 {			  
 	ATTR_RECORD *a;
+	ATTR_TYPES previous_type;
 	int ret = -1;
+	u32 offset;
+	s32 space;
 	
 	if (!ntfs_is_file_record(m->magic)) {
 		if (!NVolNoFixupWarn(vol))
@@ -240,7 +255,8 @@ int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref,
 			       le32_to_cpu(m->bytes_allocated));
 		goto err_out;
 	}
-	if (le32_to_cpu(m->bytes_in_use) > vol->mft_record_size) {
+	if (!NVolNoFixupWarn(vol)
+	    && (le32_to_cpu(m->bytes_in_use) > vol->mft_record_size)) {
 		ntfs_log_error("Record %llu has corrupt in-use size "
 			       "(%u > %u)\n", (unsigned long long)MREF(mref),
 			       (int)le32_to_cpu(m->bytes_in_use),
@@ -258,6 +274,37 @@ int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref,
 		ntfs_log_error("Record %llu is corrupt\n",
 			       (unsigned long long)MREF(mref));
 		goto err_out;
+	}
+
+	if (!NVolNoFixupWarn(vol)) {
+		offset = le16_to_cpu(m->attrs_offset);
+		space = le32_to_cpu(m->bytes_in_use) - offset;
+		a = (ATTR_RECORD*)((char*)m + offset);
+		previous_type = AT_STANDARD_INFORMATION;
+		while ((space >= (s32)offsetof(ATTR_RECORD, resident_end))
+		    && (a->type != AT_END)
+		    && (le32_to_cpu(a->type) >= le32_to_cpu(previous_type))) {
+			if ((le32_to_cpu(a->length) <= (u32)space)
+			    && !(le32_to_cpu(a->length) & 7)) {
+				if (!ntfs_attr_consistent(a, mref)) {
+					previous_type = a->type;
+					offset += le32_to_cpu(a->length);
+					space -= le32_to_cpu(a->length);
+					a = (ATTR_RECORD*)((char*)m + offset);
+				} else
+					goto err_out;
+			} else {
+				ntfs_log_error("Corrupted MFT record %llu\n",
+				       (unsigned long long)MREF(mref));
+				goto err_out;
+			}
+		}
+			/* We are supposed to reach an AT_END */
+		if ((space < 4) || (a->type != AT_END)) {
+			ntfs_log_error("Bad end of MFT record %llu\n",
+				       (unsigned long long)MREF(mref));
+			goto err_out;
+		}
 	}
 	
 	ret = 0;
