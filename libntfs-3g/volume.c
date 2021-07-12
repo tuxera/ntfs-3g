@@ -458,6 +458,12 @@ static int ntfs_mftmirr_load(ntfs_volume *vol)
 		ntfs_log_perror("Failed to map runlist of $MFTMirr/$DATA");
 		goto error_exit;
 	}
+	if (vol->mftmirr_na->rl->lcn != vol->mftmirr_lcn) {
+		ntfs_log_error("Bad $MFTMirr lcn 0x%llx, want 0x%llx\n",
+				(long long)vol->mftmirr_na->rl->lcn,
+				(long long)vol->mftmirr_lcn);
+		goto error_exit;
+	}
 	
 	return 0;
 
