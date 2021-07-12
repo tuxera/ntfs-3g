@@ -425,7 +425,8 @@ descend_into_child_node:
 		goto close_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + index_block_size) {
+	if (((s32)le32_to_cpu(ia->index.index_length) < 0)
+	    || (index_end > (u8*)ia + index_block_size)) {
 		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
 				"0x%llx exceeds maximum size.\n",
 				(long long)vcn, (unsigned long long)dir_ni->mft_no);

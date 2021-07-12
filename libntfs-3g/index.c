@@ -421,6 +421,14 @@ static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
 			       icx->block_size);
 		return -1;
 	}
+	if (((s32)le32_to_cpu(ib->index.index_length) < 0)
+	    || ((u8*)&ib->index + le32_to_cpu(ib->index.index_length) >
+			(u8*)ib + icx->block_size)) {
+		ntfs_log_error("Size of index buffer (%lld) of inode %llu "
+				"exceeds maximum size.\n", (long long)vcn,
+				(unsigned long long)icx->ni->mft_no);
+		return -1;
+	}
 	return 0;
 }
 
