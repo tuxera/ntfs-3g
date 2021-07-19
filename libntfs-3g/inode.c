@@ -231,9 +231,9 @@ static ntfs_inode *ntfs_inode_real_open(ntfs_volume *vol, const MFT_REF mref)
 	l = ntfs_get_attribute_value_length(ctx->attr);
 	if (!l)
 		goto put_err_out;
-	if (l > 0x40000) {
+	if ((u64)l > 0x40000) {
 		errno = EIO;
-		ntfs_log_perror("Too large attrlist attribute (%lld), inode "
+		ntfs_log_perror("Too large attrlist attribute (%llu), inode "
 				"%lld", (long long)l, (long long)MREF(mref));
 		goto put_err_out;
 	}
