@@ -286,7 +286,7 @@ int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref,
 		    && (le32_to_cpu(a->type) >= le32_to_cpu(previous_type))) {
 			if ((le32_to_cpu(a->length) <= (u32)space)
 			    && !(le32_to_cpu(a->length) & 7)) {
-				if (!ntfs_attr_consistent(a, mref)) {
+				if (!ntfs_attr_inconsistent(a, mref)) {
 					previous_type = a->type;
 					offset += le32_to_cpu(a->length);
 					space -= le32_to_cpu(a->length);

@@ -3402,7 +3402,7 @@ not_found:
  *		-1 with errno = EIO otherwise
  */
 
-int ntfs_attr_consistent(const ATTR_RECORD *a, const MFT_REF mref)
+int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 {
 	const FILE_NAME_ATTR *fn;
 	const INDEX_ROOT *ir;
