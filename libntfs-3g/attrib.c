@@ -3496,16 +3496,15 @@ int ntfs_attr_consistent(const ATTR_RECORD *a, const MFT_REF mref)
 			if (a->non_resident
 			    || (le32_to_cpu(a->value_length)
 				< offsetof(INDEX_ROOT, index.reserved))
+			    || (le32_to_cpu(ir->index.entries_offset)
+				< sizeof(INDEX_HEADER))
 			    || (le32_to_cpu(ir->index.index_length)
-					& 0xff000000)
-			    || ((le32_to_cpu(a->value_length)
-				- le32_to_cpu(ir->index.index_length))
-				< offsetof(INDEX_ROOT,index))
-			    || ((le32_to_cpu(a->value_length)
-				- le32_to_cpu(ir->index.index_length))
 				< le32_to_cpu(ir->index.entries_offset))
-			    || (le32_to_cpu(ir->index.index_length)
-				> le32_to_cpu(ir->index.allocated_size))) {
+			    || (le32_to_cpu(ir->index.allocated_size)
+				< le32_to_cpu(ir->index.index_length))
+			    || (le32_to_cpu(a->value_length)
+				< (le32_to_cpu(ir->index.allocated_size)
+				    + offsetof(INDEX_ROOT, reserved)))) {
 				ntfs_log_error("Corrupt index root"
 					" in MFT record %lld.\n",
 					(long long)inum);
