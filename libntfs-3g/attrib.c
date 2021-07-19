@@ -3492,7 +3492,28 @@ int ntfs_attr_consistent(const ATTR_RECORD *a, const MFT_REF mref)
 			}
 			break;
 		case AT_STANDARD_INFORMATION :
+			if (a->non_resident
+			    || (le32_to_cpu(a->value_length)
+					< offsetof(STANDARD_INFORMATION,
+							v1_end))) {
+				ntfs_log_error("Corrupt standard information"
+					" in MFT record %lld\n",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
 		case AT_OBJECT_ID :
+			if (a->non_resident
+			    || (le32_to_cpu(a->value_length)
+					< sizeof(GUID))) {
+				ntfs_log_error("Corrupt object id"
+					" in MFT record %lld\n",
+					(long long)inum);
+				errno = EIO;
+				ret = -1;
+			}
+			break;
 		case AT_VOLUME_NAME :
 		case AT_EA_INFORMATION :
 			if (a->non_resident) {
