@@ -1894,8 +1894,10 @@ int ntfs_volume_get_free_space(ntfs_volume *vol)
 
 		if (vol->free_mft_records < 0)
 			ntfs_log_perror("Failed to calculate free MFT records");
-		else
+		else {
+			NVolSetFreeSpaceKnown(vol);
 			ret = 0;
+		}
 	}
 	return (ret);
 }

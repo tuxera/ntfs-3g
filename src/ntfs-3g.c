@@ -4056,8 +4056,7 @@ static int ntfs_open(const char *device)
 				!ctx->hide_hid_files, ctx->hide_dot_files))
 		goto err_out;
 	
-	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
-	if (ctx->vol->free_clusters < 0) {
+	if (ntfs_volume_get_free_space(ctx->vol)) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}

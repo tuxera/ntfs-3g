@@ -4347,8 +4347,7 @@ static int ntfs_open(const char *device)
 	if (ctx->ignore_case && ntfs_set_ignore_case(vol))
 		goto err_out;
         
-	vol->free_clusters = ntfs_attr_get_free_bits(vol->lcnbmp_na);
-	if (vol->free_clusters < 0) {
+	if (ntfs_volume_get_free_space(ctx->vol)) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}
