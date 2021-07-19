@@ -1256,6 +1256,17 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 	LCN lcn_seek_from = -1;
 	VCN cur_vcn, from_vcn;
 
+	if (na->ni->mft_no == FILE_Bitmap) {
+		/*
+		 * Filling a hole in the main bitmap implies allocating
+		 * clusters, which is likely to imply updating the
+		 * bitmap in a cluster being allocated.
+		 * Not supported now, could lead to endless recursions.
+		 */
+		ntfs_log_error("Corrupt $BitMap not fully allocated\n");
+		errno = EIO;
+		goto err_out;
+	}
 	to_write = min(count, ((*rl)->length << vol->cluster_size_bits) - *ofs);
 	
 	cur_vcn = (*rl)->vcn;
