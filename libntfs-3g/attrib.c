@@ -3767,8 +3767,9 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		ntfs_log_perror("%s: type=%d", __FUNCTION__, le32_to_cpu(type));
 		return NULL;
 	}
-	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
-			vol->attrdef_len && ad->type; ++ad) {
+	for (ad = vol->attrdef; ((ptrdiff_t)((u8*)ad - (u8*)vol->attrdef
+				+ sizeof(ATTR_DEF)) <= vol->attrdef_len)
+			&& ad->type; ++ad) {
 		/* We haven't found it yet, carry on searching. */
 		if (le32_to_cpu(ad->type) < le32_to_cpu(type))
 			continue;
