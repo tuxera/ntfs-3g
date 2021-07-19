@@ -489,12 +489,34 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	}
 
 	if (a->non_resident) {
+		if (((a->flags & ATTR_COMPRESSION_MASK)
+			|| a->compression_unit)
+		    && (ni->vol->major_ver < 3)) {
+			errno = EIO;
+			ntfs_log_perror("Compressed inode %lld not allowed"
+					" on NTFS %d.%d",
+					(unsigned long long)ni->mft_no,
+					ni->vol->major_ver,
+					ni->vol->major_ver);
+			goto put_err_out;
+		}
 		if ((a->flags & ATTR_COMPRESSION_MASK)
 				 && !a->compression_unit) {
 			errno = EIO;
 			ntfs_log_perror("Compressed inode %lld attr 0x%x has "
 					"no compression unit",
 					(unsigned long long)ni->mft_no, le32_to_cpu(type));
+			goto put_err_out;
+		}
+		if ((a->flags & ATTR_COMPRESSION_MASK)
+				 && (a->compression_unit
+					!= STANDARD_COMPRESSION_UNIT)) {
+			errno = EIO;
+			ntfs_log_perror("Compressed inode %lld attr 0x%lx has "
+					"an unsupported compression unit %d",
+					(unsigned long long)ni->mft_no,
+					(long)le32_to_cpu(type),
+					(int)a->compression_unit);
 			goto put_err_out;
 		}
 		ntfs_attr_init(na, TRUE, a->flags,

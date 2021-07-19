@@ -752,6 +752,12 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	/* If it is a resident attribute, simply use ntfs_attr_pread(). */
 	if (!NAttrNonResident(na))
 		return ntfs_attr_pread(na, pos, count, b);
+	if (na->compression_block_size < NTFS_SB_SIZE) {
+		ntfs_log_error("Unsupported compression block size %ld\n",
+				(long)na->compression_block_size);
+		errno = EOVERFLOW;
+		return (-1);
+	}
 	total = total2 = 0;
 	/* Zero out reads beyond initialized size. */
 	if (pos + count > na->initialized_size) {
@@ -1702,6 +1708,12 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 		errno = EIO;
 		return (-1);
 	}
+	if (na->compression_block_size < NTFS_SB_SIZE) {
+		ntfs_log_error("Unsupported compression block size %ld\n",
+				(long)na->compression_block_size);
+		errno = EOVERFLOW;
+		return (-1);
+	}
 	if (wrl->vcn < *update_from)
 		*update_from = wrl->vcn;
 	written = -1; /* default return */
@@ -1881,6 +1893,12 @@ int ntfs_compressed_close(ntfs_attr *na, runlist_element *wrl, s64 offs,
 	if (*update_from < 0) {
 		ntfs_log_error("Bad update vcn for compressed close\n");
 		errno = EIO;
+		return (-1);
+	}
+	if (na->compression_block_size < NTFS_SB_SIZE) {
+		ntfs_log_error("Unsupported compression block size %ld\n",
+				(long)na->compression_block_size);
+		errno = EOVERFLOW;
 		return (-1);
 	}
 	if (wrl->vcn < *update_from)
