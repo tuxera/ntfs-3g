@@ -407,33 +407,12 @@ descend_into_child_node:
 		goto close_err_out;
 	}
 
-	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
-		ntfs_log_error("Actual VCN (0x%llx) of index buffer is different "
-				"from expected VCN (0x%llx).\n",
-				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)vcn);
-		errno = EIO;
-		goto close_err_out;
-	}
-	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		ntfs_log_error("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
-				"has a size (%u) differing from the directory "
-				"specified size (%u).\n", (long long)vcn,
-				(unsigned long long)dir_ni->mft_no,
-				(unsigned) le32_to_cpu(ia->index.allocated_size) + 0x18,
-				(unsigned)index_block_size);
+	if (ntfs_index_block_inconsistent((INDEX_BLOCK*)ia, index_block_size,
+			ia_na->ni->mft_no, vcn)) {
 		errno = EIO;
 		goto close_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (((s32)le32_to_cpu(ia->index.index_length) < 0)
-	    || (index_end > (u8*)ia + index_block_size)) {
-		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
-				"0x%llx exceeds maximum size.\n",
-				(long long)vcn, (unsigned long long)dir_ni->mft_no);
-		errno = EIO;
-		goto close_err_out;
-	}
 
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ia->index +
@@ -1372,33 +1351,12 @@ find_next_index_buffer:
 	}
 
 	ia_start = ia_pos & ~(s64)(index_block_size - 1);
-	if (sle64_to_cpu(ia->index_block_vcn) != ia_start >>
-			index_vcn_size_bits) {
-		ntfs_log_error("Actual VCN (0x%llx) of index buffer is different "
-				"from expected VCN (0x%llx) in inode 0x%llx.\n",
-				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)ia_start >> index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no);
-		goto dir_err_out;
-	}
-	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		ntfs_log_error("Index buffer (VCN 0x%llx) of directory inode %lld "
-				"has a size (%u) differing from the directory "
-				"specified size (%u).\n", (long long)ia_start >>
-				index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no,
-				(unsigned) le32_to_cpu(ia->index.allocated_size)
-				+ 0x18, (unsigned)index_block_size);
+	if (ntfs_index_block_inconsistent((INDEX_BLOCK*)ia, index_block_size,
+			ia_na->ni->mft_no, ia_start >> index_vcn_size_bits)) {
 		goto dir_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + index_block_size) {
-		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
-				"%lld exceeds maximum size.\n",
-				(long long)ia_start >> index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no);
-		goto dir_err_out;
-	}
+
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ia->index +
 			le32_to_cpu(ia->index.entries_offset));

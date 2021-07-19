@@ -388,50 +388,6 @@ static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 	return dup;
 }
 
-static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
-{
-	u32 ib_size = (unsigned)le32_to_cpu(ib->index.allocated_size) + 0x18;
-	
-	ntfs_log_trace("Entering\n");
-	
-	if (!ntfs_is_indx_record(ib->magic)) {
-		
-		ntfs_log_error("Corrupt index block signature: vcn %lld inode "
-			       "%llu\n", (long long)vcn,
-			       (unsigned long long)icx->ni->mft_no);
-		return -1;
-	}
-	
-	if (sle64_to_cpu(ib->index_block_vcn) != vcn) {
-		
-		ntfs_log_error("Corrupt index block: VCN (%lld) is different "
-			       "from expected VCN (%lld) in inode %llu\n",
-			       (long long)sle64_to_cpu(ib->index_block_vcn),
-			       (long long)vcn,
-			       (unsigned long long)icx->ni->mft_no);
-		return -1;
-	}
-	
-	if (ib_size != icx->block_size) {
-		
-		ntfs_log_error("Corrupt index block : VCN (%lld) of inode %llu "
-			       "has a size (%u) differing from the index "
-			       "specified size (%u)\n", (long long)vcn, 
-			       (unsigned long long)icx->ni->mft_no, ib_size,
-			       icx->block_size);
-		return -1;
-	}
-	if (((s32)le32_to_cpu(ib->index.index_length) < 0)
-	    || ((u8*)&ib->index + le32_to_cpu(ib->index.index_length) >
-			(u8*)ib + icx->block_size)) {
-		ntfs_log_error("Size of index buffer (%lld) of inode %llu "
-				"exceeds maximum size.\n", (long long)vcn,
-				(unsigned long long)icx->ni->mft_no);
-		return -1;
-	}
-	return 0;
-}
-
 static INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
 				  u32 name_len, ntfs_attr_search_ctx **ctx)
 {
@@ -476,6 +432,82 @@ static INDEX_ROOT *ntfs_ir_lookup2(ntfs_inode *ni, ntfschar *name, u32 len)
 		ntfs_attr_put_search_ctx(ctx);
 	return ir;
 }
+
+/*
+ *		Check the consistency of an index block
+ *
+ *	Make sure the index block does not overflow from the index record.
+ *	The size of block is assumed to have been checked to be what is
+ *	defined in the index root.
+ *
+ *	Returns 0 if no error was found
+ *		-1 otherwise (with errno unchanged)
+ *
+ *      |<--->|  offsetof(INDEX_BLOCK, index)
+ *      |     |<--->|  sizeof(INDEX_HEADER)
+ *      |     |     |
+ *      |     |     | seq          index entries         unused
+ *      |=====|=====|=====|===========================|==============|
+ *      |     |           |                           |              |
+ *      |     |<--------->| entries_offset            |              |
+ *      |     |<---------------- index_length ------->|              |
+ *      |     |<--------------------- allocated_size --------------->|
+ *      |<--------------------------- block_size ------------------->|
+ *
+ *      size(INDEX_HEADER) <= ent_offset < ind_length <= alloc_size < bk_size
+ */
+
+int ntfs_index_block_inconsistent(const INDEX_BLOCK *ib, u32 block_size,
+			u64 inum, VCN vcn)
+{
+	u32 ib_size = (unsigned)le32_to_cpu(ib->index.allocated_size)
+			+ offsetof(INDEX_BLOCK, index);
+
+	if (!ntfs_is_indx_record(ib->magic)) {
+		ntfs_log_error("Corrupt index block signature: vcn %lld inode "
+			       "%llu\n", (long long)vcn,
+			       (unsigned long long)inum);
+		return -1;
+	}
+	
+	if (sle64_to_cpu(ib->index_block_vcn) != vcn) {
+		ntfs_log_error("Corrupt index block: VCN (%lld) is different "
+			       "from expected VCN (%lld) in inode %llu\n",
+			       (long long)sle64_to_cpu(ib->index_block_vcn),
+			       (long long)vcn,
+			       (unsigned long long)inum);
+		return -1;
+	}
+	
+	if (ib_size != block_size) {
+		ntfs_log_error("Corrupt index block : VCN (%lld) of inode %llu "
+			       "has a size (%u) differing from the index "
+			       "specified size (%u)\n", (long long)vcn, 
+			       (unsigned long long)inum, ib_size,
+			       (unsigned int)block_size);
+		return -1;
+	}
+	if (le32_to_cpu(ib->index.entries_offset) < sizeof(INDEX_HEADER)) {
+		ntfs_log_error("Invalid index entry offset in inode %lld\n",
+				(unsigned long long)inum);
+		return -1;
+	}
+	if (le32_to_cpu(ib->index.index_length)
+			<= le32_to_cpu(ib->index.entries_offset)) {
+		ntfs_log_error("No space for index entries in inode %lld\n",
+				(unsigned long long)inum);
+		return -1;
+	}
+	if (le32_to_cpu(ib->index.allocated_size)
+			< le32_to_cpu(ib->index.index_length)) {
+		ntfs_log_error("Index entries overflow in inode %lld\n",
+				(unsigned long long)inum);
+		return -1;
+	}
+
+	return (0);
+}
+
 
 /*
  *		Check the consistency of an index entry
@@ -671,8 +703,11 @@ static int ntfs_ib_read(ntfs_index_context *icx, VCN vcn, INDEX_BLOCK *dst)
 		return -1;
 	}
 	
-	if (ntfs_ia_check(icx, dst, vcn))
+	if (ntfs_index_block_inconsistent((INDEX_BLOCK*)dst, icx->block_size,
+				icx->ia_na->ni->mft_no, vcn)) {
+		errno = EIO;
 		return -1;
+	}
 	
 	return 0;
 }
