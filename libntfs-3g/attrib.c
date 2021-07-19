@@ -4828,6 +4828,13 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	
 	ntfs_log_trace("Entering for new size %u.\n", (unsigned)new_size);
 
+	if (!a->value_length) {
+			/* Offset is unsafe when no value */
+		int offset = ((offsetof(ATTR_RECORD, resident_end)
+			+ a->name_length*sizeof(ntfschar) - 1) | 7) + 1;
+		a->value_offset = cpu_to_le16(offset);
+	}
+
 	/* Resize the resident part of the attribute record. */
 	if ((ret = ntfs_attr_record_resize(m, a, (le16_to_cpu(a->value_offset) +
 			new_size + 7) & ~7)) < 0)
