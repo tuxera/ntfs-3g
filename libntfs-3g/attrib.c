@@ -6930,9 +6930,10 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 		 *   index bitmaps may need more, but still limited by
 		 *   the number of clusters.
 		 */
-	if ((na->data_size > 65536)
+	if (((u64)na->data_size > 65536)
 	    && ((type != AT_BITMAP)
-			|| ((na->data_size << 3) > ni->vol->nr_clusters))) {
+		|| ((u64)na->data_size > 
+			(u64)((ni->vol->nr_clusters + 7) >> 3)))) {
 		ntfs_log_error("Corrupt attribute 0x%lx in inode %lld\n",
 				(long)le32_to_cpu(type),(long long)ni->mft_no);
 		errno = EOVERFLOW;
