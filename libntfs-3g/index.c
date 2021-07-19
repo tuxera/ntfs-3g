@@ -522,7 +522,7 @@ int ntfs_index_block_inconsistent(const INDEX_BLOCK *ib, u32 block_size,
  *		-1 otherwise (with errno unchanged)
  */
 
-int ntfs_index_entry_consistent(const INDEX_ENTRY *ie,
+int ntfs_index_entry_inconsistent(const INDEX_ENTRY *ie,
 			COLLATION_RULES collation_rule, u64 inum)
 {
 	int ret;
@@ -614,7 +614,7 @@ static int ntfs_ie_lookup(const void *key, const int key_len,
 			return STATUS_ERROR;
 		}
 			/* Make sure key and data do not overflow from entry */
-		if (ntfs_index_entry_consistent(ie, icx->ir->collation_rule,
+		if (ntfs_index_entry_inconsistent(ie, icx->ir->collation_rule,
 				icx->ni->mft_no)) {
 			errno = EIO;
 			return STATUS_ERROR;
