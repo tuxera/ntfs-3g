@@ -3092,10 +3092,11 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 
 		al_entry = (ATTR_LIST_ENTRY*)((char*)ctx->al_entry +
 				le16_to_cpu(ctx->al_entry->length));
-		if ((al_entry->name_length
-			&& ((u8*)al_entry + al_entry->name_offset
-				+ al_entry->name_length * sizeof(ntfschar))
-				> al_end))
+		if ((u8*)al_entry == al_end)
+			goto not_found;
+			/* Preliminary check for small entry */
+		if ((p2n(al_end) - p2n(al_entry))
+				< (long)offsetof(ATTR_LIST_ENTRY, name))
 			goto corrupt;
 		/*
 		 * If this is an enumeration and the attribute list attribute
