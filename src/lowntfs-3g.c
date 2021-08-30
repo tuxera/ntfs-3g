@@ -300,13 +300,13 @@ static const char *setuid_msg =
 "external FUSE library. Either remove the setuid/setgid bit from the binary\n"
 "or rebuild NTFS-3G with integrated FUSE support and make it setuid root.\n"
 "Please see more information at\n"
-"http://tuxera.com/community/ntfs-3g-faq/#unprivileged\n";
+"https://github.com/tuxera/ntfs-3g/wiki/NTFS-3G-FAQ\n";
 
 static const char *unpriv_fuseblk_msg =
 "Unprivileged user can not mount NTFS block devices using the external FUSE\n"
 "library. Either mount the volume as root, or rebuild NTFS-3G with integrated\n"
 "FUSE support and make it setuid root. Please see more information at\n"
-"http://tuxera.com/community/ntfs-3g-faq/#unprivileged\n";
+"https://github.com/tuxera/ntfs-3g/wiki/NTFS-3G-FAQ\n";
 #endif	
 
 
@@ -4398,7 +4398,7 @@ static const char *fuse26_kmod_msg =
 "         message to disappear then you should upgrade to at least kernel\n"
 "         version 2.6.20, or request help from your distribution to fix\n"
 "         the kernel problem. The below web page has more information:\n"
-"         http://tuxera.com/community/ntfs-3g-faq/#fuse26\n"
+"         https://github.com/tuxera/ntfs-3g/wiki/NTFS-3G-FAQ\n"
 "\n";
 
 static void mknod_dev_fuse(const char *dev)
