@@ -62,8 +62,6 @@ Map the users defined on the Windows system present on /dev/sda1 :
 .sp
 .RE
 .PP
-A detailed example, with screen displays is available on
-http://jp-andre.pagesperso-orange.fr/ntfsusermap.html
 .SH EXIT CODES
 .B ntfsusermap
 exits with a value of 0 when no error was detected, and with a value
@@ -72,7 +70,7 @@ of 1 when an error was detected.
 Please see 
 .RS
 .sp
-http://www.tuxera.com/community/ntfs-3g-faq/
+https://github.com/tuxera/ntfs-3g/wiki/NTFS-3G-FAQ/
 .sp
 .RE
 for common questions and known issues.

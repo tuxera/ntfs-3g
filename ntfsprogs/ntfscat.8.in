@@ -126,7 +126,7 @@ is part of the
 package and is available from:
 .br
 .nh
-http://www.tuxera.com/community/
+https://github.com/tuxera/ntfs-3g/wiki/
 .hy
 .SH SEE ALSO
 Read \fBlibntfs\fR(8) for details how to access encrypted files.

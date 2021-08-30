@@ -63,14 +63,18 @@ Unclassified FUSE error.
 Please see 
 .RS
 .sp
-http://tuxera.com/community/ntfs-3g-faq/
+https://github.com/tuxera/ntfs-3g/wiki/NTFS-3G-FAQ
 .sp
 .RE
 for common questions and known issues.
 If you think you have found an undocumented problem in the latest release of
-the software then please send an email describing it in detail. 
-You can contact the development team on the ntfs\-3g\-devel@lists.sf.net
-address.
+the software then please post an ntfs-3g issue describing it in detail
+so that the development team can be aware of the issue and take care of it:
+.RS
+.sp
+https://github.com/tuxera/ntfs-3g/issues
+.sp
+.RE
 .SH AUTHORS
 .B ntfs-3g.probe 
 was written by Szabolcs Szakacsits. 

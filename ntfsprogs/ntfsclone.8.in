@@ -387,7 +387,7 @@ is part of the
 package and is available at:
 .br
 .nh
-http://www.tuxera.com/community/
+https://github.com/tuxera/ntfs-3g/wiki/
 .hy
 .SH SEE ALSO
 .BR ntfsresize (8)
