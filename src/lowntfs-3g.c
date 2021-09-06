@@ -263,7 +263,7 @@ static const char *usage_msg =
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
 "Copyright (C) 2007-2021 Jean-Pierre Andre\n"
-"Copyright (C) 2009 Erik Larsson\n"
+"Copyright (C) 2009-2020 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
@@ -4347,8 +4347,7 @@ static int ntfs_open(const char *device)
 	if (ctx->ignore_case && ntfs_set_ignore_case(vol))
 		goto err_out;
         
-	vol->free_clusters = ntfs_attr_get_free_bits(vol->lcnbmp_na);
-	if (vol->free_clusters < 0) {
+	if (ntfs_volume_get_free_space(ctx->vol)) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}
@@ -4368,9 +4367,12 @@ static int ntfs_open(const char *device)
 	}
         
 	errno = 0;
+	goto out;
 err_out:
+	if (!errno)	/* Make sure to return an error */
+		errno = EIO;
+out :
 	return ntfs_volume_error(errno);
-        
 }
 
 static void usage(void)

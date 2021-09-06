@@ -1155,7 +1155,7 @@ close_attr:
 		if (!fstat(fileno(in),&st)) {
 			s64 change_time = st.st_mtime*10000000LL
 					+ NTFS_TIME_OFFSET;
-			out->last_data_change_time = cpu_to_le64(change_time);
+			out->last_data_change_time = cpu_to_sle64(change_time);
 			ntfs_inode_update_times(out, 0);
 		} else {
 			ntfs_log_error("Failed to get the time stamp.\n");

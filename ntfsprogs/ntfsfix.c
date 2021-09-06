@@ -780,14 +780,19 @@ static ATTR_RECORD *find_unnamed_attr(MFT_RECORD *mrec, ATTR_TYPES type)
 {
 	ATTR_RECORD *a;
 	u32 offset;
+	s32 space;
 
 			/* fetch the requested attribute */
 	offset = le16_to_cpu(mrec->attrs_offset);
+	space = le32_to_cpu(mrec->bytes_in_use) - offset;
 	a = (ATTR_RECORD*)((char*)mrec + offset);
-	while ((offset < le32_to_cpu(mrec->bytes_in_use))
+	while ((space >= (s32)offsetof(ATTR_RECORD, resident_end))
 	    && !le32_eq(a->type, AT_END)
+	    && (le32_to_cpu(a->length) <= (u32)space)
+	    && !(le32_to_cpu(a->length) & 7)
 	    && (!le32_eq(a->type, type) || a->name_length)) {
 		offset += le32_to_cpu(a->length);
+		space -= le32_to_cpu(a->length);
 		a = (ATTR_RECORD*)((char*)mrec + offset);
 	}
 	if ((offset >= le32_to_cpu(mrec->bytes_in_use))
@@ -823,7 +828,8 @@ static BOOL short_mft_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 			vol->mft_record_size, mft0)
 				== vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft0,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, 0, mft0)) {
 		a = find_unnamed_attr(mft0,AT_DATA);
 		if (a
 		    && a->non_resident
@@ -961,7 +967,9 @@ static BOOL self_mapped_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 	if ((ntfs_pread(vol->dev, offs, vol->mft_record_size,
 			mft1) == vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft1,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, inum, mft1)) {
+
 		lowest_vcn = (SELFLOC_LIMIT*vol->mft_record_size)
 				>> vol->cluster_size_bits;
 		a = find_unnamed_attr(mft1,AT_DATA);
@@ -1017,7 +1025,8 @@ static BOOL spare_record_selfloc_condition(struct MFT_SELF_LOCATED *selfloc)
 	if ((ntfs_pread(vol->dev, offs, vol->mft_record_size,
 			mft2) == vol->mft_record_size)
 	    && !ntfs_mst_post_read_fixup((NTFS_RECORD*)mft2,
-			vol->mft_record_size)) {
+			vol->mft_record_size)
+	    && !ntfs_mft_record_check(vol, inum, mft2)) {
 		if (le64_cmpz(mft2->base_mft_record)
 		    && !le16_andz(mft2->flags, MFT_RECORD_IN_USE)
 		    && !find_unnamed_attr(mft2,AT_ATTRIBUTE_LIST)

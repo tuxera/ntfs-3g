@@ -117,6 +117,7 @@ typedef enum {
 	NV_HideDotFiles,	/* 1: Set hidden flag on dot files */
 	NV_Compression,		/* 1: allow compression */
 	NV_NoFixupWarn,		/* 1: Do not log fixup errors */
+	NV_FreeSpaceKnown,	/* 1: The free space is now known */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -154,6 +155,10 @@ typedef enum {
 #define NVolNoFixupWarn(nv)		 test_nvol_flag(nv, NoFixupWarn)
 #define NVolSetNoFixupWarn(nv)		  set_nvol_flag(nv, NoFixupWarn)
 #define NVolClearNoFixupWarn(nv)	clear_nvol_flag(nv, NoFixupWarn)
+
+#define NVolFreeSpaceKnown(nv)		 test_nvol_flag(nv, FreeSpaceKnown)
+#define NVolSetFreeSpaceKnown(nv)	  set_nvol_flag(nv, FreeSpaceKnown)
+#define NVolClearFreeSpaceKnown(nv)	clear_nvol_flag(nv, FreeSpaceKnown)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.

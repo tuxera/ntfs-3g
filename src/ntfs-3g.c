@@ -198,7 +198,7 @@ static const char *usage_msg =
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
 "Copyright (C) 2007-2021 Jean-Pierre Andre\n"
-"Copyright (C) 2009 Erik Larsson\n"
+"Copyright (C) 2009-2020 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
@@ -3965,6 +3965,9 @@ static struct fuse_operations ntfs_3g_ops = {
 	.rmdir		= ntfs_fuse_rmdir,
 #ifdef HAVE_UTIMENSAT
 	.utimens	= ntfs_fuse_utimens,
+#if defined(linux) & !defined(FUSE_INTERNAL) & (FUSE_VERSION < 30)
+	.flag_utime_omit_ok = 1,
+#endif /* defined(linux) & !defined(FUSE_INTERNAL) */
 #else
 	.utime		= ntfs_fuse_utime,
 #endif
@@ -4053,8 +4056,7 @@ static int ntfs_open(const char *device)
 				!ctx->hide_hid_files, ctx->hide_dot_files))
 		goto err_out;
 	
-	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
-	if (ctx->vol->free_clusters < 0) {
+	if (ntfs_volume_get_free_space(ctx->vol)) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}
@@ -4073,9 +4075,12 @@ static int ntfs_open(const char *device)
 	}
 	
 	errno = 0;
+	goto out;
 err_out:
+	if (!errno)
+		errno = EIO;
+out :
 	return ntfs_volume_error(errno);
-	
 }
 
 static void usage(void)

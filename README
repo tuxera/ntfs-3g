@@ -3,9 +3,10 @@ INTRODUCTION
 ============
 
 The NTFS-3G driver is an open source, freely available read/write NTFS driver 
-for Linux, FreeBSD, Mac OS X, NetBSD, OpenSolaris, QNX and Haiku. It provides 
+for Linux, FreeBSD, macOS, NetBSD, OpenIndiana, QNX and Haiku. It provides 
 safe and fast handling of the Windows XP, Windows Server 2003, Windows 2000, 
-Windows Vista, Windows Server 2008 and Windows 7 file systems. 
+Windows Vista, Windows Server 2008, Windows 7, Windows 8, Windows Server 2012,
+Windows Server 2016, Windows 10 and Windows Server 2019 NTFS file systems.
 
 The purpose of the project is to develop, quality assurance and support a 
 trustable, featureful and high performance solution for hardware platforms 
@@ -18,21 +19,22 @@ Besides the common file system features, NTFS-3G has support for file
 ownership and permissions, POSIX ACLs, junction points, extended attributes 
 and creating internally compressed files (parameter files in the directory
 .NTFS-3G may be required to enable them). The new compressed file formats
-available in Windows 10 can also be read through a plugin. For using
-advanced features, please get the instructions from
-
-	http://www.tuxera.com/community/ntfs-3g-advanced/
+available in Windows 10 can also be read through a plugin. 
 
 News, support answers, problem submission instructions, support and discussion 
-forums, performance numbers and other information are available on the project 
-web site at
+forums, and other information are available on the project web site at
 
-	http://www.tuxera.com/community/
+	https://github.com/tuxera/ntfs-3g
+
+The project has been funded, supported and maintained since 2008 by Tuxera:
+
+	https://tuxera.com
+
 
 LICENSES
 ========
 
-All the NTFS related components : the file system drivers, the ntfsprogs
+All the NTFS related components: the file system drivers, the ntfsprogs
 utilities and the shared library libntfs-3g are distributed under the terms
 of the GNU General Public License as published by the Free Software
 Foundation; either version 2 of the License, or (at your option) any later
@@ -40,6 +42,7 @@ version. See the included file COPYING.
 
 The fuse-lite library is distributed under the terms of the GNU LGPLv2.
 See the included file COPYING.LIB.
+
 
 QUICK INSTALLATION
 ==================
@@ -73,12 +76,6 @@ There are also a few make targets for building parts :
 	make drivers : only build drivers and libraries, without ntfsprogs
 	make ntfsprogs : only build ntfsprogs and libntfs-3g, without drivers
 
-Non-Linux: Please see 
-
-	http://www.tuxera.com/community/ntfs-3g-download/
-
-for known OS specific installation and source packages, but generally
-the same procedures apply.
 
 USAGE
 =====
@@ -106,23 +103,23 @@ TESTING WITHOUT INSTALLING
 Newer versions of ntfs-3g can be tested without installing anything and
 without disturbing an existing installation. Just configure and make as
 shown previously. This will create the scripts ntfs-3g and lowntfs-3g
-in the src directory, which you may activate for testing :
+in the src directory, which you may activate for testing:
 
 	./configure
 	make
 
-then, as root :
+then, as root:
 	src/ntfs-3g [-o mount-options] /dev/sda1 /mnt/windows
 
-And, to end the test, unmount the usual way :
+And, to end the test, unmount the usual way:
 	umount /dev/sda1
 
 
 NTFS UTILITIES
 ==============
 
-The ntfsprogs includes utilities for doing all required tasks to NTFS 
-partitions.  In general, just run a utility without any command line
+The ntfsprogs directory includes utilities for doing all required tasks to
+NTFS partitions. In general, just run a utility without any command line
 options to display the version number and usage syntax.
 
 The following utilities are so far implemented:
@@ -159,6 +156,6 @@ ntfscat - Concatenate files and print their contents on the standard output.
 
 ntfscp - Overwrite files on an NTFS partition.
 
-ntfssecaudit : audit the security metadata.
+ntfssecaudit - Audit the security metadata.
 
-ntfsusermap : assistance for building a user mapping file.
+ntfsusermap - Assistance for building a user mapping file.

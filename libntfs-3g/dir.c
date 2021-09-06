@@ -293,6 +293,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 				(unsigned)index_block_size);
 		goto put_err_out;
 	}
+		/* Consistency check of ir done while fetching attribute */
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
@@ -305,10 +306,11 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
-			ntfs_log_error("Index entry out of bounds in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
+			ntfs_log_error("Index root entry out of bounds in"
+				" inode %lld\n",
+				(unsigned long long)dir_ni->mft_no);
 			goto put_err_out;
 		}
 		/*
@@ -318,9 +320,10 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
-		if (!le16_to_cpu(ie->length)) {
-			ntfs_log_error("Zero length index entry in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_inconsistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
 			goto put_err_out;
 		}
 		/*
@@ -398,37 +401,18 @@ descend_into_child_node:
 	if (br != 1) {
 		if (br != -1)
 			errno = EIO;
-		ntfs_log_perror("Failed to read vcn 0x%llx",
-			       	(unsigned long long)vcn);
+		ntfs_log_perror("Failed to read vcn 0x%llx from inode %lld",
+			       	(unsigned long long)vcn,
+				(unsigned long long)ia_na->ni->mft_no);
 		goto close_err_out;
 	}
 
-	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
-		ntfs_log_error("Actual VCN (0x%llx) of index buffer is different "
-				"from expected VCN (0x%llx).\n",
-				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)vcn);
-		errno = EIO;
-		goto close_err_out;
-	}
-	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		ntfs_log_error("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
-				"has a size (%u) differing from the directory "
-				"specified size (%u).\n", (long long)vcn,
-				(unsigned long long)dir_ni->mft_no,
-				(unsigned) le32_to_cpu(ia->index.allocated_size) + 0x18,
-				(unsigned)index_block_size);
+	if (ntfs_index_block_inconsistent((INDEX_BLOCK*)ia, index_block_size,
+			ia_na->ni->mft_no, vcn)) {
 		errno = EIO;
 		goto close_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + index_block_size) {
-		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
-				"0x%llx exceeds maximum size.\n",
-				(long long)vcn, (unsigned long long)dir_ni->mft_no);
-		errno = EIO;
-		goto close_err_out;
-	}
 
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ia->index +
@@ -442,7 +426,7 @@ descend_into_child_node:
 		/* Bounds check. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
 			ntfs_log_error("Index entry out of bounds in directory "
 				       "inode %lld.\n", 
@@ -457,10 +441,10 @@ descend_into_child_node:
 		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
 		
-		if (!le16_to_cpu(ie->length)) {
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_inconsistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
 			errno = EIO;
-			ntfs_log_error("Zero length index entry in inode %lld"
-				       "\n", (unsigned long long)dir_ni->mft_no);
 			goto close_err_out;
 		}
 		/*
@@ -1086,12 +1070,6 @@ static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 	}
 	fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
-	if ((u8*)fn +	le32_to_cpu(ctx->attr->value_length) >
-			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length)) {
-		ntfs_log_error("Corrupt file name attribute in inode %lld.\n",
-			       (unsigned long long)ni->mft_no);
-		goto io_err_out;
-	}
 	mref = le64_to_cpu(fn->parent_directory);
 	ntfs_attr_put_search_ctx(ctx);
 	return mref;
@@ -1250,9 +1228,13 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
-				index_end)
+				(u8*)ie + le16_to_cpu(ie->length) >
+				index_end) {
+			ntfs_log_error("Index root entry out of bounds in"
+					" inode %lld\n",
+					(unsigned long long)dir_ni->mft_no);
 			goto dir_err_out;
+		}
 		/* The last entry cannot contain a name. */
 		if (!le16_andz(ie->ie_flags, INDEX_ENTRY_END))
 			break;
@@ -1263,6 +1245,13 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* Skip index root entry if continuing previous readdir. */
 		if (ir_pos > (u8*)ie - (u8*)ir)
 			continue;
+
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_inconsistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
+			goto dir_err_out;
+		}
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
@@ -1362,33 +1351,12 @@ find_next_index_buffer:
 	}
 
 	ia_start = ia_pos & ~(s64)(index_block_size - 1);
-	if (sle64_to_cpu(ia->index_block_vcn) != ia_start >>
-			index_vcn_size_bits) {
-		ntfs_log_error("Actual VCN (0x%llx) of index buffer is different "
-				"from expected VCN (0x%llx) in inode 0x%llx.\n",
-				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)ia_start >> index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no);
-		goto dir_err_out;
-	}
-	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		ntfs_log_error("Index buffer (VCN 0x%llx) of directory inode %lld "
-				"has a size (%u) differing from the directory "
-				"specified size (%u).\n", (long long)ia_start >>
-				index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no,
-				(unsigned) le32_to_cpu(ia->index.allocated_size)
-				+ 0x18, (unsigned)index_block_size);
+	if (ntfs_index_block_inconsistent((INDEX_BLOCK*)ia, index_block_size,
+			ia_na->ni->mft_no, ia_start >> index_vcn_size_bits)) {
 		goto dir_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + index_block_size) {
-		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
-				"%lld exceeds maximum size.\n",
-				(long long)ia_start >> index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no);
-		goto dir_err_out;
-	}
+
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ia->index +
 			le32_to_cpu(ia->index.entries_offset));
@@ -1403,7 +1371,7 @@ find_next_index_buffer:
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->key_length) >
+				(u8*)ie + le16_to_cpu(ie->length) >
 				index_end) {
 			ntfs_log_error("Index entry out of bounds in directory inode "
 				"%lld.\n", (unsigned long long)dir_ni->mft_no);
@@ -1419,6 +1387,13 @@ find_next_index_buffer:
 		/* Skip index entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)
 			continue;
+
+		/* The file name must not overflow from the entry */
+		if (ntfs_index_entry_inconsistent(ie, COLLATION_FILE_NAME,
+				dir_ni->mft_no)) {
+			errno = EIO;
+			goto dir_err_out;
+		}
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.

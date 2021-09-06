@@ -221,15 +221,24 @@ static int __ntfs_volume_release(ntfs_volume *v)
 	return errno ? -1 : 0;
 }
 
-static void ntfs_attr_setup_flag(ntfs_inode *ni)
+static int ntfs_attr_setup_flag(ntfs_inode *ni)
 {
 	STANDARD_INFORMATION *si;
+	s64 lth;
+	int r;
 
-	si = ntfs_attr_readall(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0, NULL);
+	si = (STANDARD_INFORMATION*)ntfs_attr_readall(ni,
+			AT_STANDARD_INFORMATION, AT_UNNAMED, 0, &lth);
 	if (si) {
-		ni->flags = si->file_attributes;
+		if ((u64)lth >= offsetof(STANDARD_INFORMATION, owner_id))
+			ni->flags = si->file_attributes;
 		free(si);
+		r = 0;
+	} else {
+		ntfs_log_error("Failed to get standard information of $MFT\n");
+		r = -1;
 	}
+	return (r);
 }
 
 /**
@@ -303,16 +312,19 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		ntfs_log_error("Failed to get value of $MFT/$ATTR_LIST.\n");
 		goto io_error_exit;
 	}
-	if (l != vol->mft_ni->attr_list_size) {
+	if ((l != vol->mft_ni->attr_list_size)
+	    || (l < (s64)offsetof(ATTR_LIST_ENTRY, name))) {
 		ntfs_log_error("Partial read of $MFT/$ATTR_LIST (%lld != "
-			       "%u).\n", (long long)l,
-			       vol->mft_ni->attr_list_size);
+				"%u or < %d).\n", (long long)l,
+				vol->mft_ni->attr_list_size,
+				(int)offsetof(ATTR_LIST_ENTRY, name));
 		goto io_error_exit;
 	}
 
 mft_has_no_attr_list:
 
-	ntfs_attr_setup_flag(vol->mft_ni);
+	if (ntfs_attr_setup_flag(vol->mft_ni))
+		goto error_exit;
 	
 	/* We now have a fully setup ntfs inode for $MFT in vol->mft_ni. */
 	
@@ -353,6 +365,11 @@ mft_has_no_attr_list:
 		nrl = ntfs_mapping_pairs_decompress(vol, a, vol->mft_na->rl);
 		if (!nrl) {
 			ntfs_log_perror("ntfs_mapping_pairs_decompress() failed");
+			goto error_exit;
+		}
+		/* Make sure $DATA is the MFT itself */
+		if (nrl->lcn != vol->mft_lcn) {
+			ntfs_log_perror("The MFT is not self-contained");
 			goto error_exit;
 		}
 		vol->mft_na->rl = nrl;
@@ -446,6 +463,12 @@ static int ntfs_mftmirr_load(ntfs_volume *vol)
 	
 	if (ntfs_attr_map_runlist(vol->mftmirr_na, 0) < 0) {
 		ntfs_log_perror("Failed to map runlist of $MFTMirr/$DATA");
+		goto error_exit;
+	}
+	if (vol->mftmirr_na->rl->lcn != vol->mftmirr_lcn) {
+		ntfs_log_error("Bad $MFTMirr lcn 0x%llx, want 0x%llx\n",
+				(long long)vol->mftmirr_na->rl->lcn,
+				(long long)vol->mftmirr_lcn);
 		goto error_exit;
 	}
 	
@@ -601,6 +624,10 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 	vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
 	while (vol->mft_zone_end >= vol->nr_clusters) {
 		mft_zone_size >>= 1;
+		if (!mft_zone_size) {
+			errno = EINVAL;
+			goto error_exit;
+		}
 		vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
 	}
 	ntfs_log_debug("mft_zone_end = 0x%llx\n", (long long)vol->mft_zone_end);
@@ -949,6 +976,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		goto error_exit;
 	}
+	for (i = 0; (i < l) && (i < FILE_first_user); ++i)
+		if (ntfs_mft_record_check(vol, FILE_MFT + i,
+				(MFT_RECORD*)(m + i*vol->mft_record_size)))
+			goto error_exit;
 	l = ntfs_attr_mst_pread(vol->mftmirr_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m2);
 	if (l != vol->mftmirr_size) {
@@ -958,6 +989,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		vol->mftmirr_size = l;
 	}
+	for (i = 0; (i < l) && (i < FILE_first_user); ++i)
+		if (ntfs_mft_record_check(vol, FILE_MFT + i,
+				(MFT_RECORD*)(m2 + i*vol->mft_record_size)))
+			goto error_exit;
 	ntfs_log_debug("Comparing $MFTMirr to $MFT...\n");
 		/* Windows 10 does not update the full $MFTMirr any more */
 	for (i = 0; (i < vol->mftmirr_size) && (i < FILE_first_user); ++i) {
@@ -1048,19 +1083,19 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na) {
 		ntfs_log_perror("Failed to open ntfs attribute");
+		ntfs_inode_close(ni);
 		goto error_exit;
 	}
 	/*
 	 * Note: Normally, the upcase table has a length equal to 65536
-	 * 2-byte Unicode characters but allow for different cases, so no
-	 * checks done. Just check we don't overflow 32-bits worth of Unicode
-	 * characters.
+	 * 2-byte Unicode characters. Anyway we currently can only process
+	 * such characters.
 	 */
-	if (na->data_size & ~0x1ffffffffULL) {
-		ntfs_log_error("Error: Upcase table is too big (max 32-bit "
-				"allowed).\n");
+	if ((na->data_size - 2) & ~0x1fffeULL) {
+		ntfs_log_error("Error: Upcase table is invalid (want size even "
+				"<= 131072).\n");
 		errno = EINVAL;
-		goto error_exit;
+		goto bad_upcase;
 	}
 	if (vol->upcase_len != na->data_size >> 1) {
 		vol->upcase_len = na->data_size >> 1;
@@ -1068,7 +1103,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		free(vol->upcase);
 		vol->upcase = ntfs_malloc(na->data_size);
 		if (!vol->upcase)
-			goto error_exit;
+			goto bad_upcase;
 	}
 	/* Read in the $DATA attribute value into the buffer. */
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->upcase);
@@ -1077,7 +1112,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			       "(%lld != %lld).\n", (long long)l,
 			       (long long)na->data_size);
 		errno = EIO;
-		goto error_exit;
+		goto bad_upcase;
 	}
 	/* Done with the $UpCase mft record. */
 	ntfs_attr_close(na);
@@ -1213,10 +1248,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Check we don't overflow 32-bits. */
-	if (na->data_size > 0xffffffffLL) {
+	/* Check we don't overflow 24-bits. */
+	if ((u64)na->data_size > 0xffffffLL) {
 		ntfs_log_error("Attribute definition table is too big (max "
-			       "32-bit allowed).\n");
+			       "24-bit allowed).\n");
 		errno = EINVAL;
 		goto error_exit;
 	}
@@ -1282,6 +1317,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	}
 
 	return vol;
+bad_upcase :
+	ntfs_attr_close(na);
+	ntfs_inode_close(ni);
+	goto error_exit;
 io_error_exit:
 	errno = EIO;
 error_exit:
@@ -1855,8 +1894,10 @@ int ntfs_volume_get_free_space(ntfs_volume *vol)
 
 		if (vol->free_mft_records < 0)
 			ntfs_log_perror("Failed to calculate free MFT records");
-		else
+		else {
+			NVolSetFreeSpaceKnown(vol);
 			ret = 0;
+		}
 	}
 	return (ret);
 }
