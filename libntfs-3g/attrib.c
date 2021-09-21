@@ -216,6 +216,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 		if (total + (rl[i].length << vol->cluster_size_bits) >=
 				sle64_to_cpu(a->data_size)) {
 			unsigned char *intbuf = NULL;
+			s64 intlth;
 			/*
 			 * We have reached the last run so we were going to
 			 * overflow when executing the ntfs_pread() which is
@@ -229,8 +230,18 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 			 * We have reached the end of data size so we were
 			 * going to overflow in the same fashion.
 			 * Temporary fix:  same as above.
+			 *
+			 * For safety, limit the amount to read to the
+			 * needed size, knowing that the whole attribute
+			 * size has been checked to be <= 0x40000.
 			 */
-			intbuf = ntfs_malloc(rl[i].length << vol->cluster_size_bits);
+			intlth = (sle64_to_cpu(a->data_size) - total
+					+ vol->cluster_size - 1)
+					>> vol->cluster_size_bits;
+			if (rl[i].length < intlth)
+				intlth = rl[i].length;
+			intbuf = (u8*)ntfs_malloc(intlth
+						<< vol->cluster_size_bits);
 			if (!intbuf) {
 				free(rl);
 				return 0;
@@ -246,14 +257,15 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 			 * - Yes we can, in sparse files! But not necessarily
 			 * size of 16, just run length.
 			 */
-			r = ntfs_pread(vol->dev, rl[i].lcn <<
-					vol->cluster_size_bits, rl[i].length <<
-					vol->cluster_size_bits, intbuf);
-			if (r != rl[i].length << vol->cluster_size_bits) {
+			r = ntfs_pread(vol->dev,
+					rl[i].lcn << vol->cluster_size_bits,
+					intlth << vol->cluster_size_bits,
+					intbuf);
+			if (r != intlth << vol->cluster_size_bits) {
 #define ESTR "Error reading attribute value"
 				if (r == -1)
 					ntfs_log_perror(ESTR);
-				else if (r < rl[i].length <<
+				else if (r < intlth <<
 						vol->cluster_size_bits) {
 					ntfs_log_debug(ESTR ": Ran out of input data.\n");
 					errno = EIO;
