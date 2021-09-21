@@ -414,7 +414,15 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	na = ntfs_calloc(sizeof(ntfs_attr));
 	if (!na)
 		goto out;
+	if (!name_len)
+		name = (ntfschar*)NULL;
 	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {
+		/* A null char leads to a short name and unallocated bytes */
+		if (ntfs_ucsnlen(name, name_len) != name_len) {
+			ntfs_log_error("Null character in attribute name"
+				" of inode %lld\n",(long long)ni->mft_no);
+			goto err_out;
+		}
 		name = ntfs_ucsndup(name, name_len);
 		if (!name)
 			goto err_out;
