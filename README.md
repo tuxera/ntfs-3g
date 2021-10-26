@@ -43,7 +43,6 @@ See the included file [COPYING.LIB](./COPYING.LIB).
 
 ## QUICK INSTALLATION
 
-
 Most distributions have an up-to-date NTFS-3G package ready for use, and
 the recommended way is to install it.
 
