@@ -49,6 +49,10 @@ See the included file COPYING.LIB.
 Most distributions have an up-to-date NTFS-3G package ready for use, and
 the recommended way is to install it.
 
+
+## COMPILING FROM SOURCE
+------------------------
+
 If you need some specific customization, you can compile and install from
 the released source code. Make sure you have the basic development tools
 and the kernel includes the FUSE kernel module. Then unpack the source
