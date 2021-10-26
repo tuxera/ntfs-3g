@@ -1,5 +1,4 @@
 ## INTRODUCTION
----------------
 
 The NTFS-3G driver is an open source, freely available read/write NTFS driver 
 for Linux, FreeBSD, macOS, NetBSD, OpenIndiana, QNX and Haiku. It provides 
@@ -31,7 +30,6 @@ The project has been funded, supported and maintained since 2008 by Tuxera:
 
 
 ## LICENSES
------------
 
 All the NTFS related components: the file system drivers, the ntfsprogs
 utilities and the shared library libntfs-3g are distributed under the terms
@@ -44,13 +42,12 @@ See the included file [COPYING.LIB](./COPYING.LIB).
 
 
 ## QUICK INSTALLATION
----------------------
+
 
 Most distributions have an up-to-date NTFS-3G package ready for use, and
 the recommended way is to install it.
 
 ## COMPILING FROM SOURCE
-------------------------
 
 If you need some specific customization, you can compile and install from
 the released source code. Make sure you have the basic development tools
@@ -92,7 +89,6 @@ make ntfsprogs	# only build ntfsprogs and libntfs-3g, without drivers
 ```
 
 ## USAGE
---------
 
 If there was no error during installation then the NTFS volume can be
 read-write mounted for everybody the following way as the root user 
@@ -117,7 +113,6 @@ line at the **END(!)** of the `/etc/fstab` file:
 ```
 
 ## TESTING WITHOUT INSTALLING
------------------------------
 
 Newer versions of ntfs-3g can be tested without installing anything and
 without disturbing an existing installation. Just configure and make as
@@ -142,7 +137,6 @@ umount /dev/sda1
 ```
 
 ## NTFS UTILITIES
------------------
 
 The ntfsprogs directory includes utilities for doing all required tasks to
 NTFS partitions. In general, just run a utility without any command line
