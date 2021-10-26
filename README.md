@@ -22,11 +22,11 @@ available in Windows 10 can also be read through a plugin.
 News, support answers, problem submission instructions, support and discussion 
 forums, and other information are available on the project web site at
 
-	https://github.com/tuxera/ntfs-3g/wiki
+https://github.com/tuxera/ntfs-3g/wiki
 
 The project has been funded, supported and maintained since 2008 by Tuxera:
 
- 	https://tuxera.com
+https://tuxera.com
 
 
 ## LICENSES
