@@ -452,8 +452,19 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	
 	if (!name) {
 		if (a->name_length) {
-			name = ntfs_ucsndup((ntfschar*)((u8*)a + le16_to_cpu(
-					a->name_offset)), a->name_length);
+			ntfschar *attr_name;
+
+			attr_name = (ntfschar*)((u8*)a
+					+ le16_to_cpu(a->name_offset));
+			/* A null character leads to illegal memory access */
+			if (ntfs_ucsnlen(attr_name, a->name_length)
+						!= a->name_length) {
+				ntfs_log_error("Null character in attribute"
+					" name in inode %lld\n",
+					(long long)ni->mft_no);
+				goto put_err_out;
+			}
+			name = ntfs_ucsndup(attr_name, a->name_length);
 			if (!name)
 				goto put_err_out;
 			newname = name;
