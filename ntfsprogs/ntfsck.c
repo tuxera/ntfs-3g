@@ -616,7 +616,8 @@ static BOOL check_file_record(u8 *buffer, u16 buflen)
 
 	// Remove update seq & check it.
 	usa = *(u16*)(buffer+usa_ofs); // The value that should be at the end of every sector.
-	assert_u32_equal(usa_count-1, buflen/NTFS_BLOCK_SIZE, "USA length");
+	if (assert_u32_equal(usa_count-1, buflen/NTFS_BLOCK_SIZE, "USA length"))
+		return (1);
 	for (i=1;i<usa_count;i++) {
 		u16 *fixup = (u16*)(buffer+NTFS_BLOCK_SIZE*i-2); // the value at the end of the sector.
 		u16 saved_val = *(u16*)(buffer+usa_ofs+2*i); // the actual data value that was saved in the us array.
