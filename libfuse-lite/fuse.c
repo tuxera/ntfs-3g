@@ -2223,7 +2223,7 @@ static void fuse_lib_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
         }
     }
     if (dh->filled) {
-        if (off < dh->len) {
+        if ((off >= 0) && (off < dh->len)) {
             if (off + size > dh->len)
                 size = dh->len - off;
         } else
