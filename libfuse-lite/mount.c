@@ -670,11 +670,10 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
         fprintf(stderr, "fuse: 'allow_other' and 'allow_root' options are mutually exclusive\n");
         goto out;
     }
-    res = 0;
+    res = -1;
     if (mo.ishelp)
         goto out;
 
-    res = -1;
     if (get_mnt_flag_opts(&mnt_opts, mo.flags) == -1)
         goto out;
 #ifndef __SOLARIS__

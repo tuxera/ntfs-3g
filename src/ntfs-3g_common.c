@@ -128,6 +128,10 @@ const struct DEFOPTION optionlist[] = {
 	{ "efs_raw", OPT_EFS_RAW, FLGOPT_BOGUS },
 	{ "posix_nlink", OPT_POSIX_NLINK, FLGOPT_BOGUS },
 	{ "special_files", OPT_SPECIAL_FILES, FLGOPT_STRING },
+	{ "--help", OPT_HELP, FLGOPT_BOGUS },
+	{ "-h", OPT_HELP, FLGOPT_BOGUS },
+	{ "--version", OPT_VERSION, FLGOPT_BOGUS },
+	{ "-V", OPT_VERSION, FLGOPT_BOGUS },
 	{ (const char*)NULL, 0, 0 } /* end marker */
 } ;
 
@@ -521,6 +525,8 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			 * mounted or not.
 			 *      (falling through to default)
 			 */
+			case OPT_HELP : /* Could lead to unclean condition */
+			case OPT_VERSION : /* Could lead to unclean condition */
 			default :
 				ntfs_log_error("'%s' is an unsupported option.\n",
 					poptl->name);
