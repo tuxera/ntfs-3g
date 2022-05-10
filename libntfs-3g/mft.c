@@ -1537,7 +1537,7 @@ found_free_rec:
 		 */
 	seq_no = m->sequence_number;
 	if (le16_to_cpu(m->usa_ofs) <= (NTFS_BLOCK_SIZE - 2))
-		usn = *(le16*)((u8*)m + le16_to_cpu(m->usa_ofs & -2));
+		usn = *(le16*)((u8*)m + (le16_to_cpu(m->usa_ofs) & -2));
 	else
 		usn = const_cpu_to_le16(1);
 	if (ntfs_mft_record_layout(vol, bit, m)) {
