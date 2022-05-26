@@ -89,10 +89,10 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
             exit(1);
         }
         rmdir(tmp);
-        execle("/sbin/mount", "/sbin/mount", "-F", type, "-o", opts,
+        execle(MOUNT_HELPER, MOUNT_HELPER, "-F", type, "-o", opts,
               fsname, mnt, NULL, &env);
-        fprintf(stderr, "%s: failed to execute /sbin/mount: %s\n", progname,
-                strerror(errno));
+        fprintf(stderr, "%s: failed to execute %s: %s\n", progname,
+                MOUNT_HELPER, strerror(errno));
         exit(1);
     }
     res = waitpid(res, &status, 0);
@@ -126,14 +126,14 @@ int fuse_mnt_umount(const char *progname, const char *mnt, int lazy)
 
         setuid(geteuid());
         if (lazy) {
-            execle("/sbin/umount", "/sbin/umount", mnt,
+            execle(UMOUNT_HELPER, UMOUNT_HELPER, mnt,
                    NULL, &env);
         } else {
-            execle("/sbin/umount", "/sbin/umount", "-f", mnt,
+            execle(UMOUNT_HELPER, UMOUNT_HELPER, "-f", mnt,
                    NULL, &env);
         }
-        fprintf(stderr, "%s: failed to execute /sbin/umount: %s\n", progname,
-                strerror(errno));
+        fprintf(stderr, "%s: failed to execute %s: %s\n", progname,
+                UMOUNT_HELPER, strerror(errno));
         exit(1);
     }
     res = waitpid(res, &status, 0);

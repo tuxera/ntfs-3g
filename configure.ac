@@ -185,6 +185,30 @@ AC_ARG_ENABLE(
 	]
 )
 
+AC_ARG_WITH(
+	[mount-helper],
+	[AS_HELP_STRING([--with-mount-helper=BIN],[use the specified binary as mount helper @<:@default=/sbin/mount@:>@])],
+	[mount_helper="$withval"],
+	[mount_helper="/sbin/mount"]
+)
+AC_DEFINE_UNQUOTED([MOUNT_HELPER], ["$mount_helper"], [Binary used as mount helper.])
+
+AC_ARG_WITH(
+	[umount-helper],
+	[AS_HELP_STRING([--with-umount-helper=BIN],[use the specified binary as umount helper @<:@default=/sbin/umount@:>@])],
+	[umount_helper="$withval"],
+	[umount_helper="/sbin/umount"]
+)
+AC_DEFINE_UNQUOTED([UMOUNT_HELPER], ["$umount_helper"], [Binary used as umount helper.])
+
+AC_ARG_WITH(
+	[modprobe-helper],
+	[AS_HELP_STRING([--with-modprobe-helper=BIN],[use the specified binary as modprobe helper @<:@default=/sbin/modprobe@:>@])],
+	[modprobe_helper="$withval"],
+	[modprobe_helper="/sbin/modprobe"]
+)
+AC_DEFINE_UNQUOTED([MODPROBE_HELPER], ["$modprobe_helper"], [Binary used as modprobe helper.])
+
 # pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
 
