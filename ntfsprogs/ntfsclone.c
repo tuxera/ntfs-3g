@@ -163,6 +163,7 @@ static struct {
 	int preserve_timestamps;
 	int full_logfile;
 	int restore_image;
+	int domain_mapfile;
 	char *output;
 	char *volume;
 #ifndef NO_STATFS
@@ -197,6 +198,11 @@ struct ntfs_walk_cluster {
 	ntfs_walk_clusters_ctx *image;
 };
 
+typedef struct {
+	off_t begin; //inclusive
+	off_t end; //exclusive
+} domain_extent;
+static domain_extent *domain_first = NULL, *domain_last = NULL, *domain_capacity = NULL;
 
 static ntfs_volume *vol = NULL;
 static struct bitmap lcn_bitmap;
@@ -360,6 +366,7 @@ static void usage(int ret)
 		"    -O, --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
 		"    -s, --save-image       Save to the special image format\n"
 		"    -r, --restore-image    Restore from the special image format\n"
+		"    -D, --domain-mapfile   Write a ddrescue domain mapfile\n"
 		"        --rescue           Continue after disk read errors\n"
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"    -n, --no-action        Test restoring, without outputting anything\n"
@@ -400,7 +407,7 @@ static void version(void)
 
 static void parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhmno:O:qrstV";
+	static const char *sopt = "-dfhmno:O:qrstDV";
 	static const struct option lopt[] = {
 #ifdef DEBUG
 		{ "debug",	      no_argument,	 NULL, 'd' },
@@ -413,6 +420,7 @@ static void parse_options(int argc, char **argv)
 		{ "output",	      required_argument, NULL, 'o' },
 		{ "overwrite",	      required_argument, NULL, 'O' },
 		{ "restore-image",    no_argument,	 NULL, 'r' },
+		{ "domain-mapfile",   no_argument,	 NULL, 'D' },
 		{ "ignore-fs-check",  no_argument,	 NULL, 'C' },
 		{ "rescue",           no_argument,	 NULL, 'R' },
 		{ "new-serial",       no_argument,	 NULL, 'I' },
@@ -486,6 +494,10 @@ static void parse_options(int argc, char **argv)
 		case 't':
 			opt.preserve_timestamps++;
 			break;
+		case 'D':
+			opt.domain_mapfile++;
+			opt.ignore_fs_check++;
+			break;
 		case 'V':
 			version();
 			break;
@@ -525,7 +537,7 @@ static void parse_options(int argc, char **argv)
 	if (opt.metadata && !opt.metadata_image && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
 
-	if (opt.ignore_fs_check && !opt.metadata && !opt.rescue)
+	if (opt.ignore_fs_check && !opt.metadata && !opt.rescue && !opt.domain_mapfile)
 		err_exit("Filesystem check can be ignored only for metadata "
 			 "cloning or rescue situations!\n");
 
@@ -538,6 +550,9 @@ static void parse_options(int argc, char **argv)
 
 	if (opt.no_action && opt.output)
 		err_exit("A restoring test requires not defining any output!\n");
+
+	if (opt.domain_mapfile && (opt.save_image || opt.restore_image || opt.metadata_image))
+		err_exit("Cannot perform other actions when writing a domain mapfile.\n");
 
 	if (!opt.no_action && !opt.std_out) {
 		struct stat st;
@@ -574,6 +589,8 @@ static void parse_options(int argc, char **argv)
 					     "but this time add the force "
 					     "option, i.e. add '--force' to "
 					     "the command line arguments.");
+				if (opt.domain_mapfile)
+					err_exit("Writing a domain mapfile to a block device is nonsensical.\n");
 			}
 		}
 	}
@@ -663,6 +680,75 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 	return 0;
 }
 
+static void domain_add(off_t offset, int count)
+{
+	if (!domain_first) {
+		domain_first = malloc(64 * sizeof(domain_extent));
+		if (!domain_first)
+			err_exit("failed to malloc rescue domain extent array\n");
+		domain_capacity = domain_first + 64;
+		domain_last = domain_first;
+		domain_last->begin = offset;
+		domain_last->end = offset + count;
+	} else if (offset == domain_last->end)
+		domain_last->end += count;
+	else {
+		++domain_last;
+		if (domain_last == domain_capacity) {
+			size_t old_size = domain_capacity - domain_first, new_size = 2 * old_size;
+			domain_extent* domain_new = realloc(domain_first, new_size * sizeof(domain_extent));
+			if (!domain_new)
+				err_exit("failed to realloc rescue domain extent array (%zu)\n", new_size);
+			domain_first = domain_new;
+			domain_last = domain_new + old_size;
+			domain_capacity = domain_new + new_size;
+		}
+		domain_last->begin = offset;
+		domain_last->end = offset + count;
+	}
+}
+
+static int domain_cmp(const void* va, const void* vb)
+{
+	const domain_extent *a = (const domain_extent*)va;
+	const domain_extent *b = (const domain_extent*)vb;
+	if (a->begin < b->begin) return -1;
+	if (a->begin > b->begin) return 1;
+	if (a->end < b->end) return -1;
+	if (a->end > b->end) return 1;
+	return 0;
+}
+
+static void domain_write()
+{
+	if (!domain_first)
+		err_exit("Can't happen: entered domain_write with no domain extents\n");
+	const domain_extent* const domain_end = domain_last + 1;
+	qsort(domain_first, domain_end - domain_first, sizeof(domain_extent), &domain_cmp);
+	if (domain_first->begin != 0)
+		err_exit("Can't happen: domain doesn't include boot sector? first domain (%ld, %ld)\n",
+				 domain_first->begin, domain_first->end);
+
+	fprintf(stream_out, "# Domain mapfile created by %s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
+	fprintf(stream_out, "0x0	?	1 # (status line not relevant for domain mapfiles)\n");
+	fprintf(stream_out, "#          pos            size  status\n");
+	const domain_extent* d = domain_first;
+	while (d != domain_end) {
+		off_t begin = d->begin, end = d->begin;
+		do {
+			if (d->end < end)
+				err_exit("Can't happen: domain extents not sorted\n");
+			end = d->end;
+			++d;
+		} while (d != domain_end && end >= d->begin);
+		fprintf(stream_out, "0x%012lX  0x%012lX  +\n", begin, end - begin);
+		begin = end;
+		end = (d != domain_end) ? d->begin : full_device_size;
+		if (begin != end)
+			fprintf(stream_out, "0x%012lX  0x%012lX  ?\n", begin, end - begin);
+	}
+}
+
 static off_t tellin(int in)
 {
 	return (lseek(in, 0, SEEK_CUR));
@@ -675,7 +761,7 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 
 	while (count > 0) {
 		if (do_write) {
-			if (opt.no_action) {
+			if (opt.no_action || opt.domain_mapfile) {
 				i = count;
 			} else {
 				if (opt.save_image || opt.metadata_image)
@@ -690,7 +776,13 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 			}
 		} else if (opt.restore_image)
 			i = read(*(int *)fd, buf, count);
-		else
+		else if (opt.domain_mapfile) {
+			if ((int*)fd == &fd_in)
+				domain_add(tellin(fd_in), count);
+			else
+				domain_add(dev->d_ops->seek(dev, 0, SEEK_CUR), count);
+			i = count;
+		} else
 			i = dev->d_ops->read(dev, buf, count);
 		if (i < 0) {
 			if (errno != EAGAIN && errno != EINTR)
@@ -847,7 +939,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 			perr_exit("write_all");
 	}
 
-	if ((!opt.metadata_image || wipe)
+	if (!opt.domain_mapfile && (!opt.metadata_image || wipe)
 	    && (write_all(&fd_out, buff, csize) == -1)) {
 #ifndef NO_STATFS
 		int err = errno;
@@ -885,7 +977,7 @@ static void lseek_to_cluster(s64 lcn)
 	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek input");
 
-	if (opt.std_out || opt.save_image || opt.metadata_image)
+	if (opt.std_out || opt.save_image || opt.metadata_image || opt.domain_mapfile)
 		return;
 
 	if (lseek_out(fd_out, pos, SEEK_SET) == (off_t)-1)
@@ -2297,7 +2389,7 @@ static s64 device_size_get(int fd)
 static void fsync_clone(int fd)
 {
 	Printf("Syncing ...\n");
-	if (opt.save_image && stream_out && fflush(stream_out))
+	if ((opt.domain_mapfile || opt.save_image) && stream_out && fflush(stream_out))
 		perr_exit("fflush");
 	if (fsync(fd) && errno != EINVAL)
 		perr_exit("fsync");
@@ -2554,7 +2646,7 @@ static void check_dest_free_space(u64 src_bytes)
 	struct statvfs stvfs;
 	struct stat st;
 
-	if (opt.metadata || opt.blkdev_out || opt.std_out)
+	if (opt.metadata || opt.domain_mapfile || opt.blkdev_out || opt.std_out)
 		return;
 	/*
 	 * TODO: save_image needs a bit more space than src_bytes
@@ -2644,6 +2736,11 @@ int main(int argc, char **argv)
 				perr_exit("Opening file '%s' failed",
 						opt.output);
 			fd_out = fileno(stream_out);
+		} else if (opt.domain_mapfile) {
+			stream_out = fopen(opt.output, opt.overwrite ? "w" : "wx");
+			if (!stream_out)
+				perr_exit("Opening file '%s' failed", opt.output);
+			fd_out = fileno(stream_out);
 		} else {
 #ifdef HAVE_WINDOWS_H
 			if (!opt.no_action) {
@@ -2663,7 +2760,7 @@ int main(int argc, char **argv)
 #endif
 		}
 
-		if (!opt.save_image && !opt.metadata_image && !opt.no_action)
+		if (!opt.save_image && !opt.metadata_image && !opt.domain_mapfile && !opt.no_action)
 			check_output_device(ntfs_size);
 	}
 
@@ -2691,15 +2788,17 @@ int main(int argc, char **argv)
 	if (opt.save_image)
 		initialise_image_hdr(device_size, image.inuse);
 
-	if ((opt.std_out && !opt.metadata_image) || !opt.metadata) {
+	if ((opt.std_out && !opt.metadata_image) || !opt.metadata || opt.domain_mapfile) {
 		s64 nr_clusters_to_save = image.inuse;
-		if (opt.std_out && !opt.save_image)
+		if (opt.std_out && !opt.save_image && !opt.domain_mapfile)
 			nr_clusters_to_save = vol->nr_clusters;
 		nr_clusters_to_save++; /* account for the backup boot sector */
 
 		clone_ntfs(nr_clusters_to_save, image.more_use);
+		if (opt.domain_mapfile)
+			domain_write();
 		fsync_clone(fd_out);
-		if (opt.save_image)
+		if (opt.save_image || opt.domain_mapfile)
 			fclose(stream_out);
 		ntfs_umount(vol,FALSE);
 		free(lcn_bitmap.bm);
