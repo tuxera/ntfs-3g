@@ -1285,13 +1285,13 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	s64 abs_ofs;
 	win32_fd *fd = (win32_fd *)dev->d_private;
 
-	ntfs_log_trace("seek offset = 0x%llx, whence = %d.\n", offset, whence);
+	ntfs_log_trace("seek offset = 0x%llx, whence = %d.\n", offset + dev->dev_offset, whence);
 	switch (whence) {
 	case SEEK_SET:
-		abs_ofs = offset;
+		abs_ofs = offset + dev->dev_offset;
 		break;
 	case SEEK_CUR:
-		abs_ofs = fd->pos + offset;
+		abs_ofs = fd->pos + offset + dev->dev_offset;
 		break;
 	case SEEK_END:
 		/* End of partition != end of disk. */
@@ -1301,7 +1301,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 			errno = EOPNOTSUPP;
 			return -1;
 		}
-		abs_ofs = fd->part_length + offset;
+		abs_ofs = fd->part_length + offset + dev->dev_offset;
 		break;
 	default:
 		ntfs_log_trace("Wrong mode %d.\n", whence);
@@ -1788,7 +1788,7 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 		}
 	memset(buf, 0, sizeof(struct stat));
 	buf->st_mode = st_mode;
-	buf->st_size = fd->part_length;
+	buf->st_size = fd->part_length - dev->dev_offset;
 	if (buf->st_size != -1)
 		buf->st_blocks = buf->st_size >> 9;
 	else
@@ -1911,10 +1911,10 @@ static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *b,
 
 		/* read the fast way if sector aligned */
 	fd = (win32_fd*)dev->d_private;
-	if (!((count | offset) & (fd->geo_sector_size - 1))) {
-		got = ntfs_device_win32_pio(fd, offset, count, b, (void*)NULL);
+	if (!((count | (offset + dev->dev_offset)) & (fd->geo_sector_size - 1))) {
+		got = ntfs_device_win32_pio(fd, offset + dev->dev_offset, count, b, (void*)NULL);
 	} else {
-		if (ntfs_device_win32_seek(dev, offset, 0) == -1)
+		if (ntfs_device_win32_seek(dev, offset + dev->dev_offset, 0) == -1)
 			got = 0;
 		else
 			got = ntfs_device_win32_read(dev, b, count);
@@ -1931,10 +1931,10 @@ static s64 ntfs_device_win32_pwrite(struct ntfs_device *dev, const void *b,
 
 		/* write the fast way if sector aligned */
 	fd = (win32_fd*)dev->d_private;
-	if (!((count | offset) & (fd->geo_sector_size - 1))) {
-		put = ntfs_device_win32_pio(fd, offset, count, (void*)NULL, b);
+	if (!((count | (offset  + dev->dev_offset)) & (fd->geo_sector_size - 1))) {
+		put = ntfs_device_win32_pio(fd, offset + dev->dev_offset, count, (void*)NULL, b);
 	} else {
-		if (ntfs_device_win32_seek(dev, offset, 0) == -1)
+		if (ntfs_device_win32_seek(dev, offset + dev->dev_offset, 0) == -1)
 			put = 0;
 		else
 			put = ntfs_device_win32_write(dev, b, count);
