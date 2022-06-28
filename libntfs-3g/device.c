@@ -566,7 +566,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 			ntfs_log_debug("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
 					(unsigned long long)size,
 					(unsigned long long)size);
-			return (s64)size / block_size;
+			return (s64)(size - dev->dev_offset) / block_size;
 		}
 	}
 #endif
@@ -576,7 +576,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 		if (dev->d_ops->ioctl(dev, BLKGETSIZE, &size) >= 0) {
 			ntfs_log_debug("BLKGETSIZE nr 512 byte blocks = %lu (0x%lx)\n",
 					size, size);
-			return (s64)size * 512 / block_size;
+			return (s64)(size * 512 - dev->dev_offset) / block_size;
 		}
 	}
 #endif
@@ -587,7 +587,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 			ntfs_log_debug("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
 					(unsigned long)this_floppy.size,
 					(unsigned long)this_floppy.size);
-			return (s64)this_floppy.size * 512 / block_size;
+			return (s64)(this_floppy.size * 512 - dev->dev_offset) / block_size;
 		}
 	}
 #endif
@@ -600,7 +600,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 			ntfs_log_debug("DIOCGMEDIASIZE nr bytes = %llu (0x%llx)\n",
 					(unsigned long long)size,
 					(unsigned long long)size);
-			return (s64)size / block_size;
+			return (s64)(size - dev->dev_offset) / block_size;
 		}
 	}
 #endif
@@ -617,7 +617,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 			ntfs_log_debug("DKIOCGETBLOCKCOUNT nr blocks = %llu (0x%llx)\n",
 				(unsigned long long) blocks,
 				(unsigned long long) blocks);
-			return blocks * sector_size / block_size;
+			return (blocks * sector_size - dev->dev_offset) / block_size;
 		}
 	}
 #endif
