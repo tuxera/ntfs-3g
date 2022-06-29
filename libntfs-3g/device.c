@@ -529,6 +529,7 @@ static int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
 s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 {
 	s64 high, low;
+	struct stat sbuf;
 
 	if (!dev || block_size <= 0 || (block_size - 1) & block_size) {
 		errno = EINVAL;
@@ -596,6 +597,18 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 		}
 	}
 #endif
+	/*
+	 * We couldn't figure it out by using a specialized ioctl,
+	 * so do lstat on device.
+	 */
+	if (dev->d_ops->stat(dev, &sbuf) == 0) {
+		ntfs_log_debug("STAT nr bytes = %llu (0x%llx)\n",
+			(unsigned long long)sbuf.st_size,
+			(unsigned long long)sbuf.st_size);
+
+		return sbuf.st_size / block_size;
+	}
+
 	/*
 	 * We couldn't figure it out by using a specialized ioctl,
 	 * so do binary search to find the size of the device.
