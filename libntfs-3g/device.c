@@ -601,7 +601,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 	 * We couldn't figure it out by using a specialized ioctl,
 	 * so do lstat on device.
 	 */
-	if (dev->d_ops->stat(dev, &sbuf) == 0) {
+	if (dev->d_ops->stat(dev, &sbuf) == 0 && S_ISREG(sbuf.st_mode)) {
 		ntfs_log_debug("STAT nr bytes = %llu (0x%llx)\n",
 			(unsigned long long)sbuf.st_size,
 			(unsigned long long)sbuf.st_size);
