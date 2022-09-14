@@ -994,13 +994,18 @@ mpa_err:
 	rl[rlpos].vcn = vcn;
 	rl[rlpos].length = (s64)0;
 	/* If no existing runlist was specified, we are done. */
-	if (!old_rl) {
+	if (!old_rl || !old_rl[0].length) {
 		ntfs_log_debug("Mapping pairs array successfully decompressed:\n");
 		ntfs_debug_runlist_dump(rl);
+		if (old_rl)
+			free(old_rl);
 		return rl;
 	}
 	/* Now combine the new and old runlists checking for overlaps. */
-	old_rl = ntfs_runlists_merge(old_rl, rl);
+	if (rl[0].length)
+		old_rl = ntfs_runlists_merge(old_rl, rl);
+	else
+		free(rl);
 	if (old_rl)
 		return old_rl;
 	err = errno;
