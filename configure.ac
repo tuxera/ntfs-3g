@@ -228,7 +228,7 @@ esac
 
 if test "x${enable_ntfs_3g}" != "xyes"; then
 	with_fuse="none"
-elif test "x${with_fuse}" == "x"; then
+elif test "x${with_fuse}" = "x"; then
 	AC_MSG_CHECKING([fuse compatibility])
 	case "${target_os}" in
 	linux*|solaris*)
