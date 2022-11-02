@@ -3914,8 +3914,12 @@ static void ntfs_close(void)
 		return;
 	
 	if (ctx->mounted) {
-		ntfs_log_info("Unmounting %s (%s)\n", opts.device, 
-			      ctx->vol->vol_name);
+		if (ctx->debug) {
+			ntfs_log_info("Unmounting %s (label \"%s\")\n",
+					opts.device, ctx->vol->vol_name);
+		} else {
+			ntfs_log_info("Unmounting %s\n", opts.device);
+		}
 		if (ntfs_fuse_fill_security_context(&security)) {
 			if (ctx->seccache && ctx->seccache->head.p_reads) {
 				ntfs_log_info("Permissions cache : %lu writes, "
@@ -4315,10 +4319,16 @@ static void setup_logging(char *parsed_options)
 	if (strcmp(opts.arg_device,opts.device))
 		ntfs_log_info("Requested device %s canonicalized as %s\n",
 				opts.arg_device,opts.device);
-	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
-			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
-			ctx->vol->vol_name, ctx->vol->major_ver,
-			ctx->vol->minor_ver);
+	if (ctx->debug) {
+		ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
+				opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
+				ctx->vol->vol_name,
+				ctx->vol->major_ver, ctx->vol->minor_ver);
+	} else {
+		ntfs_log_info("Mounted %s (%s, NTFS %d.%d)\n",
+				opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
+				ctx->vol->major_ver, ctx->vol->minor_ver);
+	}
 	ntfs_log_info("Cmdline options: %s\n", opts.options ? opts.options : "");
 	ntfs_log_info("Mount options: %s\n", parsed_options);
 }
