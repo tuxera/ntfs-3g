@@ -776,8 +776,20 @@ static ntfs_time mkntfs_time(void)
 
 	ts.tv_sec = 0;
 	ts.tv_nsec = 0;
-	if (!opts.use_epoch_time)
-		ts.tv_sec = time(NULL);
+	if (!opts.use_epoch_time) {
+#ifdef HAVE_GETTIMEOFDAY
+		struct timeval tv = { 0, 0, };
+
+		if (!gettimeofday(&tv, NULL)) {
+			ts.tv_sec = tv.tv_sec;
+			ts.tv_nsec = tv.tv_usec * 1000L;
+		}
+		else
+#endif
+		{
+			ts.tv_sec = time(NULL);
+		}
+	}
 	return timespec2ntfs(ts);
 }
 
