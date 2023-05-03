@@ -66,8 +66,9 @@ void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 {
 	if (ictx->is_in_root)
 		ntfs_inode_mark_dirty(ictx->actx->ntfs_ino);
-	else
+	else if (ictx->ib != NULL) {
 		ictx->ib_dirty = TRUE;
+	}
 }
 
 static s64 ntfs_ib_vcn_to_pos(ntfs_index_context *icx, VCN vcn)
