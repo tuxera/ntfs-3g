@@ -978,7 +978,6 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	ll = ntfs_attr_pwrite(mftbmp_na, old_initialized_size, 8, &ll);
 	if (ll == 8) {
 		ntfs_log_debug("Wrote eight initialized bytes to mft bitmap.\n");
-		vol->free_mft_records += (8 * 8); 
 		ret = 0;
 		goto out;
 	}
@@ -1776,6 +1775,7 @@ retry:
 			(long long)mftbmp_na->initialized_size);
 	if (mftbmp_na->initialized_size + 8 > mftbmp_na->allocated_size) {
 
+		const s64 old_allocated_size = mftbmp_na->allocated_size;
 		int ret = ntfs_mft_bitmap_extend_allocation(vol);
 
 		if (ret == STATUS_ERROR)
@@ -1792,6 +1792,9 @@ retry:
 				(long long)mftbmp_na->allocated_size,
 				(long long)mftbmp_na->data_size,
 				(long long)mftbmp_na->initialized_size);
+
+		vol->free_mft_records +=
+			(mftbmp_na->allocated_size - old_allocated_size) << 3;
 	}
 	/*
 	 * We now have sufficient allocated space, extend the initialized_size
