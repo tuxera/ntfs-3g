@@ -463,6 +463,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				ntfs_log_error("Null character in attribute"
 					" name in inode %lld\n",
 					(long long)ni->mft_no);
+				errno = EIO;
 				goto put_err_out;
 			}
 			name = ntfs_ucsndup(attr_name, a->name_length);
