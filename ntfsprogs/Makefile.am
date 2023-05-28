@@ -23,13 +23,27 @@ EXTRA_PROGRAM_NAMES	= ntfswipe ntfstruncate ntfsrecover \
 QUARANTINED_PROGRAM_NAMES = ntfsdump_logfile ntfsmftalloc ntfsmove ntfsck \
 			   ntfsfallocate
 
-man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
-			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
-			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8 \
-			  ntfscmp.8 ntfswipe.8 ntfstruncate.8 \
-			  ntfsdecrypt.8 ntfsfallocate.8 ntfsrecover.8 \
-			  ntfsusermap.8 ntfssecaudit.8
-EXTRA_MANS		=
+man_MANS		= mkntfs.8 \
+			  ntfscat.8 \
+			  ntfsclone.8 \
+			  ntfscluster.8 \
+			  ntfscmp.8 \
+			  ntfscp.8 \
+			  ntfsdecrypt.8 \
+			  ntfsfallocate.8 \
+			  ntfsfix.8 \
+			  ntfsinfo.8 \
+			  ntfslabel.8 \
+			  ntfsls.8 \
+			  ntfsprogs.8 \
+			  ntfsresize.8 \
+			  ntfsundelete.8
+
+EXTRA_MANS		= ntfsrecover.8 \
+			  ntfssecaudit.8 \
+			  ntfstruncate.8 \
+			  ntfsusermap.8 \
+			  ntfswipe.8
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
 
@@ -44,6 +58,7 @@ bin_PROGRAMS		+= $(EXTRA_PROGRAM_NAMES)
 if ENABLE_QUARANTINED
 bin_PROGRAMS		+= $(QUARANTINED_PROGRAM_NAMES)
 endif
+man_MANS		+= $(EXTRA_MANS)
 else
 EXTRA_PROGRAMS		= $(EXTRA_PROGRAM_NAMES)
 endif
