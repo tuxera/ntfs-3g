@@ -1189,8 +1189,9 @@ char *ntfs_uppercase_mbs(const char *low,
 			free(upp);
 			upp = (char*)NULL;
 			errno = EILSEQ;
+		} else {
+			*t = 0;
 		}
-		*t = 0;
 	}
 	return (upp);
 }
