@@ -4787,6 +4787,16 @@ int main(int argc, char *argv[])
 #endif /* POSIXACLS */
 		ctx->dmask = ctx->fmask = 0;
 	} else {
+		/*
+		 * User mapping path was defined, but building it failed
+		 * Warn the user and halt the mounting
+		 */
+		if (ctx->usermap_path) {
+			ntfs_log_perror("Failed to load user mapping '%s'",
+					ctx->usermap_path);
+			err = NTFS_VOLUME_SYNTAX_ERROR;
+			goto err_out;
+		}
 		ctx->security.uid = ctx->uid;
 		ctx->security.gid = ctx->gid;
 		/* same ownership/permissions for all files */
@@ -4808,8 +4818,6 @@ int main(int argc, char *argv[])
 			permissions_mode = "Ownership and permissions disabled";
 		}
 	}
-	if (ctx->usermap_path)
-		free (ctx->usermap_path);
 
 #if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
 	xattr_mapping = ntfs_xattr_build_mapping(ctx->vol,
@@ -4855,6 +4863,8 @@ int main(int argc, char *argv[])
 	fuse_session_destroy(se);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);
+	if (ctx->usermap_path)
+		free(ctx->usermap_path);
 	if (ctx->abs_mnt_point)
 		free(ctx->abs_mnt_point);
 #if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
