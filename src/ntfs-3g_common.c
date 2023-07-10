@@ -132,6 +132,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "-h", OPT_HELP, FLGOPT_BOGUS },
 	{ "--version", OPT_VERSION, FLGOPT_BOGUS },
 	{ "-V", OPT_VERSION, FLGOPT_BOGUS },
+	{ "dev_offset", OPT_DEV_OFFSET, FLGOPT_DECIMAL },
 	{ (const char*)NULL, 0, 0 } /* end marker */
 } ;
 
@@ -518,6 +519,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 						" mode.\n");
 					goto err_exit;
 				}
+				break;
+			case OPT_DEV_OFFSET :
+				ctx->dev_offset = strtoull(val, 0, 0);
 				break;
 			case OPT_FSNAME : /* Filesystem name. */
 			/*

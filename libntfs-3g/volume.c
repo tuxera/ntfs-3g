@@ -1414,12 +1414,45 @@ int ntfs_set_ignore_case(ntfs_volume *vol)
 ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 		ntfs_mount_flags flags __attribute__((unused)))
 {
+	return ntfs_mount_ext(name, flags, 0);
+}
+
+/**
+ * ntfs_mount_ext - open ntfs volume with dev_offset
+ * @name:	name of device/file to open
+ * @flags:	optional mount flags
+ * @dev_offset: offset from beginning of device where the ntfs filesystem begins
+ *
+ * This function mounts an ntfs volume. @name should contain the name of the
+ * device/file to mount as the ntfs volume.
+ *
+ * @flags is an optional second parameter. The same flags are used as for
+ * the mount system call (man 2 mount). Currently only the following flags
+ * is implemented:
+ *	NTFS_MNT_RDONLY	- mount volume read-only
+ *
+ * The function opens the device or file @name and verifies that it contains a
+ * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
+ * some of the values inside the structure from the information stored in the
+ * bootsector. It proceeds to load the necessary system files and completes
+ * setting up the structure.
+ *
+ * Return the allocated volume structure on success and NULL on error with
+ * errno set to the error code.
+ *
+ * Note, that a copy is made of @name, and hence it can be discarded as
+ * soon as the function returns.
+ */
+
+ntfs_volume *ntfs_mount_ext(const char *name __attribute__((unused)),
+		ntfs_mount_flags flags __attribute__((unused)), const s64 dev_offset)
+{
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;
 	ntfs_volume *vol;
 
 	/* Allocate an ntfs_device structure. */
-	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
+	dev = ntfs_device_alloc_ext(name, 0, &ntfs_device_default_io_ops, NULL, dev_offset);
 	if (!dev)
 		return NULL;
 	/* Call ntfs_device_mount() to do the actual mount. */
