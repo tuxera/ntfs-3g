@@ -923,7 +923,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		 * See more on the ntfs-3g-devel list.
 		 */
 		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
-		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
+		if ((ni->flags & FILE_ATTR_SYSTEM) || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
 					stream_name_len);
 			if (!na) {
