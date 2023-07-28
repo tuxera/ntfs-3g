@@ -816,7 +816,8 @@ static s64 move_file(ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
 		return -1;
 	}
 
-	utils_inode_get_name(ino, buffer, MAX_PATH);
+	if (!utils_inode_get_name(ino, buffer, MAX_PATH))
+		return -1;
 
 	if (dont_move(ino)) {
 		ntfs_log_error("can't move\n");

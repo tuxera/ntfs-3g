@@ -521,7 +521,7 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
  * if parent is 5 (/) stop
  * get inode of parent
  */
-#define max_path 20
+#define max_path 40
 int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 {
 	// XXX option: names = posix/win32 or dos
@@ -535,7 +535,7 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 	int name_space;
 	MFT_REF parent = FILE_root;
 	char *names[max_path + 1];// XXX ntfs_malloc? and make max bigger?
-	int i, len, offset = 0;
+	int i, ir, len, offset = 0;
 
 	if (!inode || !buffer) {
 		errno = EINVAL;
@@ -611,26 +611,28 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 	if (i >= max_path) {
 		/* If we get into an infinite loop, we'll end up here. */
 		ntfs_log_error("The directory structure is too deep (over %d) nested directories.\n", max_path);
-		return 0;
+        offset = snprintf(buffer, bufsize, "...");
 	}
 
-	/* Assemble the names in the correct order. */
-	for (i = max_path; i >= 0; i--) {
-		if (!names[i])
-			continue;
+    if (bufsize > offset) {
+        /* Assemble the names in the correct order. */
+        for (ir = max_path; ir >= 0; ir--) {
+            if (!names[ir])
+                continue;
 
-		len = snprintf(buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[i]);
-		if (len >= (bufsize - offset)) {
-			ntfs_log_error("Pathname was truncated.\n");
-			break;
-		}
+            len = snprintf(buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[ir]);
+            if (len >= (bufsize - offset)) {
+                ntfs_log_error("Pathname was truncated.\n");
+                break;
+            }
 
-		offset += len;
-	}
+            offset += len;
+        }
+    }
 
 	/* Free all the allocated memory */
-	for (i = 0; i < max_path; i++)
-		free(names[i]);
+	for (ir = 0; ir <= i; ir++)
+		free(names[ir]);
 
 	ntfs_log_debug("Pathname: %s\n", buffer);
 
