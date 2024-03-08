@@ -125,6 +125,30 @@ static LPFN_SETFILEPOINTEREX fnSetFilePointerEx = NULL;
 #define FNPOSTFIX "A"
 #endif
 
+/* 
+ * Since many of the ahead enum constants conflict with winnt.h defines,
+ * make sure that each enum constant is undefined.
+ */
+
+#undef STATUS_UNKNOWN
+#undef STATUS_SUCCESS
+#undef STATUS_BUFFER_OVERFLOW
+#undef STATUS_INVALID_HANDLE
+#undef STATUS_INVALID_PARAMETER
+#undef STATUS_INVALID_DEVICE_REQUEST
+#undef STATUS_END_OF_FILE
+#undef STATUS_CONFLICTING_ADDRESSES
+#undef STATUS_NO_MATCH
+#undef STATUS_ACCESS_DENIED
+#undef STATUS_BUFFER_TOO_SMALL
+#undef STATUS_OBJECT_TYPE_MISMATCH
+#undef STATUS_FILE_NOT_FOUND
+#undef STATUS_OBJECT_NAME_INVALID
+#undef STATUS_OBJECT_NAME_NOT_FOUND
+#undef STATUS_SHARING_VIOLATION
+#undef STATUS_INVALID_PARAMETER_1
+#undef STATUS_IO_DEVICE_ERROR
+#undef STATUS_GUARD_PAGE_VIOLATION
 enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx */
    STATUS_UNKNOWN = -1,
    STATUS_SUCCESS =              0x00000000,
