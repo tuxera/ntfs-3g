@@ -180,7 +180,7 @@ typedef unsigned long long ULONG_PTR; /* an integer the same size as a pointer *
 typedef unsigned long ULONG_PTR; /* an integer the same size as a pointer */
 #endif
 
-HANDLE get_osfhandle(int); /* from msvcrt.dll */
+HANDLE _get_osfhandle(int); /* from msvcrt.dll */
 
 /*
  *		A few needed definitions not included in <windows.h>
@@ -1987,7 +1987,7 @@ int ntfs_win32_set_sparse(int fd)
 	HANDLE handle;
 	DWORD bytes;   
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	if (handle == INVALID_HANDLE_VALUE)
 		ok = FALSE;
 	else
@@ -2051,7 +2051,7 @@ int ntfs_win32_ftruncate(int fd, s64 size)
 	int ret;
 	HANDLE handle;
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	ret = win32_ftruncate(handle, size);
 	return (ret);
 }
