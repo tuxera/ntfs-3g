@@ -142,6 +142,16 @@
 #include "misc.h"
 
 #ifdef HAVE_WINDOWS_H
+
+// Copied from minwindef.h.
+#ifndef WINAPI
+#if defined(_ARM_)
+#define WINAPI
+#else
+#define WINAPI __stdcall
+#endif
+#endif
+
 /*
  *	Including <windows.h> leads to numerous conflicts with layout.h
  *	so define a few needed Windows calls unrelated to ntfs-3g
