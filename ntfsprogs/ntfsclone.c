@@ -110,10 +110,14 @@
 #endif
 
 #ifdef HAVE_WINDOWS_H
+#ifdef __CYGWIN__
+#include <io.h>
+#else
 /*
  *		Replacements for functions which do not exist on Windows
  */
 int setmode(int, int); /* from msvcrt.dll */
+#endif
 
 #define getpid() (0)
 #define srandom(seed) srand(seed)
