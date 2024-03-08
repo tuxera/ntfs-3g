@@ -27,9 +27,9 @@
 #include "config.h"
 
 #ifdef HAVE_WINDOWS_H
-#define BOOL WINBOOL /* avoid conflicting definitions of BOOL */
+#define _NO_BOOL_TYPEDEF /* supported by both Cygwin and MinGW-w64's w32api */ 
 #include <windows.h>
-#undef BOOL
+#undef _NO_BOOL_TYPEDEF
 #endif
 
 #ifdef HAVE_STDLIB_H
