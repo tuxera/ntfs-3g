@@ -171,7 +171,7 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
    STATUS_GUARD_PAGE_VIOLATION = 0x80000001
  } ;
 
-typedef u32 NTSTATUS; /* do not let the compiler choose the size */
+typedef s32 NTSTATUS; /* do not let the compiler choose the size */
 #ifdef __x86_64__
 typedef unsigned long long ULONG_PTR; /* an integer the same size as a pointer */
 #else
