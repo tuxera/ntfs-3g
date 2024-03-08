@@ -814,7 +814,12 @@ static boolean outputmap(const char *volume, const char *dir)
 			/* build directory, if not present */
 		if (stat(fullname,&st) && (errno == ENOENT)) {
 			printf("* Creating directory %s\n", fullname);
+			#ifdef __CYGWIN__
+			// The one-argument mkdir is exclusive to msvcrt.dll.
+			mkdir(fullname, 777);
+			#else
 			mkdir(fullname);
+			#endif
 		}
 
 		strcat(fullname, DIRSEP);
