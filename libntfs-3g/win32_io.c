@@ -45,15 +45,6 @@
 typedef unsigned long long DWORD64;
 #endif
 
-typedef struct {
-        DWORD data1;     /* The first eight hexadecimal digits of the GUID. */
-        WORD data2;     /* The first group of four hexadecimal digits. */
-        WORD data3;     /* The second group of four hexadecimal digits. */ 
-        char data4[8];    /* The first two bytes are the third group of four
-                           hexadecimal digits. The remaining six bytes are the
-                           final 12 hexadecimal digits. */
-} GUID;
-
 #include <winioctl.h>
 
 #ifdef HAVE_STDIO_H
