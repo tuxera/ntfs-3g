@@ -61,7 +61,9 @@ typedef unsigned long long DWORD64;
 #endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#ifndef __CYGWIN__ /* See https://cygwin.com/faq.html#faq.programming.stat64 */
 #define stat stat64
+#endif
 #define st_blocks  st_rdev /* emulate st_blocks, missing in Windows */
 #endif
 
