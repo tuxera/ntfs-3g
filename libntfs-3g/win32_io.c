@@ -27,9 +27,9 @@
 #include "config.h"
 
 #ifdef HAVE_WINDOWS_H
-#define BOOL WINBOOL /* avoid conflicting definitions of BOOL */
+#define _NO_BOOL_TYPEDEF /* supported by both Cygwin and MinGW-w64's w32api */ 
 #include <windows.h>
-#undef BOOL
+#undef _NO_BOOL_TYPEDEF
 #endif
 
 #ifdef HAVE_STDLIB_H
@@ -44,15 +44,6 @@
 #define _ANONYMOUS_STRUCT
 typedef unsigned long long DWORD64;
 #endif
-
-typedef struct {
-        DWORD data1;     /* The first eight hexadecimal digits of the GUID. */
-        WORD data2;     /* The first group of four hexadecimal digits. */
-        WORD data3;     /* The second group of four hexadecimal digits. */ 
-        char data4[8];    /* The first two bytes are the third group of four
-                           hexadecimal digits. The remaining six bytes are the
-                           final 12 hexadecimal digits. */
-} GUID;
 
 #include <winioctl.h>
 
@@ -70,7 +61,9 @@ typedef struct {
 #endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#ifndef __CYGWIN__ /* See https://cygwin.com/faq.html#faq.programming.stat64 */
 #define stat stat64
+#endif
 #define st_blocks  st_rdev /* emulate st_blocks, missing in Windows */
 #endif
 
@@ -134,6 +127,30 @@ static LPFN_SETFILEPOINTEREX fnSetFilePointerEx = NULL;
 #define FNPOSTFIX "A"
 #endif
 
+/* 
+ * Since many of the ahead enum constants conflict with winnt.h defines,
+ * make sure that each enum constant is undefined.
+ */
+
+#undef STATUS_UNKNOWN
+#undef STATUS_SUCCESS
+#undef STATUS_BUFFER_OVERFLOW
+#undef STATUS_INVALID_HANDLE
+#undef STATUS_INVALID_PARAMETER
+#undef STATUS_INVALID_DEVICE_REQUEST
+#undef STATUS_END_OF_FILE
+#undef STATUS_CONFLICTING_ADDRESSES
+#undef STATUS_NO_MATCH
+#undef STATUS_ACCESS_DENIED
+#undef STATUS_BUFFER_TOO_SMALL
+#undef STATUS_OBJECT_TYPE_MISMATCH
+#undef STATUS_FILE_NOT_FOUND
+#undef STATUS_OBJECT_NAME_INVALID
+#undef STATUS_OBJECT_NAME_NOT_FOUND
+#undef STATUS_SHARING_VIOLATION
+#undef STATUS_INVALID_PARAMETER_1
+#undef STATUS_IO_DEVICE_ERROR
+#undef STATUS_GUARD_PAGE_VIOLATION
 enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx */
    STATUS_UNKNOWN = -1,
    STATUS_SUCCESS =              0x00000000,
@@ -156,14 +173,14 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
    STATUS_GUARD_PAGE_VIOLATION = 0x80000001
  } ;
 
-typedef u32 NTSTATUS; /* do not let the compiler choose the size */
+typedef s32 NTSTATUS; /* do not let the compiler choose the size */
 #ifdef __x86_64__
 typedef unsigned long long ULONG_PTR; /* an integer the same size as a pointer */
 #else
 typedef unsigned long ULONG_PTR; /* an integer the same size as a pointer */
 #endif
 
-HANDLE get_osfhandle(int); /* from msvcrt.dll */
+HANDLE _get_osfhandle(int); /* from msvcrt.dll */
 
 /*
  *		A few needed definitions not included in <windows.h>
@@ -343,7 +360,7 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 
 static int ntfs_ntstatus_to_errno(NTSTATUS status)
 {
-	ntfs_log_trace("Converting w32error 0x%x.\n",w32error);
+	ntfs_log_trace("Converting w32error 0x%x.\n",status);
 	switch (status) {
 		case STATUS_INVALID_HANDLE :
 		case STATUS_INVALID_PARAMETER :
@@ -1323,7 +1340,8 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
  * @fd:		win32 device descriptor obtained via ->open
  * @pos:	at which position to do i/o from/to
  * @count:	how many bytes should be transfered
- * @b:		source/destination buffer
+ * @rbuf:	source buffer (null if writing)
+ * @wbuf:	destination buffer (null if reading)
  * @write:	TRUE if write transfer and FALSE if read transfer
  *
  * On success returns the number of bytes transfered (can be < @count) and on
@@ -1345,7 +1363,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 	s64 bytes;
 
 	ntfs_log_trace("pos = 0x%llx, count = 0x%llx, direction = %s.\n",
-			(long long)pos, (long long)count, write ? "write" :
+			(long long)pos, (long long)count, wbuf ? "write" :
 			"read");
 	li.QuadPart = pos;
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
@@ -1395,7 +1413,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 		bytes = bt;
 		if (!res) {
 			errno = ntfs_w32error_to_errno(GetLastError());
-			ntfs_log_trace("%sFile() failed.\n", write ?
+			ntfs_log_trace("%sFile() failed.\n", wbuf ?
 							"Write" : "Read");
 			return -1;
 		}
@@ -1970,7 +1988,7 @@ int ntfs_win32_set_sparse(int fd)
 	HANDLE handle;
 	DWORD bytes;   
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	if (handle == INVALID_HANDLE_VALUE)
 		ok = FALSE;
 	else
@@ -2034,7 +2052,7 @@ int ntfs_win32_ftruncate(int fd, s64 size)
 	int ret;
 	HANDLE handle;
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	ret = win32_ftruncate(handle, size);
 	return (ret);
 }

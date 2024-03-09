@@ -142,6 +142,16 @@
 #include "misc.h"
 
 #ifdef HAVE_WINDOWS_H
+
+// Copied from minwindef.h.
+#ifndef WINAPI
+#if defined(_ARM_)
+#define WINAPI
+#else
+#define WINAPI __stdcall
+#endif
+#endif
+
 /*
  *	Including <windows.h> leads to numerous conflicts with layout.h
  *	so define a few needed Windows calls unrelated to ntfs-3g
@@ -804,7 +814,12 @@ static boolean outputmap(const char *volume, const char *dir)
 			/* build directory, if not present */
 		if (stat(fullname,&st) && (errno == ENOENT)) {
 			printf("* Creating directory %s\n", fullname);
+			#ifdef __CYGWIN__
+			// The one-argument mkdir is exclusive to msvcrt.dll.
+			mkdir(fullname, 0777);
+			#else
 			mkdir(fullname);
+			#endif
 		}
 
 		strcat(fullname, DIRSEP);

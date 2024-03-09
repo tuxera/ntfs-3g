@@ -14,6 +14,10 @@ libntfs_3g_la_CPPFLAGS= $(AM_CPPFLAGS) $(LIBNTFS_CPPFLAGS) -I$(top_srcdir)/inclu
 libntfs_3g_la_LIBADD  = $(LIBNTFS_LIBS)
 libntfs_3g_la_LDFLAGS = -version-info $(LIBNTFS_3G_VERSION) -no-undefined
 
+if WINDOWS
+libntfs_3g_la_LDFLAGS += -lntdll
+endif
+
 libntfs_3g_la_SOURCES =	\
 	acls.c 	\
 	attrib.c 	\

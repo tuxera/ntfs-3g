@@ -119,6 +119,30 @@ then, as root:
 And, to end the test, unmount the usual way:
 	umount /dev/sda1
 
+BUILDING FOR WINDOWS
+====================
+
+A subset of the components found in this repository may be compiled and
+executed on Windows. This includes the libntfs-3g library and the ntfsprogs
+programs, but NOT the actual ntfs-3g driver.
+
+To target Cygwin, you must install the following packages
+from the Cygwin installer:
+
+	automake
+	libtool
+	make
+	gcc-core
+	libgcrypt-devel
+
+Then
+
+	./configure --disable-ntfs-3g --disable-plugins
+	make
+
+The full set of ntfsprogs, including ntfsusermap, can be built using:
+
+	make extra
 
 NTFS UTILITIES
 ==============
