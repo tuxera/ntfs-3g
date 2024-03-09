@@ -816,7 +816,7 @@ static boolean outputmap(const char *volume, const char *dir)
 			printf("* Creating directory %s\n", fullname);
 			#ifdef __CYGWIN__
 			// The one-argument mkdir is exclusive to msvcrt.dll.
-			mkdir(fullname, 777);
+			mkdir(fullname, 0777);
 			#else
 			mkdir(fullname);
 			#endif
