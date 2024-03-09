@@ -360,7 +360,7 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 
 static int ntfs_ntstatus_to_errno(NTSTATUS status)
 {
-	ntfs_log_trace("Converting w32error 0x%x.\n",w32error);
+	ntfs_log_trace("Converting w32error 0x%x.\n",status);
 	switch (status) {
 		case STATUS_INVALID_HANDLE :
 		case STATUS_INVALID_PARAMETER :
