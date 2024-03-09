@@ -1340,7 +1340,8 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
  * @fd:		win32 device descriptor obtained via ->open
  * @pos:	at which position to do i/o from/to
  * @count:	how many bytes should be transfered
- * @b:		source/destination buffer
+ * @rbuf:	source buffer (null if writing)
+ * @wbuf:	destination buffer (null if reading)
  * @write:	TRUE if write transfer and FALSE if read transfer
  *
  * On success returns the number of bytes transfered (can be < @count) and on
@@ -1362,7 +1363,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 	s64 bytes;
 
 	ntfs_log_trace("pos = 0x%llx, count = 0x%llx, direction = %s.\n",
-			(long long)pos, (long long)count, write ? "write" :
+			(long long)pos, (long long)count, wbuf ? "write" :
 			"read");
 	li.QuadPart = pos;
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
@@ -1412,7 +1413,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 		bytes = bt;
 		if (!res) {
 			errno = ntfs_w32error_to_errno(GetLastError());
-			ntfs_log_trace("%sFile() failed.\n", write ?
+			ntfs_log_trace("%sFile() failed.\n", wbuf ?
 							"Write" : "Read");
 			return -1;
 		}
