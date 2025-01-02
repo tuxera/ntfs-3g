@@ -369,9 +369,24 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	if ((level & NTFS_LOG_LEVEL_PERROR) && errno == ENOSPC)
 		return 1;
 #endif	
+	int priority;
+	if ( level <= NTFS_LOG_LEVEL_DEBUG ) {
+		priority = LOG_DEBUG;
+	} else if ( level <= NTFS_LOG_LEVEL_INFO ) {
+		priority = LOG_INFO;
+	} else if ( level <= NTFS_LOG_LEVEL_WARNING ) {
+		priority = LOG_NOTICE;
+	} else if ( level <= NTFS_LOG_LEVEL_ERROR ) {
+		priority = LOG_ERR;
+	} else if ( level <= NTFS_LOG_LEVEL_CRITICAL ) {
+		priority = LOG_CRIT;
+	} else {
+		priority = LOG_ALERT;
+	}
+
 	ret = vsnprintf(logbuf, LOG_LINE_LEN, format, args);
 	if (ret < 0) {
-		vsyslog(LOG_NOTICE, format, args);
+		vsyslog(priority, format, args);
 		ret = 1;
 		goto out;
 	}
@@ -382,7 +397,7 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 		ret = strlen(logbuf);
 	}
 	
-	syslog(LOG_NOTICE, "%s", logbuf);
+	syslog(priority, "%s", logbuf);
 out:
 	errno = olderr;
 	return ret;
