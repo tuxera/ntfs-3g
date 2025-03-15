@@ -222,7 +222,7 @@ Force
 .B mkntfs
 to run, even if the specified
 .I device
-is not a block special device, or appears to be mounted.
+appears to be mounted.
 .SS Output options
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR

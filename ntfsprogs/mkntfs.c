@@ -3503,11 +3503,6 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
 	}
 
 	if (!S_ISBLK(sbuf.st_mode)) {
-		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
-		if (!opts.force) {
-			ntfs_log_error("Refusing to make a filesystem here!\n");
-			goto done;
-		}
 		if (!opts.num_sectors) {
 			if (!sbuf.st_size && !sbuf.st_blocks) {
 				ntfs_log_error("You must specify the number of sectors.\n");
