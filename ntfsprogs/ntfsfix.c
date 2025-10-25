@@ -1204,11 +1204,11 @@ static int fix_self_located_mft(ntfs_volume *vol)
 			ntfs_log_info(OK);
 			res = -1;
 		}
-		free(selfloc.mft0);
-		free(selfloc.mft1);
-		free(selfloc.mft2);
-		free(selfloc.attrlist);
 	}
+	free(selfloc.mft0);
+	free(selfloc.mft1);
+	free(selfloc.mft2);
+	free(selfloc.attrlist);
 	return (res);
 }
 
@@ -1421,10 +1421,10 @@ static int check_alternate_boot(ntfs_volume *vol)
 	} else {
 		ntfs_log_info("Error : could not read the boot sector again\n");
 	}
-	free(full_bs);
-	free(alt_bs);
 
 error_exit :
+	free(full_bs);
+	free(alt_bs);
 	return (res);
 }
 
