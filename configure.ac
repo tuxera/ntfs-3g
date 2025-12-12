@@ -239,14 +239,14 @@ elif test "x${with_fuse}" = "x"; then
 			[with_fuse="internal"]
 		)
 		;;
-	darwin*|netbsd*|kfreebsd*-gnu)
+	darwin*|netbsd*|kfreebsd*-gnu|cygwin)
 		with_fuse="external"
 		;;
 	freebsd*)
 		AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
 		;;
 	*)
-		AC_MSG_ERROR([ntfs-3g can be built for Linux, FreeBSD, Mac OS X, NetBSD, and Solaris only.])
+		AC_MSG_ERROR([ntfs-3g can be built for Linux, FreeBSD, Mac OS X, NetBSD, and Solaris only. (current OS: ${target_os})])
 		;;
 	esac
 	AC_MSG_RESULT([${with_fuse}])

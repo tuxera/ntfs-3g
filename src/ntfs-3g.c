@@ -4433,11 +4433,13 @@ int main(int argc, char *argv[])
 	if (drop_privs())
 		goto err_out;
 #endif	
+#ifndef WINDOWS
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
 		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
+#endif
 
 #if !(defined(__sun) && defined (__SVR4))
 	/* Always use fuseblk for block devices unless it's surely missing. */
@@ -4445,7 +4447,7 @@ int main(int argc, char *argv[])
 		ctx->blkdev = TRUE;
 #endif
 
-#ifndef FUSE_INTERNAL
+#if !defined(FUSE_INTERNAL) && !defined(WINDOWS)
 	if (getuid() && ctx->blkdev) {
 		ntfs_log_error("%s", unpriv_fuseblk_msg);
 		err = NTFS_VOLUME_NO_PRIVILEGE;

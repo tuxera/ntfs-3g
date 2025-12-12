@@ -50,6 +50,7 @@ libntfs_3g_la_SOURCES =	\
 if NTFS_DEVICE_DEFAULT_IO_OPS
 if WINDOWS
 libntfs_3g_la_SOURCES += win32_io.c
+libntfs_3g_la_LIBADD += -lntdll
 else
 libntfs_3g_la_SOURCES += unix_io.c
 endif

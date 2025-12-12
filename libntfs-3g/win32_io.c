@@ -27,9 +27,8 @@
 #include "config.h"
 
 #ifdef HAVE_WINDOWS_H
-#define BOOL WINBOOL /* avoid conflicting definitions of BOOL */
+#define BOOL MYBOOL /* avoid conflicting definitions of BOOL */
 #include <windows.h>
-#undef BOOL
 #endif
 
 #ifdef HAVE_STDLIB_H
@@ -44,15 +43,6 @@
 #define _ANONYMOUS_STRUCT
 typedef unsigned long long DWORD64;
 #endif
-
-typedef struct {
-        DWORD data1;     /* The first eight hexadecimal digits of the GUID. */
-        WORD data2;     /* The first group of four hexadecimal digits. */
-        WORD data3;     /* The second group of four hexadecimal digits. */ 
-        char data4[8];    /* The first two bytes are the third group of four
-                           hexadecimal digits. The remaining six bytes are the
-                           final 12 hexadecimal digits. */
-} GUID;
 
 #include <winioctl.h>
 
@@ -70,12 +60,15 @@ typedef struct {
 #endif
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#ifndef __CYGWIN__
 #define stat stat64
+#endif
 #define st_blocks  st_rdev /* emulate st_blocks, missing in Windows */
 #endif
 
 /* Prevent volume.h from being be loaded, as it conflicts with winnt.h. */
 #define _NTFS_VOLUME_H
+struct ntfs_device;
 struct ntfs_volume;
 typedef struct ntfs_volume ntfs_volume;
 
@@ -138,8 +131,6 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
    STATUS_UNKNOWN = -1,
    STATUS_SUCCESS =              0x00000000,
    STATUS_BUFFER_OVERFLOW =      0x80000005,
-   STATUS_INVALID_HANDLE =       0xC0000008,
-   STATUS_INVALID_PARAMETER =    0xC000000D,
    STATUS_INVALID_DEVICE_REQUEST = 0xC0000010,
    STATUS_END_OF_FILE =          0xC0000011,
    STATUS_CONFLICTING_ADDRESSES = 0xC0000018,
@@ -152,18 +143,11 @@ enum { /* see http://msdn.microsoft.com/en-us/library/cc704588(v=prot.10).aspx *
    STATUS_OBJECT_NAME_NOT_FOUND = 0xC0000034,
    STATUS_SHARING_VIOLATION =    0xC0000043,
    STATUS_INVALID_PARAMETER_1 =  0xC00000EF,
-   STATUS_IO_DEVICE_ERROR =      0xC0000185,
-   STATUS_GUARD_PAGE_VIOLATION = 0x80000001
+   STATUS_IO_DEVICE_ERROR =      0xC0000185
  } ;
 
-typedef u32 NTSTATUS; /* do not let the compiler choose the size */
-#ifdef __x86_64__
-typedef unsigned long long ULONG_PTR; /* an integer the same size as a pointer */
-#else
-typedef unsigned long ULONG_PTR; /* an integer the same size as a pointer */
-#endif
 
-HANDLE get_osfhandle(int); /* from msvcrt.dll */
+HANDLE _get_osfhandle(int); /* from msvcrt.dll */
 
 /*
  *		A few needed definitions not included in <windows.h>
@@ -203,11 +187,6 @@ typedef struct _OBJECT_ATTRIBUTES {
 	PVOID           SecurityQualityOfService;
 }  OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
 
-#define FILE_OPEN 1
-#define FILE_CREATE 2
-#define FILE_OVERWRITE 4
-#define FILE_SYNCHRONOUS_IO_ALERT    0x10
-#define FILE_SYNCHRONOUS_IO_NONALERT 0x20
 #define OBJ_CASE_INSENSITIVE 0x40
 
 typedef void (WINAPI *PIO_APC_ROUTINE)(void*, PIO_STATUS_BLOCK, ULONG);
@@ -334,7 +313,7 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 		case ERROR_NOT_SUPPORTED:
 			return EOPNOTSUPP;
 		case ERROR_BAD_NETPATH:
-			return ENOSHARE;
+			return ENOENT;
 		default:
 			/* generic message */
 			return ENOMSG;
@@ -343,7 +322,7 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 
 static int ntfs_ntstatus_to_errno(NTSTATUS status)
 {
-	ntfs_log_trace("Converting w32error 0x%x.\n",w32error);
+	ntfs_log_trace("Converting w32error 0x%x.\n", status);
 	switch (status) {
 		case STATUS_INVALID_HANDLE :
 		case STATUS_INVALID_PARAMETER :
@@ -705,7 +684,7 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 		fd->geo_cylinders = ((DISK_GEOMETRY*)&b)->Cylinders.QuadPart;
 		fd->geo_sectors = ((DISK_GEOMETRY*)&b)->SectorsPerTrack;
 		fd->geo_size = ((DISK_GEOMETRY_EX*)&b)->DiskSize.QuadPart;
-		fd->geo_sector_size = NTFS_BLOCK_SIZE;
+		fd->geo_sector_size = ((DISK_GEOMETRY_EX*)b)->Geometry.BytesPerSector;
 		switch (ddi->DetectionType) {
 		case DetectInt13:
 			fd->geo_cylinders = ddi->Int13.MaxCylinders;
@@ -1222,8 +1201,8 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 	    && (dev->d_name[2] == '\0')) {
 		drive_char = dev->d_name[0];
 		numparams = 3;
-		drive_id = toupper(drive_char) - 'A';
 	}
+	drive_id = toupper(drive_char) - 'A';
 	switch (numparams) {
 	case 0:
 		ntfs_log_debug("win32_open(%s) -> file.\n", dev->d_name);
@@ -1345,7 +1324,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 	s64 bytes;
 
 	ntfs_log_trace("pos = 0x%llx, count = 0x%llx, direction = %s.\n",
-			(long long)pos, (long long)count, write ? "write" :
+			(long long)pos, (long long)count, wbuf ? "write" :
 			"read");
 	li.QuadPart = pos;
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
@@ -1395,7 +1374,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 		bytes = bt;
 		if (!res) {
 			errno = ntfs_w32error_to_errno(GetLastError());
-			ntfs_log_trace("%sFile() failed.\n", write ?
+			ntfs_log_trace("%sFile() failed.\n", wbuf ?
 							"Write" : "Read");
 			return -1;
 		}
@@ -1551,15 +1530,16 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	} else
 		rvl = CloseHandle(fd->handle);
 	NDevClearOpen(dev);
-	free(fd);
 	if (!rvl) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		if (fd->ntdll)
 			ntfs_log_trace("NtClose() failed.\n");
 		else
 			ntfs_log_trace("CloseHandle() failed.\n");
+		free(fd);
 		return -1;
 	}
+	free(fd);
 	return 0;
 }
 
@@ -1970,7 +1950,7 @@ int ntfs_win32_set_sparse(int fd)
 	HANDLE handle;
 	DWORD bytes;   
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	if (handle == INVALID_HANDLE_VALUE)
 		ok = FALSE;
 	else
@@ -2034,7 +2014,7 @@ int ntfs_win32_ftruncate(int fd, s64 size)
 	int ret;
 	HANDLE handle;
 
-	handle = get_osfhandle(fd);
+	handle = _get_osfhandle(fd);
 	ret = win32_ftruncate(handle, size);
 	return (ret);
 }

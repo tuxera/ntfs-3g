@@ -113,7 +113,7 @@
 /*
  *		Replacements for functions which do not exist on Windows
  */
-int setmode(int, int); /* from msvcrt.dll */
+int _setmode(int, int); /* from msvcrt.dll */
 
 #define getpid() (0)
 #define srandom(seed) srand(seed)
@@ -2382,7 +2382,7 @@ static s64 open_image(void)
 		if ((fd_in = fileno(stdin)) == -1)
 			perr_exit("fileno for stdin failed");
 #ifdef HAVE_WINDOWS_H
-		if (setmode(fd_in,O_BINARY) == -1)
+		if (_setmode(fd_in,O_BINARY) == -1)
 			perr_exit("setting binary stdin failed");
 #endif
 	} else {
@@ -2624,7 +2624,7 @@ int main(int argc, char **argv)
 			perr_exit("fileno for stdout failed");
 		stream_out = stdout;
 #ifdef HAVE_WINDOWS_H
-		if (setmode(fileno(stdout),O_BINARY) == -1)
+		if (_setmode(fileno(stdout),O_BINARY) == -1)
 			perr_exit("setting binary stdout failed");
 #endif
 	} else {

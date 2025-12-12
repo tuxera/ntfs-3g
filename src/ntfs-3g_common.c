@@ -619,6 +619,9 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 				
 				/* Canonicalize device name (mtab, etc) */
 				popts->arg_device = optarg;
+				#ifdef WINDOWS
+				popts->device = popts->arg_device;
+				#else
 				if (!ntfs_realpath_canonicalize(optarg,
 						popts->device)) {
 					ntfs_log_perror("%s: Failed to access "
@@ -627,6 +630,7 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 					popts->device = NULL;
 					return -1;
 				}
+				#endif
 			} else if (!popts->mnt_point) {
 				popts->mnt_point = optarg;
 			} else {

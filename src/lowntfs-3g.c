@@ -26,7 +26,6 @@
  */
 
 #include "config.h"
-
 #include <fuse.h>
 #include <fuse_lowlevel.h>
 

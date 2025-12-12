@@ -19,7 +19,10 @@ endif
 if ENABLE_NTFS_3G
 
 bin_PROGRAMS	 = ntfs-3g.probe
-rootbin_PROGRAMS = ntfs-3g lowntfs-3g
+rootbin_PROGRAMS = ntfs-3g
+if !WINDOWS
+rootbin_PROGRAMS += lowntfs-3g
+endif
 rootsbin_DATA 	 = #Create directory
 man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8
 
@@ -35,6 +38,7 @@ ntfs_3g_CFLAGS   =			\
 	$(PLUGIN_CFLAGS)
 ntfs_3g_SOURCES  = ntfs-3g.c ntfs-3g_common.c
 
+if !WINDOWS
 lowntfs_3g_LDADD    = $(LIBDL) $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 lowntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
@@ -46,6 +50,7 @@ lowntfs_3g_CFLAGS   =			\
 	-I$(top_srcdir)/include/ntfs-3g	\
 	$(PLUGIN_CFLAGS)
 lowntfs_3g_SOURCES  = lowntfs-3g.c ntfs-3g_common.c
+endif
 
 ntfs_3g_probe_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
@@ -54,7 +59,12 @@ endif
 ntfs_3g_probe_CFLAGS  	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
 ntfs_3g_probe_SOURCES 	= ntfs-3g.probe.c
 
-drivers : $(FUSE_LIBS) ntfs-3g lowntfs-3g
+NTFS_PROGS = ntfs-3g
+if !WINDOWS
+NTFS_PROGS += lowntfs-3g
+endif
+
+drivers : $(FUSE_LIBS) $(NTFS_PROGS)
 
 install-exec-hook:
 if RUN_LDCONFIG
