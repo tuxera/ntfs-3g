@@ -61,22 +61,22 @@ endif
 install-exec-hook: install-rootlibLTLIBRARIES
 if INSTALL_LIBRARY
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(MV) -f "$(DESTDIR)/$(libdir)"/libntfs-3g.so* "$(DESTDIR)/$(rootlibdir)";  \
+		$(MV) -f "$(DESTDIR)$(libdir)"/libntfs-3g$(SHREXT)* "$(DESTDIR)$(rootlibdir)";  \
 	fi
 if GENERATE_LDSCRIPT
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(install_sh_PROGRAM) "libntfs-3g.script.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+		$(install_sh_PROGRAM) "libntfs-3g.script$(SHREXT)" "$(DESTDIR)$(libdir)/libntfs-3g$(SHREXT)"; \
 	fi
 else
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(LN_S) "$(rootlibdir)/libntfs-3g.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+		$(LN_S) "$(rootlibdir)/libntfs-3g$(SHREXT)" "$(DESTDIR)$(libdir)/libntfs-3g$(SHREXT)"; \
 	fi
 endif
 endif
 
 uninstall-local:
 if INSTALL_LIBRARY
-	$(RM) -f "$(DESTDIR)/$(rootlibdir)"/libntfs-3g.so*
+	$(RM) -f "$(DESTDIR)$(rootlibdir)"/libntfs-3g$(SHREXT)*
 endif
 
 if ENABLE_NTFSPROGS

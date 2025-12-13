@@ -71,14 +71,14 @@ if RUN_LDCONFIG
 	$(LDCONFIG)
 endif
 if !DISABLE_PLUGINS
-	$(MKDIR_P) $(DESTDIR)/$(plugindir)
+	$(MKDIR_P) $(DESTDIR)$(plugindir)
 endif
 
 if ENABLE_MOUNT_HELPER
 install-exec-local:	install-rootbinPROGRAMS
-	$(MKDIR_P) "$(DESTDIR)/sbin"
-	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
-	$(LN_S) -f "$(rootbindir)/lowntfs-3g" "$(DESTDIR)/sbin/mount.lowntfs-3g"
+	$(MKDIR_P) "$(DESTDIR)sbin"
+	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)sbin/mount.ntfs-3g"
+	$(LN_S) -f "$(rootbindir)/lowntfs-3g" "$(DESTDIR)sbin/mount.lowntfs-3g"
 
 install-data-local:	install-man8
 	$(LN_S) -f ntfs-3g.8 "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
@@ -86,7 +86,7 @@ install-data-local:	install-man8
 
 uninstall-local:
 	$(RM) -f "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
-	$(RM) -f "$(DESTDIR)/sbin/mount.ntfs-3g" "$(DESTDIR)/sbin/mount.lowntfs-3g"
+	$(RM) -f "$(DESTDIR)sbin/mount.ntfs-3g" "$(DESTDIR)sbin/mount.lowntfs-3g"
 endif
 
 endif # ENABLE_NTFS_3G
