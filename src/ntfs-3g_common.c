@@ -671,6 +671,9 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 				      FUSE_TYPE, fuse_version());
 			exit(0);
 		default:
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (ntfs_log_parse_option (argv[optind-1])) break;
+			}
 			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
 				       argv[optind - 1]);
 			return -1;
