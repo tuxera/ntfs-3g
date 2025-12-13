@@ -101,13 +101,16 @@ int mft_next_record(struct mft_search_ctx *ctx);
 #define MAX_PATH 1024
 #endif
 
+#ifdef HAVE_WINDOWS_H
+char *ntfs_utils_unix_path(const char *in);
+#endif
+
 #if defined(HAVE_WINDOWS_H) && 0
 /*
  *	Macroes to hide the needs to translate formats on older Windows
  */
 #define MAX_FMT 1536
 char *ntfs_utils_reformat(char *out, int sz, const char *fmt);
-char *ntfs_utils_unix_path(const char *in);
 #define ntfs_log_redirect(fn,fi,li,le,d,fmt, ...) \
 		do { char _b[MAX_FMT]; ntfs_log_redirect(fn,fi,li,le,d, \
 		ntfs_utils_reformat(_b,MAX_FMT,fmt), ##__VA_ARGS__); } while (0)
