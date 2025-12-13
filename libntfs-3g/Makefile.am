@@ -61,7 +61,13 @@ endif
 install-exec-hook: install-rootlibLTLIBRARIES
 if INSTALL_LIBRARY
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(MV) -f "$(DESTDIR)$(libdir)"/libntfs-3g$(SHREXT)* "$(DESTDIR)$(rootlibdir)";  \
+		pushd "$(DESTDIR)$(libdir)"; \
+		for f in libntfs-3g$(SHREXT)*; do \
+			case $$f in \
+				*.dll.a|*.lib) ;; \
+				*) $(MV) -v "$$f" "$(DESTDIR)$(rootlibdir)/" ;; \
+			esac; \
+		done; popd; \
 	fi
 if GENERATE_LDSCRIPT
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
