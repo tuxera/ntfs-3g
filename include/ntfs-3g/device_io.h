@@ -40,6 +40,7 @@
 #define ntfs_device_default_io_ops ntfs_device_unix_io_ops
 
 #else /* HAVE_WINDOWS_H */
+#include "types.h"
 
 #ifndef HDIO_GETGEO
 #	define HDIO_GETGEO	0x301
