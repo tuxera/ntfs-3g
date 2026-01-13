@@ -112,7 +112,7 @@ typedef int (*COLLATE)(ntfs_volume *vol, const void *data1, int len1,
  * the call to ntfs_index_ctx_put() to ensure that the changes are written
  * to disk.
  */
-typedef struct {
+typedef struct ntfs_index_context {
 	ntfs_inode *ni;
 	ntfschar *name;
 	u32 name_len;
