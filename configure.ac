@@ -537,11 +537,20 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([ \
 	atexit basename daemon dup2 fdatasync ffs getopt_long hasmntopt \
-	mbsinit memmove memset realpath regcomp setlocale setxattr \
+	mbsinit memmove memset realpath regcomp setlocale \
 	strcasecmp strchr strdup strerror strnlen strsep strtol strtoul \
 	sysconf utime utimensat gettimeofday clock_gettime fork memcpy random snprintf \
 ])
 AC_SYS_LARGEFILE
+
+AC_CHECK_FUNCS([setxattr extattr_set_file],
+	[
+		AC_DEFINE([ENABLE_XATTR], 1,
+		[Define this to 1 if you want to enable
+		extended attributes support.])
+	],
+	[],
+)
 
 # The dlopen API might be in libc or in libdl.  Check libc first, then
 # fall back to libdl.
