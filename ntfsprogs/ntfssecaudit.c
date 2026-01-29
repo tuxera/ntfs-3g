@@ -294,7 +294,7 @@
 #endif /* HAVE_SYS_STAT_H */
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-#else /* HAVE_SETXATTR */
+#elif !defined(ENABLE_XATTR)  /* HAVE_SETXATTR */
 #warning "The extended attribute package is not available"
 #endif /* HAVE_SETXATTR */
 
@@ -4371,7 +4371,7 @@ static BOOL singleshow(const char *path)
 
 #ifndef HAVE_WINDOWS_H
 
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 
 static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, size_t size)
 {
@@ -4526,7 +4526,7 @@ static BOOL processmounted(const char *fullname)
 	return (err);
 }
 
-#else /* HAVE_SETXATTR */
+#else /* ENABLE_XATTR */
 
 static BOOL processmounted(const char *fullname __attribute__((unused)))
 {
@@ -4535,7 +4535,7 @@ static BOOL processmounted(const char *fullname __attribute__((unused)))
 	return (TRUE);
 }
 
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 
 #endif /* HAVE_WINDOWS_H */
 
@@ -6007,13 +6007,13 @@ static void usage(void)
 	fprintf(stderr,"	set the security parameters of file to perms\n");
 	fprintf(stderr,"   ntfssecaudit -r[v] volume perms directory\n");
 	fprintf(stderr,"	set the security parameters of files in directory to perms\n");
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 	fprintf(stderr," special cases, do not require being root :\n");
 	fprintf(stderr,"   ntfssecaudit -u mounted-file\n");
 	fprintf(stderr,"	get a user mapping proposal applicable to mounted file\n");
 	fprintf(stderr,"   ntfssecaudit [-v] mounted-file\n");
 	fprintf(stderr,"	display the security parameters of a mounted file\n");
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 #if POSIXACLS
 	fprintf(stderr,"   Notes: perms can be an octal mode or a Posix ACL description\n");
 #else /* POSIXACLS */
