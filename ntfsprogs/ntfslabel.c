@@ -120,7 +120,7 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-fh?IinqvV";
+	static const char *sopt = "fh?IinqvV";
 	static const struct option lopt[] = {
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
@@ -144,14 +144,6 @@ static int parse_options(int argc, char *argv[])
 
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
-		case 1:	/* A non-option argument */
-			if (!err && !opts.device)
-				opts.device = argv[optind-1];
-			else if (!err && !opts.label)
-				opts.label = argv[optind-1];
-			else
-				err++;
-			break;
 		case 'f':
 			opts.force++;
 			break;
@@ -202,6 +194,15 @@ static int parse_options(int argc, char *argv[])
 			break;
 		}
 	}
+
+	if (optind < argc)
+		opts.device = argv[optind++];
+
+	if (optind < argc)
+		opts.label = argv[optind++];
+
+	if (optind < argc)
+		err++;
 
 	/* Make sure we're in sync with the log levels */
 	levels = ntfs_log_get_levels();
