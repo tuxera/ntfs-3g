@@ -82,12 +82,12 @@
 static const char *EXEC_NAME = "ntfsresize";
 
 static const char *resize_warning_msg =
-"WARNING: Every sanity check passed and only the dangerous operations left.\n"
-"Make sure that important data has been backed up! Power outage or computer\n"
-"crash may result major data loss!\n";
+"WARNING: Every sanity check has passed, and only the dangerous operations are left.\n"
+"Make sure that all important data has been backed up! A power outage or a computer\n"
+"crash may result in major data loss!\n";
 
 static const char *resize_important_msg =
-"You can go on to shrink the device for example with Linux fdisk.\n"
+"You can go on to shrink the device, for example, with Linux fdisk.\n"
 "IMPORTANT: When recreating the partition, make sure that you\n"
 "  1)  create it at the same disk sector (use sector as the unit!)\n"
 "  2)  create it with the same partition type (usually 7, HPFS/NTFS)\n"
