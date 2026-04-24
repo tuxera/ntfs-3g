@@ -334,22 +334,17 @@ static int index_get_size(ntfs_inode *inode)
 static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 		ntfschar *name, int namelen)
 {
-	const int bufsize = 4096;
 	char *buffer;
 	ntfs_attr *attr;
 	s64 bytes_read, written;
 	s64 offset;
 	u32 block_size;
-
-	buffer = malloc(bufsize);
-	if (!buffer)
-		return 1;
+	u32 bufsize = 4096;
 
 	attr = ntfs_attr_open(inode, type, name, namelen);
 	if (!attr) {
 		ntfs_log_error("Cannot find attribute type 0x%x.\n",
 				le32_to_cpu(type));
-		free(buffer);
 		return 1;
 	}
 
@@ -359,6 +354,15 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 		block_size = index_get_size(inode);
 	else
 		block_size = 0;
+
+	if (bufsize < block_size) {
+		bufsize = block_size;
+	}
+
+	buffer = malloc(bufsize);
+	if (!buffer) {
+		return 1;
+	}
 
 	offset = 0;
 	for (;;) {
