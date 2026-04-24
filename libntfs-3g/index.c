@@ -1092,14 +1092,16 @@ out:
 
 static INDEX_BLOCK *ntfs_ir_to_ib(INDEX_ROOT *ir, VCN ib_vcn)
 {
+	u32 ib_size;
 	INDEX_BLOCK *ib;
 	INDEX_ENTRY *ie_last;
 	char *ies_start, *ies_end;
 	int i;
 	
 	ntfs_log_trace("Entering\n");
-	
-	ib = ntfs_ib_alloc(ib_vcn, le32_to_cpu(ir->index_block_size), LEAF_NODE);
+
+	ib_size = le32_to_cpu(ir->index_block_size);
+	ib = ntfs_ib_alloc(ib_vcn, ib_size, LEAF_NODE);
 	if (!ib)
 		return NULL;
 	
@@ -1111,6 +1113,18 @@ static INDEX_BLOCK *ntfs_ir_to_ib(INDEX_ROOT *ir, VCN ib_vcn)
 	 * as well, which can never have any data.
 	 */
 	i = (char *)ie_last - ies_start + le16_to_cpu(ie_last->length);
+
+	if (offsetof(INDEX_BLOCK, index) + le32_to_cpu(ib->index.entries_offset)
+			+ i > ib_size)
+	{
+		ntfs_log_error("Last entry in index root overflows the index "
+				"block size: %d (index block size: %lu)\n",
+				i, (unsigned long)ib_size);
+		free(ib);
+		errno = EIO;
+		return NULL;
+	}
+
 	memcpy(ntfs_ie_get_first(&ib->index), ies_start, i);
 	
 	ib->index.ih_flags = ir->index.ih_flags;
