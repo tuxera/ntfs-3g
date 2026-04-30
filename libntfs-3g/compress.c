@@ -459,7 +459,8 @@ static unsigned int ntfs_compress_block(const char *inbuf, const int bufsize,
  * @cb_start is a pointer to the compression block which needs decompressing
  * and @cb_size is the size of @cb_start in bytes (8-64kiB).
  *
- * Return 0 if success or -EOVERFLOW on error in the compressed stream.
+ * Return 0 on success.  On error in the compressed stream, set errno to
+ * EOVERFLOW and return -1.
  */
 static int ntfs_decompress(u8 *dest, const u32 dest_size,
 		u8 *const cb_start, const u32 cb_size)
@@ -479,6 +480,7 @@ static int ntfs_decompress(u8 *dest, const u32 dest_size,
 	/* Variables for tag and token parsing. */
 	u8 tag;			/* Current tag. */
 	int token;		/* Loop counter for the eight tokens in tag. */
+	u16 hdr;		/* Current sub-block header. */
 
 	ntfs_log_trace("Entering, cb_size = 0x%x.\n", (unsigned)cb_size);
 do_next_sb:
@@ -487,19 +489,21 @@ do_next_sb:
 				"cb.\n",
 				(int)(cb - cb_start));
 		/*
-		 * Have we reached the end of the compression block or the end
-		 * of the decompressed data?  The latter can happen for example
-		 * if the current position in the compression block is one byte
-		 * before its end so the first two checks do not detect it.
+		 * Have we reached the end of the compression block or the end of
+		 * the decompressed data?
+		 *
+		 * Check dest == dest_end before reading the next two-byte sub-block
+		 * header.  The compressed pointer can legally be near the end of the
+		 * buffer when the requested output has already been produced.
 		 */
-		if (cb == cb_end || !le16_to_cpup((le16*)cb) ||
-				dest == dest_end)
-		{
-			if (dest_end > dest)
-				memset(dest, 0, dest_end - dest);
-			ntfs_log_debug("Completed. Returning success (0).\n");
-			return 0;
-		}
+		if (cb == cb_end || dest == dest_end)
+			goto complete;
+		/* A sub-block header is two bytes. */
+		if ((size_t)(cb_end - cb) < 2)
+			goto return_overflow;
+		hdr = le16_to_cpup((le16*)cb);
+		if (!hdr)
+			goto complete;
 		/* Setup offset for the current sub-block destination. */
 		dest_sb_start = dest;
 		dest_sb_end = dest + NTFS_SB_SIZE;
@@ -508,18 +512,16 @@ do_next_sb:
 			goto return_overflow;
 		/* Does the minimum size of a compressed sb overflow valid
 		 * range? */
-		if (cb + 6 > cb_end)
+		if ((size_t)(cb_end - cb) < 6)
 			goto return_overflow;
 		/* Setup the current sub-block source pointers and validate
 		 * range. */
 		cb_sb_start = cb;
-		cb_sb_end = cb_sb_start
-				+ (le16_to_cpup((le16*)cb) & NTFS_SB_SIZE_MASK)
-				+ 3;
+		cb_sb_end = cb_sb_start + (hdr & NTFS_SB_SIZE_MASK) + 3;
 		if (cb_sb_end > cb_end)
 			goto return_overflow;
 		/* Now, we are ready to process the current sub-block (sb). */
-		if (!(le16_to_cpup((le16*)cb) & NTFS_SB_IS_COMPRESSED)) {
+		if (!(hdr & NTFS_SB_IS_COMPRESSED)) {
 			ntfs_log_debug("Found uncompressed sub-block.\n");
 			/* This sb is not compressed, just copy it into
 			 * destination. */
@@ -541,29 +543,17 @@ do_next_sb:
 		cb += 2;
 do_next_tag:
 		{
-			if (cb == cb_sb_end) {
-				/* Check if the decompressed sub-block was not
-				 * full-length. */
-				if (dest < dest_sb_end) {
-					int nr_bytes = dest_sb_end - dest;
-
-					ntfs_log_debug("Filling incomplete "
-						"sub-block with zeroes.\n");
-					/* Zero remainder and update destination
-					 * position. */
-					memset(dest, 0, nr_bytes);
-					dest += nr_bytes;
-				}
-				/* We have finished the current sub-block. */
-				goto do_next_sb;
-			}
 			/* Check we are still in range. */
-			if (dest == dest_sb_end) {
-				cb = cb_sb_end;
-				goto do_next_sb;
-			}
 			if (cb > cb_sb_end || dest > dest_sb_end)
 				goto return_overflow;
+			/*
+			 * Finish this compressed sub-block when either its compressed
+			 * input is exhausted or its 4 KiB output slot is full.  If output
+			 * becomes full first, skip the remaining compressed bytes in this
+			 * sub-block instead of interpreting them as more tags/tokens.
+			 */
+			if (cb == cb_sb_end || dest == dest_sb_end)
+				goto finish_compressed_sb;
 			/* Get the next tag and advance to first token. */
 			tag = *cb++;
 			/* Parse the eight tokens described by the tag. */
@@ -573,12 +563,10 @@ do_next_tag:
 				u8 *dest_back_addr;
 
 				/* Check if we are done / still in range. */
-				if (dest == dest_sb_end) {
-					cb = cb_sb_end;
-					goto do_next_sb;
-				}
-				if (cb >= cb_sb_end)
-					break;
+				if (cb > cb_sb_end || dest > dest_sb_end)
+					goto return_overflow;
+				if (cb == cb_sb_end || dest == dest_sb_end)
+					goto finish_compressed_sb;
 				/* Determine token type and parse
 				 * appropriately. */
 				if ((tag & NTFS_TOKEN_MASK) ==
@@ -594,20 +582,27 @@ do_next_tag:
 					continue;
 				}
 				/*
-				 * We have a phrase token. Make sure it is not
-				 * the first tag in the sb as this is illegal
-				 * and would confuse the code below.
+				 * We have a phrase token. Make sure it is not the first token
+				 * in the sb as this is illegal and would confuse the code
+				 * below.
 				 */
 				if (dest == dest_sb_start)
 					goto return_overflow;
 				/*
-				 * Determine the number of bytes to go back (p)
-				 * and the number of bytes to copy (l). We use
-				 * an optimized algorithm in which we first
-				 * calculate log2(current destination position
-				 * in sb), which allows determination of l and p
-				 * in O(1) rather than O(n). We just need an
-				 * arch-optimized log2() function now.
+				 * A phrase token is a two-byte compressed word.  The generic
+				 * token check above only proves that at least one byte
+				 * remains, which is enough for a symbol token but not for a
+				 * phrase token.
+				 */
+				if ((size_t)(cb_sb_end - cb) < 2)
+					goto return_overflow;
+				/*
+				 * Determine the number of bytes to go back (p) and the number
+				 * of bytes to copy (l). We use an optimized algorithm in
+				 * which we first calculate log2(current destination position
+				 * in sb), which allows determination of l and p in O(1)
+				 * rather than O(n). We just need an arch-optimized log2()
+				 * function now.
 				 */
 				lg = 0;
 				for (i = dest - dest_sb_start - 1; i >= 0x10;
@@ -615,8 +610,6 @@ do_next_tag:
 				{
 					lg++;
 				}
-				if (cb + 2 > cb_sb_end)
-					goto return_overflow;
 				/* Get the phrase token into i. */
 				pt = le16_to_cpup((le16*)cb);
 				/*
@@ -667,6 +660,27 @@ do_next_tag:
 			goto do_next_tag;
 		}
 	}
+finish_compressed_sb:
+	/* Check if the decompressed sub-block was not full-length. */
+	if (dest < dest_sb_end) {
+		size_t nr_bytes = dest_sb_end - dest;
+
+		ntfs_log_debug("Filling incomplete sub-block with zeroes.\n");
+		/* Zero remainder and update destination position. */
+		memset(dest, 0, nr_bytes);
+		dest += nr_bytes;
+	}
+	/*
+	 * If the output sub-block filled before the compressed sub-block input
+	 * was exhausted, skip the remaining compressed bytes in this sub-block.
+	 */
+	cb = cb_sb_end;
+	goto do_next_sb;
+complete:
+	if (dest_end > dest)
+		memset(dest, 0, dest_end - dest);
+	ntfs_log_debug("Completed. Returning success (0).\n");
+	return 0;
 return_overflow:
 	errno = EOVERFLOW;
 	ntfs_log_perror("Failed to decompress file");
