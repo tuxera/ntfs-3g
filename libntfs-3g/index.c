@@ -1194,7 +1194,7 @@ static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 {
 	u8 *ies_end;
 	INDEX_ENTRY *ie_head;		/* first entry after the median */
-	int tail_size, ret;
+	int tail_size, dst_capacity, ret;
 	INDEX_BLOCK *dst;
 	
 	ntfs_log_trace("Entering\n");
@@ -1208,6 +1208,25 @@ static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	
 	ies_end = (u8 *)ntfs_ie_get_end(&src->index);
 	tail_size = ies_end - (u8 *)ie_head;
+	dst_capacity = (int)(le32_to_cpu(dst->index.allocated_size)
+			     - le32_to_cpu(dst->index.entries_offset));
+
+	/*
+	 * src->index.entries_offset (on-disk, only required to be >=
+	 * sizeof(INDEX_HEADER) by ntfs_index_block_inconsistent) may be smaller
+	 * than dst's, which ntfs_ib_alloc fixes (40 on a 4 KiB block).  When
+	 * the median lands near the start of the source stream the gap lets
+	 * tail_size exceed dst's usable space.  The < 0 guard catches a
+	 * negative tail_size before memcpy sign-extends it into a huge size_t.
+	 */
+	if (tail_size < 0 || tail_size > dst_capacity) {
+		ntfs_log_error("Invalid tail_size %d (dst capacity %d) in "
+				"ntfs_ib_copy_tail\n", tail_size, dst_capacity);
+		free(dst);
+		errno = EIO;
+		return STATUS_ERROR;
+	}
+
 	memcpy(ntfs_ie_get_first(&dst->index), ie_head, tail_size);
 	
 	dst->index.index_length = cpu_to_le32(tail_size + 
