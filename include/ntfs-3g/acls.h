@@ -168,6 +168,7 @@ char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
 
 #endif /* POSIXACLS */
 
+int ntfs_count_creator_owner_inherit(const ACL *acl);
 int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			const SID *usid, const SID *gsid,
 			BOOL fordir, le16 inherited);

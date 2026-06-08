@@ -681,6 +681,53 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 	return (ok);
 }
 
+/**
+ * ntfs_count_creator_owner_inherit: count creator-owner inheritable ACEs
+ * @acl: ACL to scan
+ *
+ * Walks @acl bounded by acl->size, counting DENY ACEs whose SID matches the
+ * creator-owner placeholder and which carry the CONTAINER_INHERIT_ACE flag.
+ * A zero, too-small, or oversized ace->size terminates the walk so a malformed
+ * ACL cannot drive an out-of-bounds read.
+ *
+ * Return: the count, or 0 if @acl is NULL or its header does not fit.
+ */
+
+int ntfs_count_creator_owner_inherit(const ACL *acl)
+{
+	const ACCESS_ALLOWED_ACE *ace;
+	unsigned int off;
+	unsigned int acl_size;
+	unsigned int acesz;
+	int oldcnt;
+	int nace;
+	int count;
+
+	count = 0;
+	if (!acl)
+		return (0);
+	acl_size = le16_to_cpu(acl->size);
+	if (acl_size < sizeof(ACL))
+		return (0);
+	oldcnt = le16_to_cpu(acl->ace_count);
+	off = sizeof(ACL);
+	for (nace = 0; nace < oldcnt; nace++) {
+		if (off + 8 > acl_size)
+			break;
+		ace = (const ACCESS_ALLOWED_ACE*)((const char*)acl + off);
+		acesz = le16_to_cpu(ace->size);
+		if (acesz < 8 || acesz > acl_size - off)
+			break;
+		if (ace->type == ACCESS_DENIED_ACE_TYPE
+				&& (ace->flags & CONTAINER_INHERIT_ACE)
+				&& acesz >= 8 + sizeof(ownersidbytes)
+				&& ntfs_same_sid(&ace->sid, ownersid))
+			count++;
+		off += acesz;
+	}
+	return count;
+}
+
 /*
  *		Copy the inheritable parts of an ACL
  *
