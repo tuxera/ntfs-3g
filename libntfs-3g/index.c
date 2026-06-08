@@ -2125,6 +2125,13 @@ static INDEX_ENTRY *ntfs_index_walk_down(INDEX_ENTRY *ie,
 			/* down from non-zero level */
 			
 			ictx->pindex++;
+			if (ictx->pindex >= MAX_PARENT_VCN) {
+				errno = EOPNOTSUPP;
+				ntfs_log_perror("Index is over %d level deep",
+						MAX_PARENT_VCN);
+				entry = (INDEX_ENTRY*)NULL;
+				break;
+			}
 		}
 		ictx->parent_pos[ictx->pindex] = 0;
 		ictx->parent_vcn[ictx->pindex] = vcn;
