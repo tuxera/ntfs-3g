@@ -560,7 +560,9 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 			pace = (const ACCESS_ALLOWED_ACE*)
 				&((const char*)pacl)[offace];
 			acesz = le16_to_cpu(pace->size);
-			switch (pace->type) {
+			if (acesz < sizeof(ACE_HEADER))
+				ok = FALSE;
+			else switch (pace->type) {
 			case ACCESS_ALLOWED_ACE_TYPE :
 			case ACCESS_DENIED_ACE_TYPE :
 				wantsz = ntfs_sid_size(&pace->sid) + 8;
