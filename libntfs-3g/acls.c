@@ -684,34 +684,49 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 }
 
 /**
- * ntfs_count_creator_owner_inherit: count creator-owner inheritable ACEs
+ * ntfs_inherit_acl_extra_size: compute creator SID inheritance slack
  * @acl: ACL to scan
+ * @usid: owner SID to substitute for CREATOR_OWNER
+ * @gsid: group SID to substitute for CREATOR_GROUP
  *
- * Walks @acl bounded by acl->size, counting DENY ACEs whose SID matches the
- * creator-owner placeholder and which carry the CONTAINER_INHERIT_ACE flag.
- * A zero, too-small, or oversized ace->size terminates the walk so a malformed
- * ACL cannot drive an out-of-bounds read.
+ * Walks @acl bounded by acl->size, adding slack for ALLOW and DENY ACEs
+ * whose SID matches either creator placeholder.  ntfs_inherit_acl() can
+ * replace those placeholders by @usid or @gsid and, for directories, can
+ * also keep a verbatim copy for child inheritance.  Count the worst-case
+ * extra bytes so the inherited descriptor allocation cannot be overrun.
  *
- * Return: the count, or 0 if @acl is NULL or its header does not fit.
+ * Return: extra bytes needed, or 0 if @acl is NULL or structurally rejected.
  */
 
-int ntfs_count_creator_owner_inherit(const ACL *acl)
+int ntfs_inherit_acl_extra_size(const ACL *acl,
+			const SID *usid, const SID *gsid)
 {
 	const ACCESS_ALLOWED_ACE *ace;
 	unsigned int off;
 	unsigned int acl_size;
 	unsigned int acesz;
+	unsigned int sidsz;
+	int usidsz;
+	int gsidsz;
+	int ownersidsz;
+	int groupsidsz;
 	int oldcnt;
 	int nace;
-	int count;
+	int extra;
+	BOOL usid_is_group_sid;
 
-	count = 0;
-	if (!acl)
+	extra = 0;
+	if (!acl || !usid || !gsid)
 		return (0);
 	acl_size = le16_to_cpu(acl->size);
 	if (acl_size < sizeof(ACL))
 		return (0);
 	oldcnt = le16_to_cpu(acl->ace_count);
+	usidsz = ntfs_sid_size(usid);
+	gsidsz = ntfs_sid_size(gsid);
+	ownersidsz = sizeof(ownersidbytes);
+	groupsidsz = sizeof(groupsidbytes);
+	usid_is_group_sid = ntfs_same_sid(usid, groupsid);
 	off = sizeof(ACL);
 	for (nace = 0; nace < oldcnt; nace++) {
 		if (off + 8 > acl_size)
@@ -720,14 +735,33 @@ int ntfs_count_creator_owner_inherit(const ACL *acl)
 		acesz = le16_to_cpu(ace->size);
 		if (acesz < 8 || acesz > acl_size - off)
 			break;
-		if (ace->type == ACCESS_DENIED_ACE_TYPE
-				&& (ace->flags & CONTAINER_INHERIT_ACE)
-				&& acesz >= 8 + sizeof(ownersidbytes)
-				&& ntfs_same_sid(&ace->sid, ownersid))
-			count++;
+		switch (ace->type) {
+		case ACCESS_ALLOWED_ACE_TYPE :
+		case ACCESS_DENIED_ACE_TYPE :
+			if ((acesz >= 8 + sizeof(ownersidbytes))
+					&& ntfs_valid_sid(&ace->sid)) {
+				sidsz = ntfs_sid_size(&ace->sid);
+				if (sidsz <= acesz - 8) {
+					if (ntfs_same_sid(&ace->sid, ownersid))
+					{
+						extra += usidsz	- ownersidsz +
+								20;
+						if (usid_is_group_sid)
+							extra += gsidsz	-
+								groupsidsz + 20;
+					}
+					if (ntfs_same_sid(&ace->sid, groupsid))
+						extra += gsidsz	- groupsidsz +
+								20;
+				}
+			}
+			break;
+		default :
+			break;
+		}
 		off += acesz;
 	}
-	return count;
+	return extra;
 }
 
 /*

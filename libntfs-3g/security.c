@@ -3945,20 +3945,18 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	gsidsz = ntfs_sid_size(gsid);
 	newattrsz = parentattrsz + 3*usidsz + 3*gsidsz;
 	/*
-	 * The +3*usidsz + 3*gsidsz slack above only covers three creator-owner
-	 * SID expansions during ntfs_inherit_acl().
-	 * Add exact slack for the actual number of expanding ACEs in both the
-	 * parent DACL and SACL.  Each such ACE may grow the output by at most
-	 * (usidsz - 12) bytes for the SID substitution plus 20 bytes of
-	 * original ACE..kept for grandkids.
+	 * The +3*usidsz + 3*gsidsz slack above only covers a few creator SID
+	 * expansions during ntfs_inherit_acl().  Add worst-case slack for every
+	 * ALLOW/DENY creator-owner and creator-group ACE in both the parent
+	 * DACL and SACL.
 	 */
 	if (pphead->dacl) {
 		offpacl = le32_to_cpu(pphead->dacl);
 		if ((unsigned int)offpacl + sizeof(ACL) <=
 				(unsigned int)parentattrsz) {
 			ppacl = (const ACL*)&parentattr[offpacl];
-			newattrsz += ntfs_count_creator_owner_inherit(ppacl)
-					* (usidsz - 12 + 20);
+			newattrsz += ntfs_inherit_acl_extra_size(ppacl,
+					usid, gsid);
 		}
 	}
 	if (pphead->sacl) {
@@ -3966,8 +3964,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		if ((unsigned int)offpacl + sizeof(ACL) <=
 				(unsigned int)parentattrsz) {
 			ppacl = (const ACL*)&parentattr[offpacl];
-			newattrsz += ntfs_count_creator_owner_inherit(ppacl)
-					* (usidsz - 12 + 20);
+			newattrsz += ntfs_inherit_acl_extra_size(ppacl,
+					usid, gsid);
 		}
 	}
 	if (fordir)
