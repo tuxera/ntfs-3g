@@ -558,7 +558,11 @@ do_next_tag:
 				goto do_next_sb;
 			}
 			/* Check we are still in range. */
-			if (cb > cb_sb_end || dest >= dest_sb_end)
+			if (dest == dest_sb_end) {
+				cb = cb_sb_end;
+				goto do_next_sb;
+			}
+			if (cb > cb_sb_end || dest > dest_sb_end)
 				goto return_overflow;
 			/* Get the next tag and advance to first token. */
 			tag = *cb++;
@@ -569,7 +573,11 @@ do_next_tag:
 				u8 *dest_back_addr;
 
 				/* Check if we are done / still in range. */
-				if (cb >= cb_sb_end || dest >= dest_sb_end)
+				if (dest == dest_sb_end) {
+					cb = cb_sb_end;
+					goto do_next_sb;
+				}
+				if (cb >= cb_sb_end)
 					break;
 				/* Determine token type and parse
 				 * appropriately. */
@@ -607,6 +615,8 @@ do_next_tag:
 				{
 					lg++;
 				}
+				if (cb + 2 > cb_sb_end)
+					goto return_overflow;
 				/* Get the phrase token into i. */
 				pt = le16_to_cpup((le16*)cb);
 				/*
