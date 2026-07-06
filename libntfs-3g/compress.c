@@ -489,12 +489,13 @@ do_next_sb:
 				"cb.\n",
 				(int)(cb - cb_start));
 		/*
-		 * Have we reached the end of the compression block or the end of
-		 * the decompressed data?
+		 * Have we reached the end of the compression block or the end
+		 * of the decompressed data?
 		 *
-		 * Check dest == dest_end before reading the next two-byte sub-block
-		 * header.  The compressed pointer can legally be near the end of the
-		 * buffer when the requested output has already been produced.
+		 * Check dest == dest_end before reading the next two-byte sub-
+		 * block header.  The compressed pointer can legally be near the
+		 * end of the buffer when the requested output has already been
+		 * produced.
 		 */
 		if (cb == cb_end || dest == dest_end)
 			goto complete;
@@ -547,10 +548,11 @@ do_next_tag:
 			if (cb > cb_sb_end || dest > dest_sb_end)
 				goto return_overflow;
 			/*
-			 * Finish this compressed sub-block when either its compressed
-			 * input is exhausted or its 4 KiB output slot is full.  If output
-			 * becomes full first, skip the remaining compressed bytes in this
-			 * sub-block instead of interpreting them as more tags/tokens.
+			 * Finish this compressed sub-block when either its
+			 * compressed input is exhausted or its 4 KiB output
+			 * slot is full.  If output becomes full first, skip the
+			 * remaining compressed bytes in this sub-block instead
+			 * of interpreting them as more tags/tokens.
 			 */
 			if (cb == cb_sb_end || dest == dest_sb_end)
 				goto finish_compressed_sb;
@@ -582,27 +584,29 @@ do_next_tag:
 					continue;
 				}
 				/*
-				 * We have a phrase token. Make sure it is not the first token
-				 * in the sb as this is illegal and would confuse the code
-				 * below.
+				 * We have a phrase token. Make sure it is not
+				 * the first token in the sb as this is illegal
+				 * and would confuse the code below.
 				 */
 				if (dest == dest_sb_start)
 					goto return_overflow;
 				/*
-				 * A phrase token is a two-byte compressed word.  The generic
-				 * token check above only proves that at least one byte
-				 * remains, which is enough for a symbol token but not for a
+				 * A phrase token is a two-byte compressed word.
+				 * The generic token check above only proves
+				 * that at least one byte remains, which is
+				 * enough for a symbol token but not for a
 				 * phrase token.
 				 */
 				if ((size_t)(cb_sb_end - cb) < 2)
 					goto return_overflow;
 				/*
-				 * Determine the number of bytes to go back (p) and the number
-				 * of bytes to copy (l). We use an optimized algorithm in
-				 * which we first calculate log2(current destination position
-				 * in sb), which allows determination of l and p in O(1)
-				 * rather than O(n). We just need an arch-optimized log2()
-				 * function now.
+				 * Determine the number of bytes to go back (p)
+				 * and the number of bytes to copy (l). We use
+				 * an optimized algorithm in which we first
+				 * calculate log2(current destination position
+				 * in sb), which allows determination of l and p
+				 * in O(1) rather than O(n). We just need an
+				 * arch-optimized log2() function now.
 				 */
 				lg = 0;
 				for (i = dest - dest_sb_start - 1; i >= 0x10;
