@@ -3441,6 +3441,7 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 	const FILE_NAME_ATTR *fn;
 	const INDEX_ROOT *ir;
 	u64 inum;
+	u32 ibs;
 	int ret;
 
 	/*
@@ -3526,7 +3527,13 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 			/* Check root index is resident and does not overflow */
 			ir = (const INDEX_ROOT*)((const u8*)a +
 				le16_to_cpu(a->value_offset));
-			/* index.allocated_size may overflow while resizing */
+			/* index.allocated_size may overflow while resizing. */
+			/*
+			 * index_block_size must be >= one sector and a power of
+			 * two; same shape rule the driver enforces at
+			 * libntfs-3g/dir.c:290-291.
+			 */
+			ibs = le32_to_cpu(ir->index_block_size);
 			if (a->non_resident
 			    || (le32_to_cpu(a->value_length)
 				< offsetof(INDEX_ROOT, index.reserved))
@@ -3538,7 +3545,9 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 				< le32_to_cpu(ir->index.index_length))
 			    || (le32_to_cpu(a->value_length)
 				< (le32_to_cpu(ir->index.allocated_size)
-				    + offsetof(INDEX_ROOT, reserved)))) {
+				    + offsetof(INDEX_ROOT, reserved)))
+			    || (ibs < NTFS_BLOCK_SIZE)
+			    || (ibs & (ibs - 1))) {
 				ntfs_log_error("Corrupt index root"
 					" in MFT record %lld.\n",
 					(long long)inum);
