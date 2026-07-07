@@ -3553,6 +3553,9 @@ int ntfs_attr_inconsistent(const ATTR_RECORD *a, const MFT_REF mref)
 					(long long)inum);
 				errno = EIO;
 				ret = -1;
+			} else if (ntfs_ie_stream_inconsistent(&ir->index, inum)) {
+				errno = EIO;
+				ret = -1;
 			}
 			break;
 		case AT_STANDARD_INFORMATION :
