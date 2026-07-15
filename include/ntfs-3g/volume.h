@@ -235,8 +235,8 @@ struct _ntfs_volume {
 				   vice versa. */
 
 	ntfs_inode *secure_ni;	/* ntfs_inode structure for FILE $Secure */
-	ntfs_index_context *secure_xsii; /* index for using $Secure:$SII */
-	ntfs_index_context *secure_xsdh; /* index for using $Secure:$SDH */
+	struct ntfs_index_context *secure_xsii; /* index for using $Secure:$SII */
+	struct ntfs_index_context *secure_xsdh; /* index for using $Secure:$SDH */
 	int secure_reentry;  /* check for non-rentries */
 	unsigned int secure_flags;  /* flags, see security.h for values */
 

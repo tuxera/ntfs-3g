@@ -74,13 +74,17 @@ extern char *strsep(char **stringp, const char *delim);
 
 #ifdef WINDOWS
 
+#ifndef HAVE_STDIO_H
 #define HAVE_STDIO_H		/* mimic config.h */
+#endif
+
+#ifndef HAVE_STDARG_H
 #define HAVE_STDARG_H
+#endif
 
 #define atoll			_atoi64
 #define fdatasync		commit
 #define __inline__		inline
-#define __attribute__(X)	/*nothing*/
 
 #else /* !defined WINDOWS */
 

@@ -678,6 +678,9 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 				
 				/* Canonicalize device name (mtab, etc) */
 				popts->arg_device = optarg;
+				#ifdef WINDOWS
+				popts->device = popts->arg_device;
+				#else
 				if (!ntfs_realpath_canonicalize(optarg,
 						popts->device)) {
 					ntfs_log_perror("%s: Failed to access "
@@ -686,6 +689,7 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 					popts->device = NULL;
 					return -1;
 				}
+				#endif
 			} else if (!popts->mnt_point) {
 				popts->mnt_point = optarg;
 			} else {
@@ -726,6 +730,9 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 				      FUSE_TYPE, fuse_version());
 			exit(0);
 		default:
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (ntfs_log_parse_option (argv[optind-1])) break;
+			}
 			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
 				       argv[optind - 1]);
 			return -1;

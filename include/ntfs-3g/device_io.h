@@ -40,6 +40,7 @@
 #define ntfs_device_default_io_ops ntfs_device_unix_io_ops
 
 #else /* HAVE_WINDOWS_H */
+#include "types.h"
 
 #ifndef HDIO_GETGEO
 #	define HDIO_GETGEO	0x301
@@ -69,10 +70,12 @@ struct hd_geometry {
 /* On Windows (and Cygwin) : use Win32 low level device operations. */
 #define ntfs_device_default_io_ops ntfs_device_win32_io_ops
 
+struct ntfs_device;
+
 /* A few useful functions */
 int ntfs_win32_set_sparse(int);
 int ntfs_win32_ftruncate(int fd, s64 size);
-int ntfs_device_win32_ftruncate(struct ntfs_device*, s64);
+int ntfs_device_win32_ftruncate(struct ntfs_device *dev, s64 size);
 
 #endif /* HAVE_WINDOWS_H */
 

@@ -74,6 +74,11 @@ struct ntfs_logging {
 	ntfs_log_handler *handler BROKEN_GCC_FORMAT_ATTRIBUTE;
 };
 
+#define NTFS_LOG_LEVEL_DEFAULT (\
+	NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_WARNING | \
+	NTFS_LOG_LEVEL_ERROR | NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL | \
+	NTFS_LOG_LEVEL_PROGRESS)
+
 /**
  * ntfs_log
  * This struct controls all the logging within the library and tools.
@@ -83,9 +88,7 @@ static struct ntfs_logging ntfs_log = {
 	NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE | NTFS_LOG_LEVEL_ENTER |
 	NTFS_LOG_LEVEL_LEAVE |
 #endif
-	NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_WARNING |
-	NTFS_LOG_LEVEL_ERROR | NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
-	NTFS_LOG_LEVEL_PROGRESS,
+	NTFS_LOG_LEVEL_DEFAULT,
 	NTFS_LOG_FLAG_ONLYNAME,
 #ifdef DEBUG
 	ntfs_log_handler_outerr
@@ -601,11 +604,32 @@ int ntfs_log_handler_stderr(const char *function, const char *file,
 	return ntfs_log_handler_fprintf(function, file, line, level, data, format, args);
 }
 
+struct ntfs_log_opt {
+	const char *flag_name;
+	int flag_value;
+};
+
+static struct ntfs_log_opt ntfs_log_flags[] = {
+	{ "--log-none", -1},
+	{ "--log-default", NTFS_LOG_LEVEL_DEFAULT },
+	{ "--log-debug", NTFS_LOG_LEVEL_DEBUG },
+	{ "--log-trace", NTFS_LOG_LEVEL_TRACE },
+	{ "--log-quiet", NTFS_LOG_LEVEL_QUIET },
+	{ "--log-info", NTFS_LOG_LEVEL_INFO },
+	{ "--log-error", NTFS_LOG_LEVEL_ERROR },
+	{ "--log-verbose", NTFS_LOG_LEVEL_VERBOSE },
+	{ "--log-warning", NTFS_LOG_LEVEL_WARNING },
+	{ "--log-enter", NTFS_LOG_LEVEL_ENTER },
+	{ "--log-leave", NTFS_LOG_LEVEL_LEAVE },
+	{ "--log-progress", NTFS_LOG_LEVEL_PROGRESS },
+	{ "--log-perror", NTFS_LOG_LEVEL_PERROR },
+	{ "--log-critical", NTFS_LOG_LEVEL_CRITICAL }
+};
 
 /**
  * ntfs_log_parse_option - Act upon command line options
  * @option:	Option flag
- *
+  *
  * Delegate some of the work of parsing the command line.  All the options begin
  * with "--log-".  Options cause log levels to be enabled in @ntfs_log (the
  * global logging structure).
@@ -617,20 +641,17 @@ int ntfs_log_handler_stderr(const char *function, const char *file,
  */
 BOOL ntfs_log_parse_option(const char *option)
 {
-	if (strcmp(option, "--log-debug") == 0) {
-		ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
-		return TRUE;
-	} else if (strcmp(option, "--log-verbose") == 0) {
-		ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
-		return TRUE;
-	} else if (strcmp(option, "--log-quiet") == 0) {
-		ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
-		return TRUE;
-	} else if (strcmp(option, "--log-trace") == 0) {
-		ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
-		return TRUE;
+	for (int i=0; i<sizeof(ntfs_log_flags)/sizeof(ntfs_log_flags[0]); i++) {
+		struct ntfs_log_opt *opt = &ntfs_log_flags[i];
+		if (!strcmp(opt->flag_name, option)) {
+			if (opt->flag_value < 0) {
+				ntfs_log_clear_levels(opt->flag_value);
+			} else {
+				ntfs_log_set_levels(opt->flag_value);
+			}
+			return TRUE;
+		}
 	}
-
 	ntfs_log_debug("Unknown logging option '%s'\n", option);
 	return FALSE;
 }

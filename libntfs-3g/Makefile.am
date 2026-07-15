@@ -50,6 +50,7 @@ libntfs_3g_la_SOURCES =	\
 if NTFS_DEVICE_DEFAULT_IO_OPS
 if WINDOWS
 libntfs_3g_la_SOURCES += win32_io.c
+libntfs_3g_la_LIBADD += -lntdll
 else
 libntfs_3g_la_SOURCES += unix_io.c
 endif
@@ -60,22 +61,28 @@ endif
 install-exec-hook: install-rootlibLTLIBRARIES
 if INSTALL_LIBRARY
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(MV) -f "$(DESTDIR)/$(libdir)"/libntfs-3g.so* "$(DESTDIR)/$(rootlibdir)";  \
+		pushd "$(DESTDIR)$(libdir)"; \
+		for f in libntfs-3g$(SHREXT)*; do \
+			case $$f in \
+				*.dll.a|*.lib) ;; \
+				*) $(MV) -v "$$f" "$(DESTDIR)$(rootlibdir)/" ;; \
+			esac; \
+		done; popd; \
 	fi
 if GENERATE_LDSCRIPT
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(install_sh_PROGRAM) "libntfs-3g.script.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+		$(install_sh_PROGRAM) "libntfs-3g.script$(SHREXT)" "$(DESTDIR)$(libdir)/libntfs-3g$(SHREXT)"; \
 	fi
 else
 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
-		$(LN_S) "$(rootlibdir)/libntfs-3g.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+		$(LN_S) "$(rootlibdir)/libntfs-3g$(SHREXT)" "$(DESTDIR)$(libdir)/libntfs-3g$(SHREXT)"; \
 	fi
 endif
 endif
 
 uninstall-local:
 if INSTALL_LIBRARY
-	$(RM) -f "$(DESTDIR)/$(rootlibdir)"/libntfs-3g.so*
+	$(RM) -f "$(DESTDIR)$(rootlibdir)"/libntfs-3g$(SHREXT)*
 endif
 
 if ENABLE_NTFSPROGS
