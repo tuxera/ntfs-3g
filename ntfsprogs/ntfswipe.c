@@ -1722,7 +1722,7 @@ static int destroy_record(ntfs_volume *nv, const s64 record,
 	unsigned long int pass, i;
 	s64 j;
 	unsigned char * a_offset;
-	int selected[NPAT];
+	int selected[NPAT] = {0};
 
 	file = (struct ufile *) malloc(sizeof(struct ufile));
 	if (file == NULL) {
