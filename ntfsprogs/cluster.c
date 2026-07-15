@@ -56,6 +56,10 @@ int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void 
 		return -1;
 
 	m_ctx = mft_get_search_ctx(vol);
+
+	if (!m_ctx)
+		return -1;
+
 	m_ctx->flags_search = FEMR_IN_USE | FEMR_BASE_RECORD;
 	count = 0;
 
