@@ -1150,44 +1150,39 @@ err_out:
 char *ntfs_uppercase_mbs(const char *low,
 			const ntfschar *upcase, u32 upcase_size)
 {
-	int size;
 	char *upp;
-	u32 wc;
-	int n;
-	const char *s;
-	char *t;
 
-	size = strlen(low);
+	const int size = strlen(low);
 	upp = (char*)ntfs_malloc(3*size + 1);
 	if (upp) {
-		s = low;
-		t = upp;
-		do {
-			n = utf8_to_unicode(&wc, s);
-			if (n > 0) {
+		const char *s = low;
+		char *t = upp;
+		int n;
+		u32 wc;
+		for (n = utf8_to_unicode(&wc, s); n > 0; n = utf8_to_unicode(&wc, s)) {
 				if (wc < upcase_size)
 					wc = le16_to_cpu(upcase[wc]);
 				if (wc < 0x80)
-					*t++ = wc;
+					t[0] = wc;
 				else if (wc < 0x800) {
-					*t++ = (0xc0 | ((wc >> 6) & 0x3f));
-					*t++ = 0x80 | (wc & 0x3f);
+					t[0] = (0xc0 | ((wc >> 6) & 0x3f));
+					t[1] = 0x80 | (wc & 0x3f);
 				} else if (wc < 0x10000) {
-					*t++ = 0xe0 | (wc >> 12);
-					*t++ = 0x80 | ((wc >> 6) & 0x3f);
-					*t++ = 0x80 | (wc & 0x3f);
+					t[0] = 0xe0 | (wc >> 12);
+					t[1] = 0x80 | ((wc >> 6) & 0x3f);
+					t[2] = 0x80 | (wc & 0x3f);
 				} else {
-					*t++ = 0xf0 | ((wc >> 18) & 7);
-					*t++ = 0x80 | ((wc >> 12) & 63);
-					*t++ = 0x80 | ((wc >> 6) & 0x3f);
-					*t++ = 0x80 | (wc & 0x3f);
+					t[0] = 0xf0 | ((wc >> 18) & 7);
+					t[1] = 0x80 | ((wc >> 12) & 63);
+					t[2] = 0x80 | ((wc >> 6) & 0x3f);
+					t[3] = 0x80 | (wc & 0x3f);
 				}
+			t += n;
 			s += n;
-			}
-		} while (n > 0);
+		}
 		if (n < 0) {
 			free(upp);
-			upp = (char*)NULL;
+			upp = NULL;
 			errno = EILSEQ;
 		} else {
 			*t = 0;
