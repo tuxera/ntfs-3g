@@ -184,7 +184,7 @@ static const char *usage_msg =
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
 "\t\tConfiguration type %d, "
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 "XATTRS are on, "
 #else
 "XATTRS are off, "
@@ -391,7 +391,7 @@ static int ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 
 #endif
 
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 
 /*
  *		Check access to parent directory
@@ -459,7 +459,7 @@ static ntfs_inode *get_parent_dir(const char *path)
 }
 
 
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 
 /**
  * ntfs_fuse_statfs - return information about mounted NTFS volume
@@ -907,7 +907,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 		/*
 		 * return data size rounded to next 512 byte boundary for
 		 * encrypted files to include padding required for decryption
@@ -917,7 +917,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		    && (ni->flags & FILE_ATTR_ENCRYPTED)
 		    && ni->data_size)
 			stbuf->st_size = ((ni->data_size + 511) & ~511) + 2;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 		/* 
 		 * Temporary fix to make ActiveSync work via Samba 3.0.
 		 * See more on the ntfs-3g-devel list.
@@ -947,14 +947,14 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				if (na->data_size == 1)
 					stbuf->st_mode = S_IFSOCK;
 			}
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 			/* encrypted named stream */
 			/* round size up to next 512 byte boundary */
 			if (ctx->efs_raw && stream_name_len && 
 			    (na->data_flags & ATTR_IS_ENCRYPTED) &&
 			    NAttrNonResident(na)) 
 				stbuf->st_size = ((na->data_size+511) & ~511)+2;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 			/*
 			 * Check whether it's Interix symbolic link, block or
 			 * character device.
@@ -1527,13 +1527,13 @@ static int ntfs_fuse_open(const char *org_path,
 		/* mark a future need to compress the last chunk */
 			if (na->data_flags & ATTR_COMPRESSION_MASK)
 				fi->fh |= CLOSE_COMPRESSED;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 			if (ctx->efs_raw
 			    && !(na->data_flags & ATTR_IS_ENCRYPTED)
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				fi->fh |= CLOSE_ENCRYPTED;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 		/* mark a future need to update the mtime */
 			if (ctx->dmtime)
 				fi->fh |= CLOSE_DMTIME;
@@ -1599,7 +1599,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		goto exit;
 	}
 	max_read = na->data_size;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 	/* limit reads at next 512 byte boundary for encrypted attributes */
 	if (ctx->efs_raw
 	    && max_read
@@ -1607,7 +1607,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	    && NAttrNonResident(na)) {
 		max_read = ((na->data_size+511) & ~511) + 2;
 	}
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 	if (offset + (off_t)size > max_read) {
 		if (max_read < offset)
 			goto ok;
@@ -1776,10 +1776,10 @@ static int ntfs_fuse_release(const char *org_path,
 	res = 0;
 	if (fi->fh & CLOSE_COMPRESSED)
 		res = ntfs_attr_pclose(na);
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 	if (fi->fh & CLOSE_ENCRYPTED)
 		res = ntfs_efs_fixup_attribute(NULL, na);
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 #ifndef DISABLE_PLUGINS
 stamps:
 #endif /* DISABLE_PLUGINS */
@@ -2212,13 +2212,13 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
 				fi->fh |= CLOSE_COMPRESSED;
 			}
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 			if (fi
 			    && ctx->efs_raw
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				fi->fh |= CLOSE_ENCRYPTED;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 			/* mark a need to update the mtime */
 			if (fi && ctx->dmtime)
 				fi->fh |= CLOSE_DMTIME;
@@ -2285,12 +2285,12 @@ static int ntfs_fuse_create_stream(const char *path,
 		/* mark a future need to compress the last block */
 		if (ni->flags & FILE_ATTR_COMPRESSED)
 			fi->fh |= CLOSE_COMPRESSED;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 		/* mark a future need to fixup encrypted inode */
 		if (ctx->efs_raw
 		    && (ni->flags & FILE_ATTR_ENCRYPTED))
 			fi->fh |= CLOSE_ENCRYPTED;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 		if (ctx->dmtime)
 			fi->fh |= CLOSE_DMTIME;
 	}
@@ -2991,7 +2991,7 @@ close_inode:
 	return ret;
 }
 
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 
 /*
  *                Name space identifications and prefixes
@@ -3871,7 +3871,7 @@ exit:
 #if POSIXACLS
 #error "Option inconsistency : POSIXACLS requires SETXATTR"
 #endif
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 
 #ifndef DISABLE_PLUGINS
 static void register_internal_reparse_plugins(void)
@@ -3983,12 +3983,12 @@ static struct fuse_operations ntfs_3g_ops = {
 	.opendir	= ntfs_fuse_opendir,
 	.releasedir	= ntfs_fuse_release,
 #endif
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 	.getxattr	= ntfs_fuse_getxattr,
 	.setxattr	= ntfs_fuse_setxattr,
 	.removexattr	= ntfs_fuse_removexattr,
 	.listxattr	= ntfs_fuse_listxattr,
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 #if defined(__APPLE__) || defined(__DARWIN__)
 	/* MacFUSE extensions. */
 	.getxtimes	= ntfs_macfuse_getxtimes,
@@ -4047,7 +4047,7 @@ static int ntfs_open(const char *device)
 		NVolSetCompression(ctx->vol);
 	else
 		NVolClearCompression(ctx->vol);
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 			/* archivers must see hidden files */
 	if (ctx->efs_raw)
 		ctx->hide_hid_files = FALSE;
@@ -4332,9 +4332,9 @@ int main(int argc, char *argv[])
 #endif
 	const char *permissions_mode = (const char*)NULL;
 	const char *failed_secure = (const char*)NULL;
-#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+#if defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS)
 	struct XATTRMAPPING *xattr_mapping = (struct XATTRMAPPING*)NULL;
-#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
+#endif /* defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS) */
 	struct stat sbuf;
 	unsigned long existing_mount;
 	int err, fd;
@@ -4474,9 +4474,9 @@ int main(int argc, char *argv[])
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
 	ctx->vol->special_files = ctx->special_files;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 	ctx->vol->efs_raw = ctx->efs_raw;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path,
 		(ctx->vol->secure_flags
 			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_ACL)))
@@ -4538,7 +4538,7 @@ int main(int argc, char *argv[])
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);
 
-#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+#if defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS)
 	xattr_mapping = ntfs_xattr_build_mapping(ctx->vol,
 				ctx->xattrmap_path);
 	ctx->vol->xattr_mapping = xattr_mapping;
@@ -4548,7 +4548,7 @@ int main(int argc, char *argv[])
 	 */
 	if (ctx->xattrmap_path)
 		free(ctx->xattrmap_path);
-#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
+#endif /* defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS) */
 
 #ifndef DISABLE_PLUGINS
 	register_internal_reparse_plugins();
@@ -4586,9 +4586,9 @@ err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);
 	if (ctx->abs_mnt_point)
 		free(ctx->abs_mnt_point);
-#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+#if defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS)
 	ntfs_xattr_free_mapping(xattr_mapping);
-#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
+#endif /* defined(ENABLE_XATTR) && defined(XATTR_MAPPINGS) */
 err2:
 	ntfs_close();
 #ifndef DISABLE_PLUGINS

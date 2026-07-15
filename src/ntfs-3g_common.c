@@ -307,9 +307,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	const struct DEFOPTION *poptl;
 
 	ctx->secure_flags = 0;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 	ctx->efs_raw = FALSE;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 	ctx->compression = DEFAULT_COMPRESSION;
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
@@ -548,7 +548,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 					goto err_exit;
 				}
 				break;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 #ifdef XATTR_MAPPINGS
 			case OPT_XATTRMAPPING :
 				ctx->xattrmap_path = strdup(val);
@@ -562,7 +562,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			case OPT_EFS_RAW :
 				ctx->efs_raw = TRUE;
 				break;
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 			case OPT_POSIX_NLINK :
 				ctx->posix_nlink = TRUE;
 				break;
@@ -744,7 +744,7 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 	return 0;
 }
 
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
 			char *list, size_t size, BOOL prefixing)
@@ -850,7 +850,7 @@ exit :
 	return (ret);
 }
 
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 
 #ifndef DISABLE_PLUGINS
 
@@ -962,7 +962,7 @@ void close_reparse_plugins(ntfs_fuse_context_t *ctx)
 
 #endif /* DISABLE_PLUGINS */
 
-#ifdef HAVE_SETXATTR
+#ifdef ENABLE_XATTR
 
 /*
  *		Check whether a user xattr is allowed
@@ -1018,4 +1018,4 @@ BOOL user_xattrs_allowed(ntfs_fuse_context_t *ctx __attribute__((unused)),
 	return (res);
 }
 
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
