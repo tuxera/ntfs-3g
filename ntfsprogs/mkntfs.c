@@ -3503,7 +3503,11 @@ static BOOL mkntfs_open_partition(ntfs_volume *vol)
 	}
 
 	if (!S_ISBLK(sbuf.st_mode)) {
-		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
+		ntfs_log_error("%s is not a block device.\n"
+                       "You can force creation with `--force`, but note that such image "
+                       "couldn't be transferred to the actual device because device and "
+                       "NTFS sector sizes must match.\n"
+                       , vol->dev->d_name);
 		if (!opts.force) {
 			ntfs_log_error("Refusing to make a filesystem here!\n");
 			goto done;
