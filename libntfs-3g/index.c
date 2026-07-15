@@ -2118,6 +2118,8 @@ static INDEX_ENTRY *ntfs_index_walk_down(INDEX_ENTRY *ie,
 
 			ictx->ir = (INDEX_ROOT*)NULL;
 			ictx->ib = (INDEX_BLOCK*)ntfs_malloc(ictx->block_size);
+			if (!ictx->ib)
+				return NULL;
 			ictx->pindex = 1;
 			ictx->is_in_root = FALSE;
 		} else {

@@ -975,6 +975,10 @@ struct mft_search_ctx * mft_get_search_ctx(ntfs_volume *vol)
 	}
 
 	ctx = (struct mft_search_ctx*)calloc(1, sizeof *ctx);
+	if(!ctx){
+		errno = ENOMEM;
+		return NULL;
+	}
 
 	ctx->mft_num = -1;
 	ctx->vol = vol;

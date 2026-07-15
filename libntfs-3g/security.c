@@ -1646,6 +1646,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 				cacheblock = (struct CACHED_PERMISSIONS*)
 					malloc(sizeof(struct CACHED_PERMISSIONS)
 						<< CACHE_PERMISSIONS_BITS);
+				if (!cacheblock)
+					return NULL;
 				pcache->cachetable[index1] = cacheblock;
 				for (i=0; i<(1 << CACHE_PERMISSIONS_BITS); i++)
 					cacheblock[i].valid = 0;

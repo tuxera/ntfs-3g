@@ -301,6 +301,10 @@ struct ATTR *getattrentry(unsigned int key, unsigned int lth)
 			} else {
 				attrtable = (struct ATTR**)
 						malloc(sizeof(struct ATTR*));
+				if (!attrtable){
+					free(pa);
+					return NULL;
+				}
 				attrtable[0] = pa;
 			}
 		pa->key = key;
@@ -349,6 +353,8 @@ static const struct BUFFER *read_buffer(CONTEXT *ctx, unsigned int num)
 	if (!buffer) {
 		buffer = (struct BUFFER*)
 			malloc(sizeof(struct BUFFER) + blocksz);
+		if (!buffer)
+			return NULL;
 		buffer->size = blocksz;
 		buffer->rnum = num + 1; /* forced to being read */
 		buffer->safe = FALSE;
@@ -2474,6 +2480,8 @@ static u16 overlapshow(CONTEXT *ctx, u16 k, u32 blk, const struct BUFFER *buf,
 		if ((space >= LOG_RECORD_HEAD_SZ)
 		    && (size > space)) {
 			fullrec = (char*)malloc(size);
+			if (!fullrec)
+				return 0;
 			if (size <= (space + nextspace)) {
 				/* Overlap on two blocks */
 				memcpy(fullrec,&data[k],space);
@@ -3356,6 +3364,8 @@ static TRISTATE backoverlap(CONTEXT *ctx, int blk,
 	    && (size > space)
 	    && (size < MAXRECSIZE)) {
 		fullrec = (char*)malloc(size);
+		if (!fullrec)
+			return T_ERR;
 		memcpy(fullrec,&data[k],space);
 		if (size <= (space + nextspace))
 			memcpy(&fullrec[space], nextdata + blkheadsz,
