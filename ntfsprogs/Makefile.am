@@ -181,7 +181,7 @@ extras:	libs $(EXTRA_PROGRAMS)
 if ENABLE_MOUNT_HELPER
 install-exec-hook:
 	$(INSTALL) -d $(DESTDIR)/$(sbindir)
-	$(LN_S) -f $(sbindir)/mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
+	$(LN_S) -f mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
 
 install-data-hook:
 	$(INSTALL) -d $(DESTDIR)$(man8dir)
