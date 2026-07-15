@@ -69,6 +69,9 @@ struct hd_geometry {
 /* On Windows (and Cygwin) : use Win32 low level device operations. */
 #define ntfs_device_default_io_ops ntfs_device_win32_io_ops
 
+/* Forward declaration. */
+struct ntfs_device;
+
 /* A few useful functions */
 int ntfs_win32_set_sparse(int);
 int ntfs_win32_ftruncate(int fd, s64 size);
