@@ -45,6 +45,7 @@ typedef enum {
 static struct options {
 	probe_t  probetype;
 	char	 *device;
+	s64	 dev_offset;
 } opts;
 
 static const char *EXEC_NAME = "ntfs-3g.probe";
@@ -55,13 +56,13 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2007 Szabolcs Szakacsits\n"
 "\n"
-"Usage:    %s <--readonly|--readwrite> <device|image_file>\n"
+"Usage:    %s <--readonly|--readwrite> <--dev_offset n> <device|image_file>\n"
 "\n"
 "Example:  ntfs-3g.probe --readwrite /dev/sda1\n"
 "\n"
 "%s";
 
-static int ntfs_open(const char *device)
+static int ntfs_open(const char *device, const s64 dev_offset)
 {
 	ntfs_volume *vol;
 	unsigned long flags = 0;
@@ -70,7 +71,7 @@ static int ntfs_open(const char *device)
 	if (opts.probetype == PROBE_READONLY)
 		flags |= NTFS_MNT_RDONLY;
 
-	vol = ntfs_mount(device, flags);
+	vol = ntfs_mount_ext(device, flags, dev_offset);
 	if (!vol)
 		ret = ntfs_volume_error(errno);
 
@@ -89,11 +90,12 @@ static int parse_options(int argc, char *argv[])
 {
 	int c;
 
-	static const char *sopt = "-hrw";
+	static const char *sopt = "-hrwo:";
 	static const struct option lopt[] = {
 		{ "readonly",	no_argument,	NULL, 'r' },
 		{ "readwrite",	no_argument,	NULL, 'w' },
 		{ "help",	no_argument,	NULL, 'h' },
+		{ "dev_offset",	required_argument,	NULL, 'o' },
 		{ NULL,		0,		NULL,  0  }
 	};
 
@@ -124,6 +126,9 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'w':
 			opts.probetype = PROBE_READWRITE;
+			break;
+		case 'o':
+			opts.dev_offset = optarg ? strtoull(optarg, 0, 0) : 0;
 			break;
 		default:
 			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
@@ -156,7 +161,7 @@ int main(int argc, char *argv[])
 		exit(NTFS_VOLUME_SYNTAX_ERROR);
 	}
 
-	err = ntfs_open(opts.device);
+	err = ntfs_open(opts.device, opts.dev_offset);
 
 	free(opts.device);
 	if (err)

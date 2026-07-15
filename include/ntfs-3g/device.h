@@ -90,6 +90,8 @@ struct ntfs_device {
 						   heads or -1. */
 	int d_sectors_per_track;		/* Disk geometry: number of
 						   sectors per track or -1. */
+	s64 dev_offset;				/* Offset from the start of the device
+						   where the ntfs filesystem begins.*/
 };
 
 struct stat;
@@ -117,6 +119,9 @@ struct ntfs_device_operations {
 
 extern struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
 		struct ntfs_device_operations *dops, void *priv_data);
+extern struct ntfs_device *ntfs_device_alloc_ext(const char *name, const long state,
+		struct ntfs_device_operations *dops, void *priv_data, s64 dev_offset);
+
 extern int ntfs_device_free(struct ntfs_device *dev);
 extern int ntfs_device_sync(struct ntfs_device *dev);
 

@@ -299,6 +299,7 @@ extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
 		ntfs_mount_flags flags);
 
 extern ntfs_volume *ntfs_mount(const char *name, ntfs_mount_flags flags);
+extern ntfs_volume *ntfs_mount_ext(const char *name, ntfs_mount_flags flags, const s64 dev_offset);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);

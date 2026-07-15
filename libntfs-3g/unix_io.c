@@ -244,7 +244,7 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
 {
-	return lseek(DEV_FD(dev), offset, whence);
+	return lseek(DEV_FD(dev), offset + dev->dev_offset, whence);
 }
 
 /**
@@ -298,7 +298,7 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
 {
-	return pread(DEV_FD(dev), buf, count, offset);
+	return pread(DEV_FD(dev), buf, count, offset + dev->dev_offset);
 }
 
 /**
@@ -320,7 +320,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 		return -1;
 	}
 	NDevSetDirty(dev);
-	return pwrite(DEV_FD(dev), buf, count, offset);
+	return pwrite(DEV_FD(dev), buf, count, offset + dev->dev_offset);
 }
 
 /**
@@ -356,7 +356,15 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
  */
 static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 {
-	return fstat(DEV_FD(dev), buf);
+	int res = fstat(DEV_FD(dev), buf);
+
+	if (res == 0) {
+		buf->st_size -= dev->dev_offset;
+		buf->st_blocks = ((buf->st_blksize == 0) ?
+				  0 : buf->st_size / buf->st_blksize);
+	}
+
+	return res;
 }
 
 /**

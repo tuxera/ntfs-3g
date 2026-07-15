@@ -202,7 +202,7 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
-"Options:  ro (read-only mount), windows_names, uid=, gid=,\n" 
+"Options:  ro (read-only mount), windows_names, dev_offset=, uid=, gid=,\n"
 "          umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual (type: man ntfs-3g).\n"
 "\n"
@@ -4020,7 +4020,7 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static int ntfs_open(const char *device)
+static int ntfs_open(const char *device, const s64 dev_offset)
 {
 	unsigned long flags = 0;
 	
@@ -4036,7 +4036,7 @@ static int ntfs_open(const char *device)
 	if (ctx->hiberfile)
 		flags |= NTFS_MNT_IGNORE_HIBERFILE;
 
-	ctx->vol = ntfs_mount(device, flags);
+	ctx->vol = ntfs_mount_ext(device, flags, dev_offset);
 	if (!ctx->vol) {
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
@@ -4452,7 +4452,7 @@ int main(int argc, char *argv[])
 		goto err2;
 	}
 #endif
-	err = ntfs_open(opts.device);
+	err = ntfs_open(opts.device, ctx->dev_offset);
 	if (err)
 		goto err_out;
 	
