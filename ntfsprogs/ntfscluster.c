@@ -392,9 +392,8 @@ static int dump_file(ntfs_volume *vol, ntfs_inode *ino)
 	int i;
 	runlist *runs;
 
-	utils_inode_get_name(ino, buffer, sizeof(buffer));
-
-	ntfs_log_info("Dump: %s\n", buffer);
+	if (utils_inode_get_name(ino, buffer, sizeof(buffer)))
+		ntfs_log_info("Dump: %s\n", buffer);
 
 	ctx = ntfs_attr_get_search_ctx(ino, NULL);
 
@@ -440,8 +439,8 @@ static int print_match(ntfs_inode *ino, ATTR_RECORD *attr,
 		return 1;
 	}
 
-	utils_inode_get_name(ino, buffer, MAX_PATH);
-	ntfs_log_info("Inode %llu %s", (unsigned long long)ino->mft_no, buffer);
+	if (utils_inode_get_name(ino, buffer, MAX_PATH))
+		ntfs_log_info("Inode %llu %s", (unsigned long long)ino->mft_no, buffer);
 
 	utils_attr_get_name(ino->vol, attr, buffer, MAX_PATH);
 	ntfs_log_info("/%s\n", buffer);
