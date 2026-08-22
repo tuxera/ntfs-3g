@@ -355,14 +355,7 @@ static BOOL ntfs_fuse_fill_security_context(fuse_req_t req,
 		scx->uid = fusecontext->uid;
 		scx->gid = fusecontext->gid;
 		scx->tid = fusecontext->pid;
-#ifdef FUSE_CAP_DONT_MASK
-			/* the umask can be processed by the file system */
-		scx->umask = fusecontext->umask;
-#else
-			/* the umask if forced by fuse on creation */
 		scx->umask = 0;
-#endif
-
 	} else {
 		scx->uid = 0;
 		scx->gid = 0;
@@ -623,10 +616,6 @@ static void ntfs_init(void *userdata __attribute__((unused)),
 #if defined(__APPLE__) || defined(__DARWIN__)
 	FUSE_ENABLE_XTIMES(conn);
 #endif
-#ifdef FUSE_CAP_DONT_MASK
-		/* request umask not to be enforced by fuse */
-	conn->want |= FUSE_CAP_DONT_MASK;
-#endif /* defined FUSE_CAP_DONT_MASK */
 #if POSIXACLS & KERNELACLS
 		/* request ACLs to be checked by kernel */
 	conn->want |= FUSE_CAP_POSIX_ACL;
@@ -3007,7 +2996,8 @@ static int ntfs_fuse_rename_existing_dest(fuse_req_t req, fuse_ino_t ino,
 
 static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 			const char *name, fuse_ino_t newparent,
-			const char *newname)
+			const char *newname,
+			unsigned int flags __attribute__((unused)))
 {
 	int ret;
 	fuse_ino_t ino;
@@ -3818,7 +3808,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		 * fuse before 2.8)
 		 */
 		if ((res >= 0)
-		    && fuse_lowlevel_notify_inval_inode(ctx->fc, ino, -1, 0))
+		    && fuse_lowlevel_notify_inval_inode(ctx->se, ino, -1, 0))
 			res = -errno;
 #endif
 		if (res < 0)
@@ -4065,7 +4055,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 		 * fuse before 2.8)
 		 */
 			if ((res >= 0)
-			    && fuse_lowlevel_notify_inval_inode(ctx->fc,
+			    && fuse_lowlevel_notify_inval_inode(ctx->se,
 						ino, -1, 0))
 				res = -errno;
 #endif
@@ -4300,7 +4290,7 @@ static int ntfs_fuse_init(void)
 #else		        
 		.streams = NF_STREAMS_INTERFACE_NONE,
 #endif		        
-		.atime	 = ATIME_RELATIVE,
+		.atime	 = ATIME_DISABLED,
 		.silent  = TRUE,
 		.recover = TRUE
 	};
@@ -4494,26 +4484,6 @@ static fuse_fstype load_fuse_module(void)
 
 #endif
 
-static struct fuse_chan *try_fuse_mount(char *parsed_options)
-{
-	struct fuse_chan *fc = NULL;
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
-        
-	/* The fuse_mount() options get modified, so we always rebuild it */
-	if ((fuse_opt_add_arg(&margs, EXEC_NAME) == -1 ||
-	     fuse_opt_add_arg(&margs, "-o") == -1 ||
-	     fuse_opt_add_arg(&margs, parsed_options) == -1)) {
-		ntfs_log_error("Failed to set FUSE options.\n");
-		goto free_args;
-	}
-        
-	fc = fuse_mount(opts.mnt_point, &margs);
-free_args:
-	fuse_opt_free_args(&margs);
-	return fc;
-	        
-}
-	        
 static int set_fuseblk_options(char **parsed_options)
 {
 	char options[64];
@@ -4538,32 +4508,34 @@ static struct fuse_session *mount_fuse(char *parsed_options)
 	struct fuse_session *se = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
         
-	ctx->fc = try_fuse_mount(parsed_options);
-	if (!ctx->fc)
-		return NULL;
-        
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+
+	if (fuse_opt_add_arg(&args, "-o") == -1
+	    || fuse_opt_add_arg(&args, parsed_options) == -1)
+		goto err;
+
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
         
-	se = fuse_lowlevel_new(&args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+	se = fuse_session_new(&args, &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
 	if (!se)
 		goto err;
-        
-        
+	ctx->se = se;
 	if (fuse_set_signal_handlers(se))
 		goto err_destroy;
-	fuse_session_add_chan(se, ctx->fc);
+
+	if(fuse_session_mount(se, ctx->abs_mnt_point) != 0)
+		goto err_destroy;
 out:
 	fuse_opt_free_args(&args);
 	return se;
 err_destroy:
+	fuse_session_unmount(se);
 	fuse_session_destroy(se);
 	se = NULL;
 err:    
-	fuse_unmount(opts.mnt_point, ctx->fc);
 	goto out;
 }
 
@@ -4832,7 +4804,7 @@ int main(int argc, char *argv[])
 		err = NTFS_VOLUME_FUSE_ERROR;
 		goto err_out;
 	}
-        
+	ctx->se = se;
 	ctx->mounted = TRUE;
 
 #if defined(linux) || defined(__uClinux__)
@@ -4851,7 +4823,7 @@ int main(int argc, char *argv[])
         
 	err = 0;
 
-	fuse_unmount(opts.mnt_point, ctx->fc);
+	fuse_session_unmount(se);
 	fuse_session_destroy(se);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);

@@ -165,7 +165,7 @@ typedef struct {
 	char *xattrmap_path;
 #endif /* XATTR_MAPPINGS */
 #endif /* HAVE_SETXATTR */
-	struct fuse_chan *fc;
+	struct fuse_session * se;
 	BOOL inherit;
 	unsigned int secure_flags;
 	single_log_t errors_logged;

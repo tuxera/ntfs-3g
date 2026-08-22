@@ -675,15 +675,11 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 }
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
-static void *ntfs_init(struct fuse_conn_info *conn)
+static void *ntfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
 #if defined(__APPLE__) || defined(__DARWIN__)
 	FUSE_ENABLE_XTIMES(conn);
 #endif
-#ifdef FUSE_CAP_DONT_MASK
-		/* request umask not to be enforced by fuse */
-	conn->want |= FUSE_CAP_DONT_MASK;
-#endif /* defined FUSE_CAP_DONT_MASK */
 #if POSIXACLS & KERNELACLS
 		/* request ACLs to be checked by kernel */
 	conn->want |= FUSE_CAP_POSIX_ACL;
@@ -697,6 +693,7 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 #ifdef FUSE_CAP_IOCTL_DIR
 	conn->want |= FUSE_CAP_IOCTL_DIR;
 #endif /* defined(FUSE_CAP_IOCTL_DIR) */
+	cfg->use_ino = 1;
 	return NULL;
 }
 
@@ -802,7 +799,7 @@ static void apply_umask(struct stat *stbuf)
 
 #endif /* DISABLE_PLUGINS */
 
-static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
+static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf, struct fuse_file_info *fi __attribute__((unused)))
 {
 	int res = 0;
 	ntfs_inode *ni;
@@ -1361,7 +1358,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		}
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 	
-		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
+		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0, 0);
 	}
 	
 	free(filename);
@@ -1426,7 +1423,8 @@ static int ntfs_fuse_opendir(const char *path,
 
 static int ntfs_fuse_readdir(const char *path, void *buf,
 		fuse_fill_dir_t filler, off_t offset __attribute__((unused)),
-		struct fuse_file_info *fi __attribute__((unused)))
+		struct fuse_file_info *fi __attribute__((unused)),
+		enum fuse_readdir_flags flags __attribute__((unused)))
 {
 	ntfs_fuse_fill_context_t fill_ctx;
 	ntfs_inode *ni;
@@ -1899,23 +1897,13 @@ exit:
 	return res;
 }
 
-static int ntfs_fuse_truncate(const char *org_path, off_t size)
+static int ntfs_fuse_truncate(const char *org_path, off_t size, struct fuse_file_info *fi __attribute__((unused)))
 {
 	return ntfs_fuse_trunc(org_path, size, TRUE);
 }
 
-static int ntfs_fuse_ftruncate(const char *org_path, off_t size,
-			struct fuse_file_info *fi __attribute__((unused)))
-{
-	/*
-	 * in ->ftruncate() the file handle is guaranteed
-	 * to have been opened for write.
-	 */
-	return (ntfs_fuse_trunc(org_path, size, FALSE));
-}
-
 static int ntfs_fuse_chmod(const char *path,
-		mode_t mode)
+		mode_t mode, struct fuse_file_info *fi __attribute__((unused)))
 {
 	int res = 0;
 	ntfs_inode *ni;
@@ -1960,7 +1948,7 @@ static int ntfs_fuse_chmod(const char *path,
 	return res;
 }
 
-static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
+static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_inode *ni;
 	int res;
@@ -2676,7 +2664,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	return 	ret;
 }
 
-static int ntfs_fuse_rename(const char *old_path, const char *new_path)
+static int ntfs_fuse_rename(const char *old_path, const char *new_path, unsigned int flags __attribute__((unused)))
 {
 	int ret, stream_name_len;
 	char *path = NULL;
@@ -2766,7 +2754,7 @@ static int ntfs_fuse_rmdir(const char *path)
 
 #ifdef HAVE_UTIMENSAT
 
-static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2])
+static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -2914,6 +2902,7 @@ static int ntfs_fuse_fsync(const char *path __attribute__((unused)),
 		ret = -errno;
 	return (ret);
 }
+
 
 #if defined(FUSE_INTERNAL) || (FUSE_VERSION >= 28)
 static int ntfs_fuse_ioctl(const char *path,
@@ -3951,7 +3940,6 @@ static struct fuse_operations ntfs_3g_ops = {
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,
-	.ftruncate	= ntfs_fuse_ftruncate,
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
@@ -4013,7 +4001,7 @@ static int ntfs_fuse_init(void)
 #else			
 		.streams = NF_STREAMS_INTERFACE_NONE,
 #endif			
-		.atime   = ATIME_RELATIVE,
+		.atime   = ATIME_DISABLED,
 		.silent  = TRUE,
 		.recover = TRUE
 	};
@@ -4202,26 +4190,6 @@ static fuse_fstype load_fuse_module(void)
 
 #endif
 
-static struct fuse_chan *try_fuse_mount(char *parsed_options)
-{
-	struct fuse_chan *fc = NULL;
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
-	
-	/* The fuse_mount() options get modified, so we always rebuild it */
-	if ((fuse_opt_add_arg(&margs, EXEC_NAME) == -1 ||
-	     fuse_opt_add_arg(&margs, "-o") == -1 ||
-	     fuse_opt_add_arg(&margs, parsed_options) == -1)) {
-		ntfs_log_error("Failed to set FUSE options.\n");
-		goto free_args;
-	}
-	
-	fc = fuse_mount(opts.mnt_point, &margs);
-free_args:
-	fuse_opt_free_args(&margs);
-	return fc;
-		
-}
-		
 static int set_fuseblk_options(char **parsed_options)
 {
 	char options[64];
@@ -4246,17 +4214,18 @@ static struct fuse *mount_fuse(char *parsed_options)
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	
-	ctx->fc = try_fuse_mount(parsed_options);
-	if (!ctx->fc)
-		return NULL;
-	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+
+	if (fuse_opt_add_arg(&args, "-o") == -1
+	    || fuse_opt_add_arg(&args, parsed_options) == -1)
+		goto err;
+
 	if (ctx->ro) {
 		char buf[128];
 		int len;
-        
-		len = snprintf(buf, sizeof(buf), "-ouse_ino,kernel_cache"
+
+		len = snprintf(buf, sizeof(buf), "-okernel_cache"
 				",attr_timeout=%d,entry_timeout=%d",
 				(int)TIMEOUT_RO, (int)TIMEOUT_RO);
 		if ((len < 0)
@@ -4265,11 +4234,11 @@ static struct fuse *mount_fuse(char *parsed_options)
 			goto err;
 	} else {
 #if !CACHEING
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+		if (fuse_opt_add_arg(&args, "-okernel_cache"
 				",attr_timeout=0") == -1)
 			goto err;
 #else
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+		if (fuse_opt_add_arg(&args, "-okernel_cache"
 				",attr_timeout=1") == -1)
 			goto err;
 #endif
@@ -4278,20 +4247,23 @@ static struct fuse *mount_fuse(char *parsed_options)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
 	
-	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+	fh = fuse_new(&args, &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
 	if (!fh)
 		goto err;
 	
+	if (fuse_mount(fh, opts.mnt_point) != 0)
+		goto err_destory;
+
 	if (fuse_set_signal_handlers(fuse_get_session(fh)))
 		goto err_destory;
 out:
 	fuse_opt_free_args(&args);
 	return fh;
 err_destory:
+	fuse_unmount(fh);
 	fuse_destroy(fh);
 	fh = NULL;
-err:	
-	fuse_unmount(opts.mnt_point, ctx->fc);
+err:
 	goto out;
 }
 
@@ -4580,7 +4552,7 @@ int main(int argc, char *argv[])
 	
 	err = 0;
 
-	fuse_unmount(opts.mnt_point, ctx->fc);
+	fuse_unmount(fh);
 	fuse_destroy(fh);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);

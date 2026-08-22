@@ -71,7 +71,7 @@ const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
 
 static const char nf_ns_alt_xattr_efsinfo[] = "user.ntfs.efsinfo";
 
-static const char def_opts[] = "allow_other,nonempty,";
+static const char def_opts[] = "allow_other,";
 
 	/*
 	 *	 Table of recognized options
