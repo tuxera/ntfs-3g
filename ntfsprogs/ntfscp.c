@@ -826,6 +826,96 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 }
 
 /**
+ * Resolve a directory path, creating any missing components (mkdir -p).
+ *
+ * Walks @path from the volume root, opening each component that exists and
+ * creating each missing component as an NTFS directory. Returns the inode of
+ * the deepest directory on success (caller must ntfs_inode_close() it), or
+ * NULL on error (I/O failure, name conversion failure, or a non-directory
+ * blocking the path).
+ */
+static ntfs_inode *ntfs_mkdir_p(ntfs_volume *vol, const char *path)
+{
+	ntfs_inode *cur;
+	char *buf;
+	char *p;
+
+	cur = ntfs_inode_open(vol, FILE_root);
+	if (!cur)
+		return NULL;
+	if (!path || !*path)
+		return cur;
+
+	buf = strdup(path);
+	if (!buf) {
+		ntfs_log_perror("strdup() failed");
+		ntfs_inode_close(cur);
+		return NULL;
+	}
+
+	p = buf;
+	while (*p) {
+		char *slash;
+		char *token;
+		ntfschar *uname;
+		int uname_len;
+		u64 mref;
+		ntfs_inode *child;
+
+		while (*p == '/')
+			p++;
+		if (!*p)
+			break;
+		token = p;
+		slash = strchr(p, '/');
+		if (slash) {
+			*slash = 0;
+			p = slash + 1;
+		} else {
+			p += strlen(p);
+		}
+
+		uname = NULL;
+		uname_len = ntfs_mbstoucs(token, &uname);
+		if (uname_len < 0) {
+			ntfs_log_perror("ERROR: Failed to convert '%s' to unicode",
+					token);
+			free(buf);
+			ntfs_inode_close(cur);
+			return NULL;
+		}
+
+		mref = ntfs_inode_lookup_by_name(cur, uname, uname_len);
+		if (mref == (u64)-1) {
+			child = ntfs_create(cur, const_cpu_to_le32(0), uname,
+					uname_len, S_IFDIR);
+			if (!child)
+				ntfs_log_perror("Failed to create directory '%s'",
+						token);
+		} else {
+			child = ntfs_inode_open(vol, MREF(mref));
+			if (child &&
+			    !(child->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+				ntfs_log_error("Path component '%s' exists and "
+						"is not a directory.\n", token);
+				ntfs_inode_close(child);
+				child = NULL;
+			}
+		}
+		free(uname);
+		ntfs_inode_close(cur);
+		cur = child;
+		if (!cur) {
+			free(buf);
+			return NULL;
+		}
+	}
+
+	free(buf);
+	return cur;
+}
+
+/**
  * main - Begin here
  *
  * Start from here.
@@ -954,8 +1044,7 @@ int main(int argc, char *argv[])
 				dirname_last_whack[1] = 0;
 			else
 				*dirname_last_whack = 0;
-			dir_ni = ntfs_pathname_to_inode(vol, NULL,
-					parent_dirname);
+			dir_ni = ntfs_mkdir_p(vol, parent_dirname);
 		} else {
 			ntfs_log_verbose("Target path does not contain '/'. "
 					"Using root directory as parent.\n");
