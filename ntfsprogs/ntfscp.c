@@ -48,6 +48,7 @@
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
+#include <dirent.h>
 
 #include "types.h"
 #include "attrib.h"
@@ -826,22 +827,110 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 }
 
 /**
- * main - Begin here
+ * Resolve a directory path, creating any missing components (mkdir -p).
  *
- * Start from here.
- *
- * Return:  0  Success, the program worked
- *	    1  Error, something went wrong
+ * Walks @path from the volume root, opening each component that exists and
+ * creating each missing component as an NTFS directory. Returns the inode of
+ * the deepest directory on success (caller must ntfs_inode_close() it), or
+ * NULL on error (I/O failure, name conversion failure, or a non-directory
+ * blocking the path).
  */
-int main(int argc, char *argv[])
+static ntfs_inode *ntfs_mkdir_p(ntfs_volume *vol, const char *path)
+{
+	ntfs_inode *cur;
+	char *buf;
+	char *p;
+
+	cur = ntfs_inode_open(vol, FILE_root);
+	if (!cur)
+		return NULL;
+	if (!path || !*path)
+		return cur;
+
+	buf = strdup(path);
+	if (!buf) {
+		ntfs_log_perror("strdup() failed");
+		ntfs_inode_close(cur);
+		return NULL;
+	}
+
+	p = buf;
+	while (*p) {
+		char *slash;
+		char *token;
+		ntfschar *uname;
+		int uname_len;
+		u64 mref;
+		ntfs_inode *child;
+
+		while (*p == '/')
+			p++;
+		if (!*p)
+			break;
+		token = p;
+		slash = strchr(p, '/');
+		if (slash) {
+			*slash = 0;
+			p = slash + 1;
+		} else {
+			p += strlen(p);
+		}
+
+		uname = NULL;
+		uname_len = ntfs_mbstoucs(token, &uname);
+		if (uname_len < 0) {
+			ntfs_log_perror("ERROR: Failed to convert '%s' to unicode",
+					token);
+			free(buf);
+			ntfs_inode_close(cur);
+			return NULL;
+		}
+
+		mref = ntfs_inode_lookup_by_name(cur, uname, uname_len);
+		if (mref == (u64)-1) {
+			child = ntfs_create(cur, const_cpu_to_le32(0), uname,
+					uname_len, S_IFDIR);
+			if (!child)
+				ntfs_log_perror("Failed to create directory '%s'",
+						token);
+		} else {
+			child = ntfs_inode_open(vol, MREF(mref));
+			if (child &&
+			    !(child->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+				ntfs_log_error("Path component '%s' exists and "
+						"is not a directory.\n", token);
+				ntfs_inode_close(child);
+				child = NULL;
+			}
+		}
+		free(uname);
+		ntfs_inode_close(cur);
+		cur = child;
+		if (!cur) {
+			free(buf);
+			return NULL;
+		}
+	}
+
+	free(buf);
+	return cur;
+}
+
+/**
+ * Copy a single host file into the NTFS volume at @dest_path.
+ *
+ * Handles destination resolution (creating parent directories on demand via
+ * ntfs_mkdir_p), the "destination is a directory" case (appends basename),
+ * attribute open/create, resize, and the pwrite loop. Returns 0 on success
+ * and 1 on failure.
+ */
+static int copy_one_file(ntfs_volume *vol, const char *src_path,
+		const char *dest_path)
 {
 	FILE *in;
 	struct stat st;
-	ntfs_volume *vol;
 	ntfs_inode *out;
 	ntfs_attr *na;
-	int flags = 0;
-	int res;
 	int result = 1;
 	s64 new_size;
 	u64 offset;
@@ -853,66 +942,29 @@ int main(int argc, char *argv[])
 	char *unix_name;
 #endif
 
-	ntfs_log_set_handler(ntfs_log_handler_stderr);
-
-	res = parse_options(argc, argv);
-	if (res >= 0)
-		return (res);
-
-	utils_set_locale();
-
-	/* Set SIGINT handler. */
-	if (signal(SIGINT, signal_handler) == SIG_ERR) {
-		ntfs_log_perror("Failed to set SIGINT handler");
-		return 1;
-	}
-	/* Set SIGTERM handler. */
-	if (signal(SIGTERM, signal_handler) == SIG_ERR) {
-		ntfs_log_perror("Failed to set SIGTERM handler");
-		return 1;
-	}
-
-	if (opts.noaction)
-		flags = NTFS_MNT_RDONLY;
-	if (opts.force)
-		flags |= NTFS_MNT_RECOVER;
-
-	vol = utils_mount_volume(opts.device, flags);
-	if (!vol) {
-		ntfs_log_perror("ERROR: couldn't mount volume");
-		return 1;
-	}
-
-	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
-		goto umount;
-
-	NVolSetCompression(vol); /* allow compression */
-	if (ntfs_volume_get_free_space(vol)) {
-		ntfs_log_perror("ERROR: couldn't get free space");
-		goto umount;
-	}
-
 	{
 		struct stat fst;
-		if (stat(opts.src_file, &fst) == -1) {
-			ntfs_log_perror("ERROR: Couldn't stat source file");
-			goto umount;
+		if (stat(src_path, &fst) == -1) {
+			ntfs_log_perror("ERROR: Couldn't stat source file '%s'",
+					src_path);
+			return 1;
 		}
 		new_size = fst.st_size;
 	}
 	ntfs_log_verbose("New file size: %lld\n", (long long)new_size);
 
-	in = fopen(opts.src_file, "r");
+	in = fopen(src_path, "r");
 	if (!in) {
-		ntfs_log_perror("ERROR: Couldn't open source file");
-		goto umount;
+		ntfs_log_perror("ERROR: Couldn't open source file '%s'",
+				src_path);
+		return 1;
 	}
 
 	if (opts.inode) {
 		s64 inode_num;
 		char *s;
 
-		inode_num = strtoll(opts.dest_file, &s, 0);
+		inode_num = strtoll(dest_path, &s, 0);
 		if (*s) {
 			ntfs_log_error("ERROR: Couldn't parse inode number.\n");
 			goto close_src;
@@ -920,17 +972,17 @@ int main(int argc, char *argv[])
 		out = ntfs_inode_open(vol, inode_num);
 	} else {
 #ifdef HAVE_WINDOWS_H
-		unix_name = ntfs_utils_unix_path(opts.dest_file);
+		unix_name = ntfs_utils_unix_path(dest_path);
 		if (unix_name) {
 			out = ntfs_pathname_to_inode(vol, NULL, unix_name);
   		} else
 			out = (ntfs_inode*)NULL;
 #else
-		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
+		out = ntfs_pathname_to_inode(vol, NULL, dest_path);
 #endif
 	}
 	if (!out) {
-		/* Copy the file if the dest_file's parent dir can be opened. */
+		/* Copy the file if the dest_path's parent dir can be opened. */
 		char *parent_dirname;
 		char *filename;
 		ntfs_inode *dir_ni;
@@ -941,8 +993,8 @@ int main(int argc, char *argv[])
 		filename = basename(unix_name);
 		parent_dirname = strdup(unix_name);
 #else
-		filename = basename(opts.dest_file);
-		parent_dirname = strdup(opts.dest_file);
+		filename = basename((char *)dest_path);
+		parent_dirname = strdup(dest_path);
 #endif
 		if (!parent_dirname) {
 			ntfs_log_perror("strdup() failed");
@@ -954,8 +1006,7 @@ int main(int argc, char *argv[])
 				dirname_last_whack[1] = 0;
 			else
 				*dirname_last_whack = 0;
-			dir_ni = ntfs_pathname_to_inode(vol, NULL,
-					parent_dirname);
+			dir_ni = ntfs_mkdir_p(vol, parent_dirname);
 		} else {
 			ntfs_log_verbose("Target path does not contain '/'. "
 					"Using root directory as parent.\n");
@@ -1002,10 +1053,10 @@ int main(int argc, char *argv[])
 		int filename_len;
 		int dest_dirname_len;
 
-		filename = basename(opts.src_file);
+		filename = basename((char *)src_path);
 		dir_ni = out;
 		filename_len = strlen(filename);
-		dest_dirname_len = strlen(opts.dest_file);
+		dest_dirname_len = strlen(dest_path);
 		overwrite_filename_len = filename_len+dest_dirname_len + 2;
 		overwrite_filename = malloc(overwrite_filename_len);
 		if (!overwrite_filename) {
@@ -1018,7 +1069,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_WINDOWS_H
 		strcpy(overwrite_filename, unix_name);
 #else
-		strcpy(overwrite_filename, opts.dest_file);
+		strcpy(overwrite_filename, dest_path);
 #endif
 		if (overwrite_filename[dest_dirname_len - 1] != '/') {
 			strcat(overwrite_filename, "/");
@@ -1034,13 +1085,13 @@ int main(int argc, char *argv[])
 			out = ni;
 		} else {
 			ntfs_log_verbose("Creating a new file '%s' under "
-					"'%s'\n", filename, opts.dest_file);
+					"'%s'\n", filename, dest_path);
 			ni = ntfs_new_file(dir_ni, filename);
 			ntfs_inode_close(dir_ni);
 			if (!ni) {
 				ntfs_log_perror("ERROR: Failed to create the "
 						"destination file under '%s'",
-						opts.dest_file);
+						dest_path);
 				free(overwrite_filename);
 				goto close_src;
 			}
@@ -1172,6 +1223,215 @@ close_dst:
 	}
 close_src:
 	fclose(in);
+	return result;
+}
+
+/**
+ * Recursively copy a host directory tree into @dest_dir on the volume.
+ *
+ * Ensures @dest_dir exists on the volume via ntfs_mkdir_p (so empty source
+ * directories are still materialised), then walks @src_dir. Regular files are
+ * dispatched to copy_one_file; subdirectories recurse. Non-regular /
+ * non-directory entries are logged and skipped. Returns 0 on success and 1 on
+ * the first failure.
+ */
+static int copy_dir_recursive(ntfs_volume *vol, const char *src_dir,
+		const char *dest_dir)
+{
+	DIR *d;
+	struct dirent *ent;
+	ntfs_inode *dest_ni;
+	int result = 0;
+
+	dest_ni = ntfs_mkdir_p(vol, dest_dir);
+	if (!dest_ni) {
+		ntfs_log_error("ERROR: Couldn't create destination directory "
+				"'%s'\n", dest_dir);
+		return 1;
+	}
+	ntfs_inode_close(dest_ni);
+
+	d = opendir(src_dir);
+	if (!d) {
+		ntfs_log_perror("ERROR: Couldn't open source directory '%s'",
+				src_dir);
+		return 1;
+	}
+
+	while ((ent = readdir(d)) != NULL) {
+		char *child_src;
+		char *child_dest;
+		size_t src_len;
+		size_t dest_len;
+		struct stat cst;
+
+		if (caught_terminate) {
+			ntfs_log_error("SIGTERM or SIGINT received.  "
+					"Aborting recursive copy.\n");
+			result = 1;
+			break;
+		}
+		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
+			continue;
+
+		src_len = strlen(src_dir) + 1 + strlen(ent->d_name) + 1;
+		child_src = malloc(src_len);
+		dest_len = strlen(dest_dir) + 1 + strlen(ent->d_name) + 1;
+		child_dest = malloc(dest_len);
+		if (!child_src || !child_dest) {
+			ntfs_log_perror("ERROR: malloc failed");
+			free(child_src);
+			free(child_dest);
+			result = 1;
+			break;
+		}
+		snprintf(child_src, src_len, "%s/%s", src_dir, ent->d_name);
+		if (!strcmp(dest_dir, "/"))
+			snprintf(child_dest, dest_len, "/%s", ent->d_name);
+		else
+			snprintf(child_dest, dest_len, "%s/%s", dest_dir,
+					ent->d_name);
+
+		if (lstat(child_src, &cst) == -1) {
+			ntfs_log_perror("ERROR: Couldn't stat '%s'", child_src);
+			free(child_src);
+			free(child_dest);
+			result = 1;
+			break;
+		}
+
+		if (S_ISDIR(cst.st_mode)) {
+			result = copy_dir_recursive(vol, child_src, child_dest);
+		} else if (S_ISREG(cst.st_mode)) {
+			result = copy_one_file(vol, child_src, child_dest);
+		} else {
+			ntfs_log_info("Skipping non-regular file '%s'\n",
+					child_src);
+		}
+		free(child_src);
+		free(child_dest);
+		if (result)
+			break;
+	}
+	closedir(d);
+	return result;
+}
+
+/**
+ * main - Begin here
+ *
+ * Start from here.
+ *
+ * Return:  0  Success, the program worked
+ *	    1  Error, something went wrong
+ */
+int main(int argc, char *argv[])
+{
+	ntfs_volume *vol;
+	int flags = 0;
+	int res;
+	int result = 1;
+	struct stat sst;
+
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
+
+	res = parse_options(argc, argv);
+	if (res >= 0)
+		return (res);
+
+	utils_set_locale();
+
+	/* Set SIGINT handler. */
+	if (signal(SIGINT, signal_handler) == SIG_ERR) {
+		ntfs_log_perror("Failed to set SIGINT handler");
+		return 1;
+	}
+	/* Set SIGTERM handler. */
+	if (signal(SIGTERM, signal_handler) == SIG_ERR) {
+		ntfs_log_perror("Failed to set SIGTERM handler");
+		return 1;
+	}
+
+	if (opts.noaction)
+		flags = NTFS_MNT_RDONLY;
+	if (opts.force)
+		flags |= NTFS_MNT_RECOVER;
+
+	vol = utils_mount_volume(opts.device, flags);
+	if (!vol) {
+		ntfs_log_perror("ERROR: couldn't mount volume");
+		return 1;
+	}
+
+	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
+		goto umount;
+
+	NVolSetCompression(vol); /* allow compression */
+	if (ntfs_volume_get_free_space(vol)) {
+		ntfs_log_perror("ERROR: couldn't get free space");
+		goto umount;
+	}
+
+	if (lstat(opts.src_file, &sst) == -1) {
+		ntfs_log_perror("ERROR: Couldn't stat source '%s'",
+				opts.src_file);
+		goto umount;
+	}
+
+	if (S_ISDIR(sst.st_mode)) {
+		const char *effective_dest = opts.dest_file;
+		char *joined = NULL;
+		ntfs_inode *probe;
+
+		if (opts.inode) {
+			ntfs_log_error("ERROR: --inode cannot be used with a "
+					"directory source.\n");
+			goto umount;
+		}
+
+		/* cp -r destination semantics: if dest exists as a directory
+		 * on the volume, append basename(src) so the source directory
+		 * becomes a subdirectory of dest. Otherwise dest itself is the
+		 * mirror of src. */
+		probe = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
+		if (probe) {
+			int is_dir = probe->mrec->flags
+					& MFT_RECORD_IS_DIRECTORY;
+			ntfs_inode_close(probe);
+			if (is_dir) {
+				char *src_copy = strdup(opts.src_file);
+				const char *base;
+				size_t need;
+
+				if (!src_copy) {
+					ntfs_log_perror("strdup() failed");
+					goto umount;
+				}
+				base = basename(src_copy);
+				need = strlen(opts.dest_file) + 1
+						+ strlen(base) + 1;
+				joined = malloc(need);
+				if (!joined) {
+					ntfs_log_perror("malloc() failed");
+					free(src_copy);
+					goto umount;
+				}
+				if (!strcmp(opts.dest_file, "/"))
+					snprintf(joined, need, "/%s", base);
+				else
+					snprintf(joined, need, "%s/%s",
+							opts.dest_file, base);
+				free(src_copy);
+				effective_dest = joined;
+			}
+		}
+
+		result = copy_dir_recursive(vol, opts.src_file, effective_dest);
+		free(joined);
+	} else {
+		result = copy_one_file(vol, opts.src_file, opts.dest_file);
+	}
+
 umount:
 	ntfs_umount(vol, FALSE);
 	ntfs_log_verbose("Done.\n");
