@@ -2673,17 +2673,8 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 		/* log errors unless silenced */
 	warn = !na->ni || !na->ni->vol || !NVolNoFixupWarn(na->ni->vol);
 	for (end = (u8*)dst + br * bk_size; (u8*)dst < end; dst = (u8*)dst +
-			bk_size) {
-		/*
-		 * A record which cannot be multi sector transfer protected at
-		 * all (EINVAL) has not been deprotected, so it must not be
-		 * used. A record damaged by an incomplete transfer (EIO) is
-		 * left to the caller, which detects it by the BAAD magic.
-		 */
-		if (ntfs_mst_post_read_fixup_warn((NTFS_RECORD*)dst, bk_size,
-					warn) && (errno == EINVAL))
-			return -1;
-	}
+			bk_size)
+		ntfs_mst_post_read_fixup_warn((NTFS_RECORD*)dst, bk_size, warn);
 	/* Finally, return the number of blocks read. */
 	return br;
 }
