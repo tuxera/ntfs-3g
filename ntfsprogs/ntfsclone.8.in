@@ -300,7 +300,7 @@ Save an NTFS into a compressed image file:
 Restore an NTFS volume from a compressed image file:
 .RS
 .sp
-.B gunzip \-c backup.img.gz | \\\\
+.B gunzip \-c backup.img.gz | \e
 .br
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
@@ -309,7 +309,7 @@ Backup an NTFS volume to a remote host, using ssh. Please note, that
 ssh may ask for a password!
 .RS
 .sp
-.B ntfsclone \-\-save\-image \-\-output \- /dev/hda1 | \\\\
+.B ntfsclone \-\-save\-image \-\-output \- /dev/hda1 | \e
 .br
 .B gzip \-c | ssh host 'cat > backup.img.gz'
 .sp
@@ -318,7 +318,7 @@ Restore an NTFS volume from a remote host via ssh. Please note, that
 ssh may ask for a password!
 .RS
 .sp
-.B ssh host 'cat backup.img.gz' | gunzip \-c | \\\\
+.B ssh host 'cat backup.img.gz' | gunzip \-c | \e
 .br
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
@@ -326,7 +326,7 @@ ssh may ask for a password!
 Stream an image file from a web server and restore it to a partition:
 .RS
 .sp
-.B wget \-qO \- http://server/backup.img | \\\\
+.B wget \-qO \- http://server/backup.img | \e
 .br
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
@@ -354,7 +354,7 @@ Or, outputting to a compressed image :
 Unpacking NTFS metadata into a sparse file:
 .RS
 .sp
-.B bunzip2 \-c ntfsmeta.img.bz2 | \\\\
+.B bunzip2 \-c ntfsmeta.img.bz2 | \e
 .br
 .B cp \-\-sparse=always /proc/self/fd/0 ntfsmeta.img
 .sp
