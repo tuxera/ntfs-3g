@@ -159,12 +159,12 @@ typedef struct {
 	BOOL mounted;
 	BOOL posix_nlink;
 	ntfs_volume_special_files special_files;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef ENABLE_XATTR	/* extended attributes interface required */
 	BOOL efs_raw;
 #ifdef XATTR_MAPPINGS
 	char *xattrmap_path;
 #endif /* XATTR_MAPPINGS */
-#endif /* HAVE_SETXATTR */
+#endif /* ENABLE_XATTR */
 	struct fuse_chan *fc;
 	BOOL inherit;
 	unsigned int secure_flags;
