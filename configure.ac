@@ -530,13 +530,13 @@ esac
 # Checks for declarations
 AC_CHECK_DECL(
 	[optreset],
-	AC_DEFINE(
+	[AC_DEFINE(
 		[HAVE_OPTRESET],
 		[1],
 		[Defined to 1 if the 'optreset' global variable is present.]
-	)
-	,
-	[#include <getopt.h>]
+	)],
+	[],
+	[[#include <getopt.h>]]
 )
 
 # Checks for library functions.
